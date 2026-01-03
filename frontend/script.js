@@ -294,25 +294,18 @@ function buildImagesForm(){
  * LOGIN / LOGOUT / SESSION RESTORE
  ***********************/
 async function login() {
-  const username = document.getElementById("username").value.trim();
-  const password = document.getElementById("password").value.trim();
-
-  if (!username || !password) {
-    showNotification("Inserisci username e password.", "warn");
-    return;
-  }
+  const username = document.getElementById("username").value;
+  const password = document.getElementById("password").value;
 
   try {
-    const me = await api("/login", {
+    await api("/login", {
       method: "POST",
-      body: JSON.stringify({ username, password })
+      body: JSON.stringify({ username, password }),
     });
 
-    currentUser = me;
-    onLoggedIn();
-    showNotification(`Benvenuto, ${me.username}!`, "success");
+    location.reload();
   } catch (e) {
-    showNotification("Credenziali errate o utente disabilitato.", "error");
+    alert("Login fallito");
   }
 }
 
@@ -910,4 +903,19 @@ document.addEventListener("DOMContentLoaded", async () => {
 
   // prova ripristino sessione
   await restoreSession();
+});
+// =========================
+// LOGIN BIND (CRITICO)
+// =========================
+document.addEventListener("DOMContentLoaded", () => {
+  const btn = document.getElementById("loginBtn");
+  if (!btn) {
+    console.error("loginBtn non trovato");
+    return;
+  }
+
+  btn.addEventListener("click", () => {
+    console.log("CLICK LOGIN");
+    login();
+  });
 });
