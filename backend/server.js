@@ -9,45 +9,65 @@ import routes from "./src/routes.js";
 
 const app = express();
 
-/* SECURITY */
+/* =========================
+   TRUST PROXY (CRITICO SU RENDER)
+========================= */
+app.set("trust proxy", 1); // 🔥 QUESTO MANCAVA
+
+/* =========================
+   SECURITY
+========================= */
 app.use(helmet());
 
-/* CORS */
+/* =========================
+   CORS
+========================= */
 app.use(
   cors({
-    origin: process.env.FRONTEND_ORIGIN,
+    origin: process.env.FRONTEND_ORIGIN, // https://tommi38.onrender.com
     credentials: true,
   })
 );
 
-/* BODY */
+/* =========================
+   BODY / COOKIE
+========================= */
 app.use(express.json());
 app.use(cookieParser());
 
-/* SESSION */
+/* =========================
+   SESSION
+========================= */
 app.use(
   session({
-    name: process.env.SESSION_COOKIE_NAME,
+    name: process.env.SESSION_COOKIE_NAME || "tommi38sid",
     secret: process.env.SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
-cookie: {
-  httpOnly: true,
-  sameSite: "lax",
-  secure: process.env.NODE_ENV === "production",
-},
+    proxy: true,
+    cookie: {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: process.env.NODE_ENV === "production",
+    },
   })
 );
 
-/* ROUTES */
+/* =========================
+   ROUTES
+========================= */
 app.use("/api", routes);
 
-/* HEALTH */
+/* =========================
+   HEALTH
+========================= */
 app.get("/health", (req, res) => {
   res.json({ ok: true, time: new Date().toISOString() });
 });
 
-/* START */
+/* =========================
+   START
+========================= */
 const PORT = Number(process.env.PORT || 3001);
 app.listen(PORT, () => {
   console.log("Backend avviato sulla porta", PORT);
