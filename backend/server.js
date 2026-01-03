@@ -1,11 +1,16 @@
 import "dotenv/config";
 import express from "express";
+import path from "path";
+import { fileURLToPath } from "url";
 import cors from "cors";
 import helmet from "helmet";
 import cookieParser from "cookie-parser";
 import session from "express-session";
 
 import routes from "./src/routes.js";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 
@@ -21,10 +26,11 @@ app.use(helmet());
 
 /* =========================
    CORS
+   (stesso dominio → niente problemi)
 ========================= */
 app.use(
   cors({
-    origin: process.env.FRONTEND_ORIGIN, // https://tommi38.onrender.com
+    origin: true,
     credentials: true,
   })
 );
@@ -36,7 +42,7 @@ app.use(express.json());
 app.use(cookieParser());
 
 /* =========================
-   SESSION (FIX REALE)
+   SESSION (FIRST-PARTY)
 ========================= */
 app.use(
   session({
@@ -47,22 +53,26 @@ app.use(
     proxy: true,
     cookie: {
       httpOnly: true,
-      sameSite: "none", // 🔥 FIX CRITICO
-      secure: true,     // 🔥 OBBLIGATORIO con sameSite none
+      sameSite: "lax",              // ✅ ora va bene
+      secure: process.env.NODE_ENV === "production",
     },
   })
 );
 
 /* =========================
-   ROUTES
+   API
 ========================= */
 app.use("/api", routes);
 
 /* =========================
-   HEALTH
+   FRONTEND STATIC
 ========================= */
-app.get("/health", (req, res) => {
-  res.json({ ok: true, time: new Date().toISOString() });
+const frontendPath = path.join(__dirname, "../frontend");
+app.use(express.static(frontendPath));
+
+/* SPA fallback */
+app.get("*", (req, res) => {
+  res.sendFile(path.join(frontendPath, "index.html"));
 });
 
 /* =========================
@@ -70,5 +80,5 @@ app.get("/health", (req, res) => {
 ========================= */
 const PORT = Number(process.env.PORT || 3001);
 app.listen(PORT, () => {
-  console.log("Backend avviato sulla porta", PORT);
+  console.log("Server unico avviato sulla porta", PORT);
 });

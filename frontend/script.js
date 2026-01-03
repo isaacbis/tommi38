@@ -1,7 +1,7 @@
 /***********************
  * CONFIG
  ***********************/
-const API_BASE = "https://tommi38-backend.onrender.com/api";
+const API_BASE = "/api";
 
 const TIME_SLOTS = [
   "08:45","09:30","10:15",
@@ -32,25 +32,27 @@ let reservations = {}; // map: reservations[fieldId][date][time] = username
 
 let refreshTimer = null;
 
-/***********************
- * API HELPER
- ***********************/
-async function api(path, opts = {}) {
+
+/* =========================
+   API HELPER (CRITICO)
+========================= */
+async function api(path, options = {}) {
   const res = await fetch(API_BASE + path, {
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    ...opts
+    credentials: "include", // 🔥 OBBLIGATORIO
+    headers: {
+      "Content-Type": "application/json",
+    },
+    ...options,
   });
-  const isJson = (res.headers.get("content-type") || "").includes("application/json");
-  const data = isJson ? await res.json() : null;
+
+  const data = await res.json().catch(() => null);
 
   if (!res.ok) {
-    const msg = (data && (data.error || data.message)) ? (data.error || data.message) : "ERROR";
-    throw new Error(msg);
+    throw new Error(data?.error || "API_ERROR");
   }
+
   return data;
 }
-
 /***********************
  * UTILS
  ***********************/
