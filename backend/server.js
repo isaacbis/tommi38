@@ -10,9 +10,9 @@ import routes from "./src/routes.js";
 const app = express();
 
 /* =========================
-   TRUST PROXY (CRITICO SU RENDER)
+   TRUST PROXY (RENDER)
 ========================= */
-app.set("trust proxy", 1); // 🔥 QUESTO MANCAVA
+app.set("trust proxy", 1);
 
 /* =========================
    SECURITY
@@ -36,7 +36,7 @@ app.use(express.json());
 app.use(cookieParser());
 
 /* =========================
-   SESSION
+   SESSION (FIX REALE)
 ========================= */
 app.use(
   session({
@@ -47,8 +47,8 @@ app.use(
     proxy: true,
     cookie: {
       httpOnly: true,
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
+      sameSite: "none", // 🔥 FIX CRITICO
+      secure: true,     // 🔥 OBBLIGATORIO con sameSite none
     },
   })
 );
