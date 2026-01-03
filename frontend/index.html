@@ -6,8 +6,9 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <title>Prenotazione Campi</title>
 
-  <link rel="manifest" href="manifest.json">
-  <link rel="apple-touch-icon" href="icon-192.png">
+  <link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/icon-192.png">
+
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Tommi38">
 
@@ -24,7 +25,11 @@
 
   <script>
     var timestamp = new Date().getTime();
-    document.write('<link rel="stylesheet" href="style.css?v=' + timestamp + '">');
+    <script>
+  var timestamp = new Date().getTime();
+  document.write('<link rel="stylesheet" href="/style.css?v=' + timestamp + '">');
+</script>
+
   </script>
 </head>
 
@@ -192,7 +197,11 @@
 
   <script>
     var timestamp2 = new Date().getTime();
-    document.write('<script src="script.js?v=' + timestamp2 + '"><\/script>');
+    <script>
+  var timestamp2 = new Date().getTime();
+  document.write('<script src="/script.js?v=' + timestamp2 + '"><\/script>');
+</script>
+
   </script>
 </body>
 </html>
