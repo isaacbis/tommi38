@@ -1,7 +1,7 @@
 /***********************
  * CONFIG
  ***********************/
-const API_BASE = "http://localhost:3001/api"; // cambia con il tuo dominio Render
+const API_BASE = "https://tommi38-backend.onrender.com/api";
 
 const TIME_SLOTS = [
   "08:45","09:30","10:15",
