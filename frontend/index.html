@@ -2,206 +2,66 @@
 <html lang="it">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
   <title>Prenotazione Campi</title>
 
+  <!-- PWA -->
   <link rel="manifest" href="/manifest.json">
-<link rel="apple-touch-icon" href="/icon-192.png">
+  <link rel="apple-touch-icon" href="/icon-192.png">
+  <meta name="theme-color" content="#f59e0b">
 
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="Tommi38">
+  <!-- CSS -->
+  <link rel="stylesheet" href="/style.css">
 
-  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-  <meta http-equiv="Pragma" content="no-cache">
-  <meta http-equiv="Expires" content="0">
-
-  <link
-    rel="stylesheet"
-    href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
-    crossorigin="anonymous"
-    referrerpolicy="no-referrer"
-  />
-
-  <script>
-    var timestamp = new Date().getTime();
-    <script>
-  var timestamp = new Date().getTime();
-  document.write('<link rel="stylesheet" href="/style.css?v=' + timestamp + '">');
-</script>
-
-  </script>
 </head>
-
 <body>
+
   <!-- LOGIN -->
-  <div id="login-area">
-    <div class="login-container">
-      <div id="login-images-container-top"></div>
+  <div id="loginBox">
+    <h1>🌞 Benvenuto! 🏖️</h1>
+    <p>1 credito = 1 slot da <b>45 minuti</b>.</p>
 
-      <div class="login-form">
-        <h1>☀️ Benvenuto! 🏖️</h1>
-        <div id="login-images-container-bottom"></div>
+    <input id="username" type="text" placeholder="Username">
+    <input id="password" type="password" placeholder="Password">
+    <button onclick="login()">➡️ Accedi</button>
 
-        <p>
-          <span style="font-size: 1.1rem;">1 credito = 1 slot</span>
-          <strong> da 45 minuti.</strong>
-        </p>
-
-        <input type="text" id="username" placeholder="Username" maxlength="20" autocomplete="off">
-        <input type="password" id="password" placeholder="Password" maxlength="20" autocomplete="off">
-        <button id="login-btn"><i class="fas fa-sign-in-alt"></i> Accedi</button>
-
-        <p>© 2025 Prenotazione Campi - Tutti i diritti riservati</p>
-        <p>Assistenza - 📞 3381523364</p>
-      </div>
-    </div>
+    <p style="margin-top:20px;font-size:14px;">
+      © 2025 Prenotazione Campi<br>
+      Assistenza 📞 <a href="tel:3381523364">3381523364</a>
+    </p>
   </div>
 
   <!-- APP -->
-  <div id="app-area" style="display:none;">
-    <header>
-      <div class="header-container">
-        <div class="header-top">
-          <button id="theme-toggle" title="Cambia tema" aria-label="Cambia tema">
-            <i class="fas fa-moon"></i>
-          </button>
+  <div id="app" style="display:none;">
+    <h2 id="welcome"></h2>
 
-          <div id="user-credits" style="margin-left:10px;">Crediti: -</div>
+    <div id="creditsBox"></div>
 
-          <a href="#" class="logout" id="logout-btn">
-            <i class="fas fa-sign-out-alt"></i> Esci
-          </a>
-        </div>
+    <div id="adminPanel" style="display:none;">
+      <h3>👑 Area Admin</h3>
 
-        <div class="header-bottom" style="margin-top:10px;">
-          <label style="margin-right:8px;">Data:</label>
-          <input id="booking-date" type="date">
-        </div>
-      </div>
-    </header>
+      <h4>Note</h4>
+      <textarea id="notesText" rows="4"></textarea>
+      <button onclick="saveNotes()">💾 Salva note</button>
 
-    <main>
-      <!-- METEO -->
-      <section>
-        <h2>Meteo Senigallia</h2>
-        <div id="weather-container" style="display:flex; gap:10px; flex-wrap:wrap;"></div>
-      </section>
+      <h4>Campi</h4>
+      <textarea id="fieldsText" rows="4"></textarea>
+      <button onclick="saveFields()">💾 Salva campi</button>
+    </div>
 
-      <!-- NOTE STAFF -->
-      <section>
-        <h2>Note dello Staff</h2>
-        <div id="notes-content" style="white-space:pre-wrap;"></div>
-      </section>
-
-      <!-- IMMAGINI APP -->
-      <section>
-        <h2>Info</h2>
-        <div id="app-images-container" style="display:flex; gap:12px; flex-wrap:wrap;"></div>
-      </section>
-
-      <!-- CAMPI -->
-      <section>
-        <h2>Prenota</h2>
-        <div id="fields-container"></div>
-      </section>
-
-      <!-- ADMIN AREA -->
-      <section id="admin-area" style="display:none; margin-top:24px;">
-        <h2>Area Admin</h2>
-
-        <div class="admin">
-          <h3 class="admin-toggle" data-target="admin-config">Configurazione</h3>
-          <div id="admin-config">
-            <label>Max prenotazioni per utente:</label>
-            <input id="maxBookingsPerUser" type="number" min="1" value="2">
-            <button id="save-max-bookings">Salva Parametri</button>
-          </div>
-        </div>
-
-        <div class="admin">
-          <h3 class="admin-toggle" data-target="admin-campi">Gestione Campi</h3>
-          <div id="admin-campi">
-            <div id="field-config-container"></div>
-            <button id="add-field">Aggiungi Campo</button>
-            <button id="save-fields">Salva Configurazione Campi</button>
-          </div>
-        </div>
-
-        <div class="admin">
-          <h3 class="admin-toggle" data-target="admin-note">Note</h3>
-          <div id="admin-note">
-            <textarea id="admin-notes" rows="4" style="width:100%;"></textarea>
-            <button id="save-notes">Salva Note</button>
-          </div>
-        </div>
-
-        <div class="admin">
-          <h3 class="admin-toggle" data-target="admin-users">Utenti (crediti / stato / password)</h3>
-          <div id="admin-users">
-            <table style="width:100%; border-collapse:collapse;">
-              <thead>
-                <tr>
-                  <th>Username</th>
-                  <th>Crediti</th>
-                  <th>Stato</th>
-                  <th>Azioni</th>
-                </tr>
-              </thead>
-              <tbody id="credentials-table"></tbody>
-            </table>
-          </div>
-        </div>
-
-        <div class="admin">
-          <h3 class="admin-toggle" data-target="admin-res">Prenotazioni (giorno selezionato)</h3>
-          <div id="admin-res">
-            <table style="width:100%; border-collapse:collapse;">
-              <thead>
-                <tr>
-                  <th>Campo</th>
-                  <th>Data</th>
-                  <th>Ora</th>
-                  <th>Utente</th>
-                  <th>Azioni</th>
-                </tr>
-              </thead>
-              <tbody id="admin-table"></tbody>
-            </table>
-          </div>
-        </div>
-
-        <div class="admin">
-          <h3 class="admin-toggle" data-target="admin-images">Immagini (1..12)</h3>
-          <div id="admin-images">
-            <p>Immagini 1..8 = sopra (login). 9..12 = sotto (login). Le prime 8 vengono anche mostrate in app.</p>
-            <div id="images-form"></div>
-            <button id="save-images">Salva Immagini</button>
-          </div>
-        </div>
-      </section>
-
-      <p style="margin-top:24px;">© 2025 Prenotazione Campi - Tutti i diritti riservati</p>
-    </main>
-
-    <div id="notification-container"></div>
+    <button onclick="logout()">🚪 Logout</button>
   </div>
 
+  <!-- JS -->
+  <script src="/script.js"></script>
+
+  <!-- SERVICE WORKER -->
   <script>
-    // Tema persistito anche se script carica dopo
-    (function(){
-      var saved = localStorage.getItem('theme');
-      if(saved === 'light'){ document.documentElement.classList.add('light'); }
-    })();
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/service-worker.js");
+    }
   </script>
 
-  <script>
-    var timestamp2 = new Date().getTime();
-    <script>
-  var timestamp2 = new Date().getTime();
-  document.write('<script src="/script.js?v=' + timestamp2 + '"><\/script>');
-</script>
-
-  </script>
 </body>
 </html>
