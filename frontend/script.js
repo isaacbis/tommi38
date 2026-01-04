@@ -367,13 +367,20 @@ function renderLoginGallery() {
   box.innerHTML = "";
 
   STATE.gallery.forEach(g => {
+    if (!g.url || !g.link) return;
+
     const wrap = document.createElement("div");
     wrap.className = "login-gallery-item";
 
     const a = document.createElement("a");
-    a.href = g.link || "#";
+    a.href = g.link;
     a.target = "_blank";
     a.rel = "noopener noreferrer";
+
+    // 🔒 BLOCCA EVENTI SPA
+    a.addEventListener("click", e => {
+      e.stopPropagation();
+    });
 
     const img = document.createElement("img");
     img.src = g.url;
@@ -382,7 +389,6 @@ function renderLoginGallery() {
 
     a.appendChild(img);
     wrap.appendChild(a);
-
     box.appendChild(wrap);
   });
 }
