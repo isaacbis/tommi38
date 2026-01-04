@@ -90,29 +90,26 @@ html, body {
 /* ===== MINI GALLERIA LOGIN ===== */
 .login-gallery {
   display: flex;
-  gap: 10px;
-  margin-top: 16px;
-  overflow-x: auto;
-  padding-bottom: 6px;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 14px;
 }
 
 .login-gallery-item {
-  min-width: 80px;
+  width: 56px;
   text-align: center;
 }
 
 .login-gallery-item img {
-  width: 80px;
-  height: 60px;
+  width: 56px;
+  height: 42px;
   object-fit: cover;
-  border-radius: 12px;
+  border-radius: 8px;
   border: 1px solid var(--border);
 }
 
 .login-gallery-caption {
-  font-size: 11px;
-  color: var(--muted);
-  margin-top: 4px;
+  display: none; /* login pulito */
 }
 
 /* ===== TESTI ===== */

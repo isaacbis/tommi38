@@ -4,6 +4,17 @@ const qs = id => document.getElementById(id);
 const show = el => el.classList.remove("hidden");
 const hide = el => el.classList.add("hidden");
 
+async function loadPublicLoginGallery() {
+  try {
+    const pub = await api("/public/config");
+    STATE.gallery = pub.gallery || [];
+    renderLoginGallery();
+  } catch {
+    // silenzioso
+  }
+}
+
+
 /* ================= STATE ================= */
 let STATE = {
   me: null,
@@ -439,5 +450,7 @@ document.addEventListener("DOMContentLoaded", () => {
   qs("addGalleryBtn").onclick = addGalleryItem;
   qs("saveGalleryBtn").onclick = saveGallery;
 
-  loadAll({ setDateToToday: true }).catch(() => {});
+  loadPublicLoginGallery();
+loadAll({ setDateToToday: true }).catch(() => {});
+
 });
