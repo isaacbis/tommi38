@@ -138,12 +138,17 @@ router.post("/reservations", requireAuth, async (req, res) => {
 
     activeSnap.forEach(doc => {
       const r = doc.data();
-      if (r.date > date) {
-        activeCount++;
-      } else if (r.date === date) {
-        const end = timeToMinutes(r.time) + slotMinutes;
-        if (end > nowMinutes) activeCount++;
-      }
+      const today = new Date().toISOString().slice(0, 10);
+
+if (r.date > today) {
+  // qualsiasi prenotazione futura blocca
+  activeCount++;
+} else if (r.date === today) {
+  // oggi blocca solo se non ancora finita
+  const end = timeToMinutes(r.time) + slotMinutes;
+  if (end > nowMinutes) activeCount++;
+}
+
     });
 
     if (activeCount >= maxActive) {
