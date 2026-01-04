@@ -6,7 +6,7 @@ import { db, FieldValue } from "./db.js";
 
 const router = express.Router();
 
-/* ================== HELPERS ================== */
+/* =================== MIDDLEWARE =================== */
 function requireAuth(req, res, next) {
   if (!req.session?.user) {
     return res.status(401).json({ error: "NOT_AUTHENTICATED" });
@@ -26,12 +26,13 @@ const loginLimiter = rateLimit({
   max: 10
 });
 
+/* =================== UTILS =================== */
 function timeToMinutes(t) {
   const [h, m] = t.split(":").map(Number);
   return h * 60 + m;
 }
 
-/* ================== AUTH ================== */
+/* =================== AUTH =================== */
 router.post("/login", loginLimiter, async (req, res) => {
   const schema = z.object({
     username: z.string().min(1),
@@ -41,9 +42,9 @@ router.post("/login", loginLimiter, async (req, res) => {
   if (!parsed.success) return res.status(400).json({ error: "BAD_BODY" });
 
   const { username, password } = parsed.data;
-
   const ref = db.collection("users").doc(username);
   const snap = await ref.get();
+
   if (!snap.exists) return res.status(401).json({ error: "INVALID_LOGIN" });
 
   const user = snap.data();
@@ -52,7 +53,11 @@ router.post("/login", loginLimiter, async (req, res) => {
   const ok = await bcrypt.compare(password, user.passwordHash);
   if (!ok) return res.status(401).json({ error: "INVALID_LOGIN" });
 
-  req.session.user = { username, role: user.role || "user" };
+  req.session.user = {
+    username,
+    role: user.role || "user"
+  };
+
   res.json({ ok: true });
 });
 
@@ -64,6 +69,7 @@ router.get("/me", requireAuth, async (req, res) => {
   const username = req.session.user.username;
   const snap = await db.collection("users").doc(username).get();
   const u = snap.exists ? snap.data() : {};
+
   res.json({
     username,
     role: u.role || "user",
@@ -72,13 +78,14 @@ router.get("/me", requireAuth, async (req, res) => {
   });
 });
 
-/* ================== PUBLIC CONFIG ================== */
+/* =================== PUBLIC CONFIG =================== */
 router.get("/public/config", async (req, res) => {
   const cfgSnap = await db.collection("admin").doc("config").get();
-  const cfg = cfgSnap.exists ? cfgSnap.data() : {};
-
   const fieldsSnap = await db.collection("admin").doc("fields").get();
   const notesSnap = await db.collection("admin").doc("notes").get();
+  const gallerySnap = await db.collection("admin").doc("gallery").get();
+
+  const cfg = cfgSnap.exists ? cfgSnap.data() : {};
 
   res.json({
     slotMinutes: Number(cfg.slotMinutes || 45),
@@ -87,11 +94,12 @@ router.get("/public/config", async (req, res) => {
     maxBookingsPerUserPerDay: Number(cfg.maxBookingsPerUserPerDay || 1),
     maxActiveBookingsPerUser: Number(cfg.maxActiveBookingsPerUser || 1),
     fields: fieldsSnap.exists ? (fieldsSnap.data().fields || []) : [],
-    notesText: notesSnap.exists ? (notesSnap.data().text || "") : ""
+    notesText: notesSnap.exists ? (notesSnap.data().text || "") : "",
+    gallery: gallerySnap.exists ? (gallerySnap.data().images || []) : []
   });
 });
 
-/* ================== RESERVATIONS ================== */
+/* =================== RESERVATIONS =================== */
 router.get("/reservations", requireAuth, async (req, res) => {
   const date = String(req.query.date || "");
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
@@ -123,12 +131,11 @@ router.post("/reservations", requireAuth, async (req, res) => {
   const cfgSnap = await db.collection("admin").doc("config").get();
   const cfg = cfgSnap.exists ? cfgSnap.data() : {};
   const slotMinutes = Number(cfg.slotMinutes || 45);
-  const maxActive = Number(cfg.maxActiveBookingsPerUser || 1);
 
-  const now = new Date();
-  const nowMinutes = now.getHours() * 60 + now.getMinutes();
+  const today = new Date().toISOString().slice(0, 10);
+  const nowMinutes = new Date().getHours() * 60 + new Date().getMinutes();
 
-  /* 🔒 BLOCCO PRENOTAZIONI ATTIVE */
+  /* 🔒 UNA SOLA PRENOTAZIONE TOTALE PER USER */
   if (!isAdmin) {
     const activeSnap = await db.collection("reservations")
       .where("user", "==", username)
@@ -138,20 +145,15 @@ router.post("/reservations", requireAuth, async (req, res) => {
 
     activeSnap.forEach(doc => {
       const r = doc.data();
-      const today = new Date().toISOString().slice(0, 10);
-
-if (r.date > today) {
-  // qualsiasi prenotazione futura blocca
-  activeCount++;
-} else if (r.date === today) {
-  // oggi blocca solo se non ancora finita
-  const end = timeToMinutes(r.time) + slotMinutes;
-  if (end > nowMinutes) activeCount++;
-}
-
+      if (r.date > today) {
+        activeCount++;
+      } else if (r.date === today) {
+        const end = timeToMinutes(r.time) + slotMinutes;
+        if (end > nowMinutes) activeCount++;
+      }
     });
 
-    if (activeCount >= maxActive) {
+    if (activeCount >= 1) {
       return res.status(403).json({ error: "ACTIVE_BOOKING_LIMIT" });
     }
   }
@@ -179,8 +181,7 @@ if (r.date > today) {
 });
 
 router.delete("/reservations/:id", requireAuth, async (req, res) => {
-  const id = req.params.id;
-  const snap = await db.collection("reservations").doc(id).get();
+  const snap = await db.collection("reservations").doc(req.params.id).get();
   if (!snap.exists) return res.json({ ok: true });
 
   const r = snap.data();
@@ -192,7 +193,9 @@ router.delete("/reservations/:id", requireAuth, async (req, res) => {
   }
 
   const today = new Date().toISOString().slice(0, 10);
-  if (r.date > today && !isAdmin) {
+
+  /* recupero credito SOLO se futuro */
+  if (!isAdmin && r.date > today) {
     await db.collection("users").doc(username)
       .update({ credits: FieldValue.increment(1) });
   }
@@ -201,21 +204,10 @@ router.delete("/reservations/:id", requireAuth, async (req, res) => {
   res.json({ ok: true });
 });
 
-/* ================== ADMIN ================== */
+/* =================== ADMIN =================== */
 router.put("/admin/config", requireAdmin, async (req, res) => {
-  const schema = z.object({
-    slotMinutes: z.number().optional(),
-    dayStart: z.string().optional(),
-    dayEnd: z.string().optional(),
-    maxBookingsPerUserPerDay: z.number().optional(),
-    maxActiveBookingsPerUser: z.number().optional()
-  });
-  const parsed = schema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: "BAD_BODY" });
-
   await db.collection("admin").doc("config")
-    .set(parsed.data, { merge: true });
-
+    .set(req.body || {}, { merge: true });
   res.json({ ok: true });
 });
 
@@ -231,7 +223,16 @@ router.put("/admin/fields", requireAdmin, async (req, res) => {
   res.json({ ok: true });
 });
 
-/* ================== ADMIN USERS ================== */
+router.put("/admin/gallery", requireAdmin, async (req, res) => {
+  const images = Array.isArray(req.body.images)
+    ? req.body.images.slice(0, 10)
+    : [];
+  await db.collection("admin").doc("gallery")
+    .set({ images }, { merge: true });
+  res.json({ ok: true });
+});
+
+/* =================== ADMIN USERS =================== */
 router.get("/admin/users", requireAdmin, async (req, res) => {
   const snap = await db.collection("users").get();
   const items = [];
