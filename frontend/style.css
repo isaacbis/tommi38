@@ -1,10 +1,12 @@
 :root {
-  /* 🎨 COLORI DARK */
+  /* ===== COLORI DARK ===== */
   --bg: #0b0f14;
   --card: #121826;
   --card-soft: #161d2f;
+
   --primary: #f59e0b;
   --primary-dark: #d97706;
+
   --danger: #ef4444;
   --success: #22c55e;
 
@@ -16,7 +18,7 @@
   --shadow: 0 10px 30px rgba(0,0,0,.35);
 }
 
-/* ================= RESET + PERFORMANCE ================= */
+/* ===== RESET + PERFORMANCE ===== */
 * {
   box-sizing: border-box;
   -webkit-tap-highlight-color: transparent;
@@ -32,7 +34,7 @@ html, body {
   overscroll-behavior-y: none;
 }
 
-/* ================= HEADER ================= */
+/* ===== HEADER ===== */
 .topbar {
   position: sticky;
   top: 0;
@@ -47,12 +49,12 @@ html, body {
 }
 
 .brand {
-  font-weight: 800;
-  font-size: 16px;
-  letter-spacing: .3px;
+  font-weight: 900;
+  font-size: 18px;
+  letter-spacing: 1px;
 }
 
-/* ================= LAYOUT ================= */
+/* ===== LAYOUT ===== */
 .wrap {
   max-width: 720px;
   margin: 0 auto;
@@ -60,11 +62,7 @@ html, body {
 }
 
 .card {
-  background: linear-gradient(
-    180deg,
-    var(--card),
-    var(--card-soft)
-  );
+  background: linear-gradient(180deg, var(--card), var(--card-soft));
   border-radius: var(--radius);
   padding: 16px;
   margin-bottom: 14px;
@@ -72,13 +70,57 @@ html, body {
   border: 1px solid var(--border);
 }
 
-/* ================= TESTI ================= */
+/* ===== LOGIN ===== */
+.login-card {
+  text-align: center;
+}
+
+.login-title {
+  font-size: 30px;
+  font-weight: 900;
+  letter-spacing: 1.2px;
+  margin-bottom: 4px;
+}
+
+.login-subtitle {
+  color: var(--muted);
+  margin-bottom: 16px;
+}
+
+/* ===== MINI GALLERIA LOGIN ===== */
+.login-gallery {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+}
+
+.login-gallery-item {
+  min-width: 80px;
+  text-align: center;
+}
+
+.login-gallery-item img {
+  width: 80px;
+  height: 60px;
+  object-fit: cover;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+}
+
+.login-gallery-caption {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+/* ===== TESTI ===== */
 h1, h2, h3, h4 {
   margin: 0 0 12px;
   font-weight: 700;
 }
 
-h1 { font-size: 22px; }
 h2 { font-size: 20px; }
 h3 { font-size: 18px; }
 h4 { font-size: 16px; }
@@ -88,19 +130,19 @@ h4 { font-size: 16px; }
   font-size: 14px;
 }
 
-/* ================= BADGE ================= */
+/* ===== BADGE ===== */
 .badge {
   display: inline-block;
   margin-top: 6px;
   padding: 6px 12px;
   border-radius: 999px;
   font-size: 12px;
-  font-weight: 700;
+  font-weight: 800;
   background: rgba(245,158,11,.15);
   color: var(--primary);
 }
 
-/* ================= ERROR / SUCCESS ================= */
+/* ===== ERROR / SUCCESS ===== */
 .error {
   color: var(--danger);
   font-size: 14px;
@@ -113,7 +155,7 @@ h4 { font-size: 16px; }
   margin-top: 8px;
 }
 
-/* ================= INPUT ================= */
+/* ===== INPUT ===== */
 input, select, textarea {
   width: 100%;
   padding: 14px;
@@ -121,7 +163,7 @@ input, select, textarea {
   border: 1px solid var(--border);
   background: #0f1524;
   color: var(--text);
-  font-size: 16px; /* NO ZOOM iOS */
+  font-size: 16px; /* evita zoom iOS */
   margin-bottom: 10px;
   outline: none;
 }
@@ -137,12 +179,12 @@ textarea:focus {
   border-color: var(--primary);
 }
 
-/* ================= BOTTONI ================= */
+/* ===== BOTTONI ===== */
 button {
   border: none;
   border-radius: 14px;
   font-size: 16px;
-  font-weight: 700;
+  font-weight: 800;
   padding: 14px;
   cursor: pointer;
   transition: transform .08s ease, opacity .08s ease;
@@ -153,11 +195,7 @@ button:active {
 }
 
 .btn {
-  background: linear-gradient(
-    180deg,
-    var(--primary),
-    var(--primary-dark)
-  );
+  background: linear-gradient(180deg, var(--primary), var(--primary-dark));
   color: #000;
   width: 100%;
 }
@@ -169,21 +207,21 @@ button:active {
   margin-top: 6px;
 }
 
-/* ================= SEPARATOR ================= */
+/* ===== SEPARATOR ===== */
 .sep {
   border: none;
   border-top: 1px solid var(--border);
   margin: 18px 0;
 }
 
-/* ================= GRID PRENOTAZIONE ================= */
+/* ===== GRID PRENOTAZIONE ===== */
 .grid3 {
   display: grid;
   grid-template-columns: 1fr;
   gap: 10px;
 }
 
-/* ================= LISTE ================= */
+/* ===== LISTE ===== */
 .list {
   display: flex;
   flex-direction: column;
@@ -206,7 +244,7 @@ button:active {
   padding: 10px;
 }
 
-/* ================= ADMIN ================= */
+/* ===== ADMIN ===== */
 #adminMenu button {
   width: 100%;
   margin-bottom: 8px;
@@ -216,12 +254,12 @@ button:active {
   margin-top: 12px;
 }
 
-/* ================= NASCONDERE ================= */
+/* ===== NASCONDI ===== */
 .hidden {
   display: none !important;
 }
 
-/* ================= DESKTOP / TABLET ================= */
+/* ===== DESKTOP / TABLET ===== */
 @media (min-width: 768px) {
 
   .wrap {
