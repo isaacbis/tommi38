@@ -577,19 +577,6 @@ body.admin-visible #admin-area {
   margin-right: 0;
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-  const themeBtn = document.getElementById('theme-toggle');
-  if (!themeBtn) return;
-
-  themeBtn.addEventListener('click', () => {
-    const html = document.documentElement;
-    const isLight = html.classList.toggle('light'); // aggiunge/toglie la classe
-
-    // salvo la scelta
-    localStorage.setItem('theme', isLight ? 'light' : 'dark');
-  });
-});
-
 /* Immagini promo sotto il meteo: colonna */
 #app-images-container{
   display: flex;
@@ -611,38 +598,4 @@ document.addEventListener('DOMContentLoaded', () => {
   #app-images-container a img{
     width: 42px;            /* circa come le .hour-chip del meteo */
   }
-}
-body {
-  font-family: Arial, sans-serif;
-  background: #fff7ed;
-  margin: 0;
-  padding: 20px;
-}
-
-.hidden {
-  display: none;
-}
-
-input, textarea, button {
-  width: 100%;
-  margin: 6px 0;
-  padding: 10px;
-  font-size: 16px;
-}
-
-button {
-  background: #f59e0b;
-  color: #000;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-}
-
-button:hover {
-  background: #d97706;
-}
-
-.footerText {
-  margin-top: 20px;
-  font-size: 14px;
 }
