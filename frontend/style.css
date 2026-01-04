@@ -3,13 +3,15 @@
   --card: #ffffff;
   --primary: #f59e0b;
   --primary-dark: #d97706;
+  --danger: #dc2626;
+  --success: #16a34a;
   --text: #1f2937;
   --muted: #6b7280;
   --border: #e5e7eb;
   --radius: 14px;
 }
 
-/* RESET MINIMO */
+/* RESET */
 * {
   box-sizing: border-box;
   -webkit-tap-highlight-color: transparent;
@@ -19,7 +21,7 @@ html, body {
   margin: 0;
   padding: 0;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
-               Roboto, Helvetica, Arial, sans-serif;
+    Roboto, Helvetica, Arial, sans-serif;
   background: var(--bg);
   color: var(--text);
 }
@@ -67,20 +69,43 @@ h1, h2, h3, h4 {
   font-size: 14px;
 }
 
+/* BADGE */
+.badge {
+  display: inline-block;
+  margin-top: 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+/* ERRORI */
+.error {
+  color: var(--danger);
+  font-size: 14px;
+  margin-top: 8px;
+}
+
 /* INPUT */
 input, select, textarea {
   width: 100%;
   padding: 14px;
   border-radius: 12px;
   border: 1px solid var(--border);
-  font-size: 16px; /* evita zoom iOS */
+  font-size: 16px;
   margin-bottom: 10px;
   background: #fff;
 }
 
+textarea {
+  min-height: 90px;
+  resize: vertical;
+}
+
 /* BOTTONI */
 button {
-  width: 100%;
   padding: 14px;
   border-radius: 12px;
   border: none;
@@ -92,6 +117,7 @@ button {
 .btn {
   background: var(--primary);
   color: #fff;
+  width: 100%;
 }
 
 .btn:active {
@@ -102,7 +128,21 @@ button {
   background: transparent;
   color: var(--primary-dark);
   border: 1px solid var(--border);
-  margin-top: 8px;
+  margin-top: 6px;
+}
+
+/* SEPARATOR */
+.sep {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 16px 0;
+}
+
+/* GRID PRENOTAZIONE */
+.grid3 {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
 }
 
 /* LISTE */
@@ -118,7 +158,13 @@ button {
   background: #f3f4f6;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 8px;
+}
+
+/* BOTTONI DENTRO ITEM (ADMIN) */
+.item button {
+  font-size: 14px;
+  padding: 10px;
 }
 
 /* NASCONDI */
@@ -128,7 +174,12 @@ button {
 
 /* ADMIN MENU */
 #adminMenu button {
+  width: 100%;
   margin-bottom: 8px;
+}
+
+.backAdmin {
+  margin-top: 10px;
 }
 
 /* DESKTOP */
@@ -137,11 +188,25 @@ button {
     padding: 20px;
   }
 
+  .grid3 {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
   button {
     width: auto;
   }
 
   .btn, .btn-ghost {
     padding: 12px 18px;
+  }
+
+  .item {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .item button {
+    width: auto;
   }
 }
