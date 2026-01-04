@@ -6,63 +6,49 @@
 
   <title>Prenotazione Campi</title>
 
-  <!-- PWA -->
-  <link rel="manifest" href="/manifest.json">
-  <link rel="apple-touch-icon" href="/icon-192.png">
-  <meta name="theme-color" content="#f59e0b">
+  <link rel="manifest" href="/manifest.json" />
+  <link rel="apple-touch-icon" href="/icon-192.png" />
+  <meta name="theme-color" content="#f59e0b" />
 
-  <!-- CSS -->
-  <link rel="stylesheet" href="/style.css">
-
+  <link rel="stylesheet" href="/style.css" />
 </head>
+
 <body>
 
-  <!-- LOGIN -->
   <div id="loginBox">
     <h1>🌞 Benvenuto! 🏖️</h1>
-    <p>1 credito = 1 slot da <b>45 minuti</b>.</p>
+    <p>1 credito = 1 slot da <b>45 minuti</b></p>
 
-    <input id="username" type="text" placeholder="Username">
-    <input id="password" type="password" placeholder="Password">
+    <input id="username" type="text" placeholder="Username" />
+    <input id="password" type="password" placeholder="Password" />
+
     <button id="loginBtn">➡️ Accedi</button>
 
-
-    <p style="margin-top:20px;font-size:14px;">
-      © 2025 Prenotazione Campi<br>
+    <p class="footerText">
+      © 2025 Prenotazione Campi<br />
       Assistenza 📞 <a href="tel:3381523364">3381523364</a>
     </p>
   </div>
 
-  <!-- APP -->
-  <div id="app" style="display:none;">
+  <div id="app" class="hidden">
     <h2 id="welcome"></h2>
-
     <div id="creditsBox"></div>
 
-    <div id="adminPanel" style="display:none;">
+    <div id="adminPanel" class="hidden">
       <h3>👑 Area Admin</h3>
 
       <h4>Note</h4>
       <textarea id="notesText" rows="4"></textarea>
-      <button onclick="saveNotes()">💾 Salva note</button>
+      <button id="saveNotesBtn">💾 Salva note</button>
 
       <h4>Campi</h4>
       <textarea id="fieldsText" rows="4"></textarea>
-      <button onclick="saveFields()">💾 Salva campi</button>
+      <button id="saveFieldsBtn">💾 Salva campi</button>
     </div>
 
-    <button onclick="logout()">🚪 Logout</button>
+    <button id="logoutBtn">🚪 Logout</button>
   </div>
 
-  <!-- JS -->
-  <script src="/script.js"></script>
-
-  <!-- SERVICE WORKER -->
-  <script>
-    if ("serviceWorker" in navigator) {
-      navigator.serviceWorker.register("/service-worker.js");
-    }
-  </script>
-
+  <script src="/script.js" defer></script>
 </body>
 </html>

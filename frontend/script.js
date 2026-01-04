@@ -1,35 +1,21 @@
-/* =========================
-   CONFIG
-========================= */
 const API_BASE = "/api";
 
-/* =========================
-   API HELPER (COOKIE FIRST-PARTY)
-========================= */
+/* API */
 async function api(path, options = {}) {
   const res = await fetch(API_BASE + path, {
     credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-    },
+    headers: { "Content-Type": "application/json" },
     ...options,
   });
 
   let data = null;
-  try {
-    data = await res.json();
-  } catch (_) {}
+  try { data = await res.json(); } catch {}
 
-  if (!res.ok) {
-    throw new Error(data?.error || "API_ERROR");
-  }
-
+  if (!res.ok) throw new Error(data?.error || "API_ERROR");
   return data;
 }
 
-/* =========================
-   AUTH
-========================= */
+/* AUTH */
 async function login() {
   const username = document.getElementById("username").value.trim();
   const password = document.getElementById("password").value.trim();
@@ -44,113 +30,74 @@ async function login() {
       method: "POST",
       body: JSON.stringify({ username, password }),
     });
-
     location.reload();
-  } catch (e) {
+  } catch {
     alert("Login fallito");
   }
 }
 
 async function logout() {
-  try {
-    await api("/logout", { method: "POST" });
-    location.reload();
-  } catch (_) {
-    location.reload();
-  }
+  await api("/logout", { method: "POST" });
+  location.reload();
 }
 
-/* =========================
-   INIT SESSION
-========================= */
+/* INIT */
 async function init() {
   try {
     const me = await api("/me");
 
-    document.getElementById("loginBox").style.display = "none";
-    document.getElementById("app").style.display = "block";
+    document.getElementById("loginBox").classList.add("hidden");
+    document.getElementById("app").classList.remove("hidden");
 
-    document.getElementById("welcome").innerText =
-      `Ciao ${me.username}`;
+    document.getElementById("welcome").innerText = `Ciao ${me.username}`;
     document.getElementById("creditsBox").innerText =
       `Crediti disponibili: ${me.credits}`;
 
     if (me.role === "admin") {
-      document.getElementById("adminPanel").style.display = "block";
-      await loadAdminData();
+      document.getElementById("adminPanel").classList.remove("hidden");
+      loadAdmin();
     }
-  } catch (_) {
-    document.getElementById("loginBox").style.display = "block";
-    document.getElementById("app").style.display = "none";
+  } catch {
+    document.getElementById("loginBox").classList.remove("hidden");
+    document.getElementById("app").classList.add("hidden");
   }
 }
 
-/* =========================
-   ADMIN DATA
-========================= */
-async function loadAdminData() {
-  try {
-    const cfg = await api("/public/config");
-
-    document.getElementById("notesText").value =
-      cfg.notesText || "";
-
-    document.getElementById("fieldsText").value =
-      (cfg.fields || []).join("\n");
-
-  } catch (e) {
-    alert("Errore caricamento dati admin");
-  }
+/* ADMIN */
+async function loadAdmin() {
+  const cfg = await api("/public/config");
+  document.getElementById("notesText").value = cfg.notesText || "";
+  document.getElementById("fieldsText").value =
+    (cfg.fields || []).join("\n");
 }
 
 async function saveNotes() {
   const text = document.getElementById("notesText").value;
-
-  try {
-    await api("/admin/notes", {
-      method: "PUT",
-      body: JSON.stringify({ text }),
-    });
-    alert("Note salvate");
-  } catch (e) {
-    alert("Errore salvataggio note");
-  }
+  await api("/admin/notes", {
+    method: "PUT",
+    body: JSON.stringify({ text }),
+  });
+  alert("Note salvate");
 }
 
 async function saveFields() {
-  const raw = document.getElementById("fieldsText").value;
-  const fields = raw
+  const fields = document.getElementById("fieldsText").value
     .split("\n")
-    .map(f => f.trim())
+    .map(v => v.trim())
     .filter(Boolean);
 
-  try {
-    await api("/admin/fields", {
-      method: "PUT",
-      body: JSON.stringify({ fields }),
-    });
-    alert("Campi salvati");
-  } catch (e) {
-    alert("Errore salvataggio campi");
-  }
+  await api("/admin/fields", {
+    method: "PUT",
+    body: JSON.stringify({ fields }),
+  });
+  alert("Campi salvati");
 }
 
-/* =========================
-   EVENT BIND (CSP SAFE)
-========================= */
+/* EVENT BIND */
 document.addEventListener("DOMContentLoaded", () => {
-
-  document.getElementById("loginBtn")
-    ?.addEventListener("click", login);
-
-  document.getElementById("logoutBtn")
-    ?.addEventListener("click", logout);
-
-  document.getElementById("saveNotesBtn")
-    ?.addEventListener("click", saveNotes);
-
-  document.getElementById("saveFieldsBtn")
-    ?.addEventListener("click", saveFields);
-
+  document.getElementById("loginBtn").addEventListener("click", login);
+  document.getElementById("logoutBtn").addEventListener("click", logout);
+  document.getElementById("saveNotesBtn").addEventListener("click", saveNotes);
+  document.getElementById("saveFieldsBtn").addEventListener("click", saveFields);
   init();
 });

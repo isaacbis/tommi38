@@ -2,7 +2,6 @@ import "dotenv/config";
 import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
-import cors from "cors";
 import helmet from "helmet";
 import cookieParser from "cookie-parser";
 import session from "express-session";
@@ -14,36 +13,28 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 
-/* =========================
-   TRUST PROXY (RENDER)
-========================= */
+/* TRUST PROXY (Render) */
 app.set("trust proxy", 1);
 
-/* =========================
-   SECURITY
-========================= */
-app.use(helmet());
-
-/* =========================
-   CORS
-   (stesso dominio → niente problemi)
-========================= */
+/* SECURITY (CSP attiva) */
 app.use(
-  cors({
-    origin: true,
-    credentials: true,
+  helmet({
+    contentSecurityPolicy: {
+      useDefaults: true,
+      directives: {
+        "script-src": ["'self'"],
+        "style-src": ["'self'"],
+        "img-src": ["'self'", "data:"],
+      },
+    },
   })
 );
 
-/* =========================
-   BODY / COOKIE
-========================= */
+/* BODY & COOKIE */
 app.use(express.json());
 app.use(cookieParser());
 
-/* =========================
-   SESSION (FIRST-PARTY)
-========================= */
+/* SESSION (FIRST-PARTY) */
 app.use(
   session({
     name: process.env.SESSION_COOKIE_NAME || "tommi38sid",
@@ -53,31 +44,25 @@ app.use(
     proxy: true,
     cookie: {
       httpOnly: true,
-      sameSite: "lax",              // ✅ ora va bene
+      sameSite: "lax",
       secure: process.env.NODE_ENV === "production",
     },
   })
 );
 
-/* =========================
-   API
-========================= */
+/* API */
 app.use("/api", routes);
 
-/* =========================
-   FRONTEND STATIC
-========================= */
+/* FRONTEND STATIC */
 const frontendPath = path.join(__dirname, "../frontend");
 app.use(express.static(frontendPath));
 
-/* SPA fallback */
+/* SPA FALLBACK */
 app.get("*", (req, res) => {
   res.sendFile(path.join(frontendPath, "index.html"));
 });
 
-/* =========================
-   START
-========================= */
+/* START */
 const PORT = Number(process.env.PORT || 3001);
 app.listen(PORT, () => {
   console.log("Server unico avviato sulla porta", PORT);
