@@ -9,8 +9,17 @@ let STATE = {
   fieldsDraft: [],
   notes: "",
   reservations: [],
-  users: []
+  users: [],
+  config: {}
 };
+
+function nowMinutes(){
+  const d = new Date();
+  return d.getHours()*60 + d.getMinutes();
+}
+function minutes(t){ const [h,m]=t.split(":").map(Number); return h*60+m; }
+function timeStr(m){ return String(Math.floor(m/60)).padStart(2,"0")+":"+String(m%60).padStart(2,"0"); }
+function todayISO(){ return new Date().toISOString().slice(0,10); }
 
 async function api(path, options={}) {
   const r = await fetch(API+path, {
@@ -45,6 +54,7 @@ async function loadAll(){
   STATE.fields = pub.fields || [];
   STATE.fieldsDraft = [...STATE.fields];
   STATE.notes = pub.notesText || "";
+  STATE.config = pub;
 
   qs("welcome").textContent = `Ciao ${STATE.me.username}`;
   qs("creditsBox").textContent = `Crediti: ${STATE.me.credits}`;
@@ -57,18 +67,19 @@ async function loadAll(){
 
   if(STATE.me.role==="admin"){
     show(qs("adminMenu"));
+    qs("cfgSlotMinutes").value = pub.slotMinutes;
+    qs("cfgDayStart").value = pub.dayStart;
+    qs("cfgDayEnd").value = pub.dayEnd;
+    qs("cfgMaxPerDay").value = pub.maxBookingsPerUserPerDay;
     await loadUsers();
   }
 
   renderFields();
-  qs("datePick").valueAsDate = new Date();
+  qs("datePick").value = todayISO();
   await loadReservations();
 }
 
 /* PRENOTAZIONI */
-function minutes(t){ const [h,m]=t.split(":").map(Number); return h*60+m; }
-function timeStr(m){ return String(Math.floor(m/60)).padStart(2,"0")+":"+String(m%60).padStart(2,"0"); }
-
 async function loadReservations(){
   const date = qs("datePick").value;
   const res = await api(`/reservations?date=${date}`);
@@ -82,18 +93,33 @@ async function loadReservations(){
 function renderTimeSelect(){
   const sel = qs("timeSelect");
   sel.innerHTML="";
-  const slot=45, start=minutes("09:00"), end=minutes("20:00");
-  const field=qs("fieldSelect").value;
-  const taken=new Set(
+  const slot = STATE.config.slotMinutes || 45;
+  const start = minutes(STATE.config.dayStart || "09:00");
+  const end = minutes(STATE.config.dayEnd || "20:00");
+  const field = qs("fieldSelect").value;
+  const today = qs("datePick").value === todayISO();
+
+  const taken = new Set(
     STATE.reservations.filter(r=>r.fieldId===field).map(r=>r.time)
   );
-  for(let m=start;m+slot<=end;m+=slot){
+
+  for(let m=start; m+slot<=end; m+=slot){
     const t=timeStr(m);
-    const o=document.createElement("option");
-    o.value=t;
-    if(taken.has(t)){ o.textContent=`${t} ❌`; o.disabled=true; }
-    else o.textContent=`${t} ✅`;
-    sel.appendChild(o);
+    const opt=document.createElement("option");
+    opt.value=t;
+
+    const slotPast = today && m < nowMinutes();
+
+    if(slotPast){
+      opt.textContent = `${t} ⏰ Terminato`;
+      opt.disabled = true;
+    } else if(taken.has(t)){
+      opt.textContent = `${t} ❌ Occupato`;
+      opt.disabled = true;
+    } else {
+      opt.textContent = `${t} ✅ Libero`;
+    }
+    sel.appendChild(opt);
   }
 }
 
@@ -105,63 +131,60 @@ async function book(){
       time:qs("timeSelect").value
     })});
     await loadReservations();
-  }catch{ qs("bookMsg").textContent="Errore prenotazione"; }
+  }catch{
+    qs("bookMsg").textContent="Errore prenotazione";
+  }
 }
 
 function renderReservations(){
-  const list = qs("reservationsList");
-  list.innerHTML = "";
-
-  if (STATE.reservations.length === 0) {
-    const d = document.createElement("div");
-    d.className = "muted";
-    d.textContent = "Nessuna prenotazione per questo giorno.";
-    list.appendChild(d);
+  const list=qs("reservationsList");
+  list.innerHTML="";
+  if(STATE.reservations.length===0){
+    list.textContent="Nessuna prenotazione.";
     return;
   }
+  STATE.reservations.forEach(r=>{
+    const d=document.createElement("div");
+    d.className="item";
+    d.textContent=`${r.time} – ${r.fieldId}${STATE.me.role==="admin" ? " – "+r.user : ""}`;
 
-  STATE.reservations.forEach(r => {
-    const item = document.createElement("div");
-    item.className = "item";
-
-    const info = document.createElement("div");
-    info.textContent =
-      `${r.time} – ${r.fieldId}` +
-      (STATE.me.role === "admin" ? ` – utente: ${r.user}` : "");
-
-    item.appendChild(info);
-
-    // 🔴 pulsante cancella (admin SEMPRE, user solo le proprie)
-    const canDelete =
-      STATE.me.role === "admin" ||
-      r.user === STATE.me.username;
-
-    if (canDelete) {
-      const btn = document.createElement("button");
-      btn.className = "btn-ghost";
-      btn.textContent = "❌ Cancella";
-
-      btn.addEventListener("click", async () => {
-        if (!confirm("Vuoi cancellare questa prenotazione?")) return;
-
-        try {
-          await api(`/reservations/${r.id}`, {
-            method: "DELETE"
-          });
-
-          // aggiorna lista + crediti
-          await loadReservations();
-          await loadAll(); // ricarica crediti se admin/user
-        } catch {
-          alert("Errore cancellazione");
-        }
-      });
-
-      item.appendChild(btn);
+    const canDelete = STATE.me.role==="admin" || r.user===STATE.me.username;
+    if(canDelete){
+      const btn=document.createElement("button");
+      btn.textContent="❌ Cancella";
+      btn.className="btn-ghost";
+      btn.onclick=async()=>{
+        if(!confirm("Cancellare la prenotazione?")) return;
+        await api(`/reservations/${r.id}`,{method:"DELETE"});
+        await loadReservations();
+        await loadAll();
+      };
+      d.appendChild(btn);
     }
-
-    list.appendChild(item);
+    list.appendChild(d);
   });
+}
+
+/* ADMIN CONFIG */
+async function saveConfig(){
+  try{
+    await api("/admin/config",{method:"PUT",body:JSON.stringify({
+      slotMinutes:Number(qs("cfgSlotMinutes").value),
+      dayStart:qs("cfgDayStart").value,
+      dayEnd:qs("cfgDayEnd").value,
+      maxBookingsPerUserPerDay:Number(qs("cfgMaxPerDay").value)
+    })});
+    qs("configMsg").textContent="Configurazione salvata";
+    STATE.config = await api("/public/config");
+    renderTimeSelect();
+  }catch{
+    qs("configMsg").textContent="Errore salvataggio";
+  }
+}
+
+/* NOTE */
+async function saveNotes(){
+  await api("/admin/notes",{method:"PUT",body:JSON.stringify({text:qs("notesText").value})});
 }
 
 /* CAMPI */
@@ -173,24 +196,9 @@ function renderFields(){
     o.value=f.id; o.textContent=f.name;
     s.appendChild(o);
   });
-
-  const l=qs("fieldsList");
-  l.innerHTML="";
-  STATE.fieldsDraft.forEach(f=>{
-    const d=document.createElement("div");
-    d.className="item";
-    d.textContent=`${f.id} – ${f.name}`;
-    l.appendChild(d);
-  });
 }
-
 async function saveFields(){
   await api("/admin/fields",{method:"PUT",body:JSON.stringify({fields:STATE.fieldsDraft})});
-}
-
-/* NOTE */
-async function saveNotes(){
-  await api("/admin/notes",{method:"PUT",body:JSON.stringify({text:qs("notesText").value})});
 }
 
 /* UTENTI */
@@ -202,7 +210,7 @@ async function loadUsers(){
   STATE.users.forEach(u=>{
     const d=document.createElement("div");
     d.className="item";
-    d.innerHTML=`<b>${u.username}</b> – crediti ${u.credits}`;
+    d.textContent=`${u.username} – crediti ${u.credits}`;
     const edit=document.createElement("button");
     edit.textContent="✏️ Crediti";
     edit.onclick=()=>setCredits(u);
@@ -216,7 +224,6 @@ async function loadUsers(){
     l.appendChild(d);
   });
 }
-
 async function setCredits(u){
   const v=prompt("Crediti per "+u.username,u.credits);
   if(v===null)return;
@@ -237,9 +244,12 @@ async function toggleUser(u){
 
 /* ADMIN NAV */
 function openAdmin(section){
-  ["adminMenu","adminNotes","adminFields","adminUsers"].forEach(id=>hide(qs(id)));
+  ["adminMenu","adminConfig","adminNotes","adminFields","adminUsers"]
+    .forEach(id=>hide(qs(id)));
   show(qs(section));
 }
+
+/* INIT */
 document.addEventListener("DOMContentLoaded",()=>{
   qs("loginBtn").onclick=login;
   qs("logoutBtn").onclick=logout;
@@ -247,11 +257,13 @@ document.addEventListener("DOMContentLoaded",()=>{
   qs("datePick").onchange=loadReservations;
   qs("fieldSelect").onchange=renderTimeSelect;
 
+  qs("btnAdminConfig").onclick=()=>openAdmin("adminConfig");
   qs("btnAdminNotes").onclick=()=>openAdmin("adminNotes");
   qs("btnAdminFields").onclick=()=>openAdmin("adminFields");
   qs("btnAdminUsers").onclick=()=>openAdmin("adminUsers");
   document.querySelectorAll(".backAdmin").forEach(b=>b.onclick=()=>openAdmin("adminMenu"));
 
+  qs("saveConfigBtn").onclick=saveConfig;
   qs("saveNotesBtn").onclick=saveNotes;
   qs("saveFieldsBtn").onclick=saveFields;
 

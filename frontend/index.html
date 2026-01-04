@@ -63,12 +63,35 @@
     <!-- ADMIN MENU -->
     <section id="adminMenu" class="card hidden">
       <h3>👑 Area Admin</h3>
+      <button id="btnAdminConfig" class="btn">Config</button>
       <button id="btnAdminNotes" class="btn">Note</button>
       <button id="btnAdminFields" class="btn">Campi</button>
       <button id="btnAdminUsers" class="btn">Utenti</button>
     </section>
 
-    <!-- ADMIN SEZIONI -->
+    <!-- ADMIN CONFIG -->
+    <section id="adminConfig" class="card hidden">
+      <h4>⚙️ Configurazione</h4>
+
+      <label>Durata slot (minuti)</label>
+      <input id="cfgSlotMinutes" type="number" min="15">
+
+      <label>Ora inizio giornata</label>
+      <input id="cfgDayStart" type="time">
+
+      <label>Ora fine giornata</label>
+      <input id="cfgDayEnd" type="time">
+
+      <label>Max prenotazioni per utente (al giorno)</label>
+      <input id="cfgMaxPerDay" type="number" min="1">
+
+      <button id="saveConfigBtn" class="btn">Salva</button>
+      <div id="configMsg" class="muted"></div>
+
+      <button class="btn-ghost backAdmin">⬅ Indietro</button>
+    </section>
+
+    <!-- ADMIN NOTE -->
     <section id="adminNotes" class="card hidden">
       <h4>Note</h4>
       <textarea id="notesText"></textarea>
@@ -76,6 +99,7 @@
       <button class="btn-ghost backAdmin">⬅ Indietro</button>
     </section>
 
+    <!-- ADMIN CAMPI -->
     <section id="adminFields" class="card hidden">
       <h4>Campi</h4>
       <input id="newFieldId" placeholder="id campo">
@@ -86,6 +110,7 @@
       <button class="btn-ghost backAdmin">⬅ Indietro</button>
     </section>
 
+    <!-- ADMIN UTENTI -->
     <section id="adminUsers" class="card hidden">
       <h4>Utenti</h4>
       <div id="usersList" class="list"></div>
