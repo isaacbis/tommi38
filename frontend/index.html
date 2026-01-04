@@ -6,9 +6,6 @@
   <title>Prenotazione Campi</title>
 
   <link rel="manifest" href="/manifest.json" />
-  <link rel="apple-touch-icon" href="/icon-192.png" />
-  <meta name="theme-color" content="#f59e0b" />
-
   <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
@@ -23,11 +20,8 @@
   <!-- LOGIN -->
   <section id="loginBox" class="card">
     <h1>Benvenuto</h1>
-    <p class="muted">1 credito = 1 slot da 45 minuti</p>
-
     <input id="username" placeholder="Username">
     <input id="password" type="password" placeholder="Password">
-
     <button id="loginBtn" class="btn">Accedi</button>
     <div id="loginErr" class="error hidden"></div>
   </section>
@@ -41,7 +35,7 @@
       <span id="roleBadge" class="badge"></span>
     </section>
 
-    <!-- NOTE ADMIN VISIBILI A TUTTI -->
+    <!-- NOTE PUBBLICHE -->
     <section class="card">
       <h4>📌 Comunicazioni</h4>
       <div id="notesView" class="muted"></div>
@@ -62,34 +56,40 @@
 
       <hr class="sep">
 
-      <h3>Prenotazioni del giorno</h3>
+      <h3>Le tue prenotazioni del giorno</h3>
       <div id="reservationsList" class="list"></div>
     </section>
 
-    <!-- ADMIN -->
-    <section id="adminPanel" class="card hidden">
+    <!-- ADMIN MENU -->
+    <section id="adminMenu" class="card hidden">
       <h3>👑 Area Admin</h3>
+      <button id="btnAdminNotes" class="btn">Note</button>
+      <button id="btnAdminFields" class="btn">Campi</button>
+      <button id="btnAdminUsers" class="btn">Utenti</button>
+    </section>
 
+    <!-- ADMIN SEZIONI -->
+    <section id="adminNotes" class="card hidden">
       <h4>Note</h4>
       <textarea id="notesText"></textarea>
-      <button id="saveNotesBtn" class="btn">Salva note</button>
-      <div id="notesMsg" class="muted"></div>
+      <button id="saveNotesBtn" class="btn">Salva</button>
+      <button class="btn-ghost backAdmin">⬅ Indietro</button>
+    </section>
 
-      <hr class="sep">
-
+    <section id="adminFields" class="card hidden">
       <h4>Campi</h4>
       <input id="newFieldId" placeholder="id campo">
       <input id="newFieldName" placeholder="nome campo">
-      <button id="addFieldBtn" class="btn">Aggiungi campo</button>
-
+      <button id="addFieldBtn" class="btn">Aggiungi</button>
       <div id="fieldsList" class="list"></div>
       <button id="saveFieldsBtn" class="btn">Salva campi</button>
-      <div id="fieldsMsg" class="muted"></div>
+      <button class="btn-ghost backAdmin">⬅ Indietro</button>
+    </section>
 
-      <hr class="sep">
-
+    <section id="adminUsers" class="card hidden">
       <h4>Utenti</h4>
       <div id="usersList" class="list"></div>
+      <button class="btn-ghost backAdmin">⬅ Indietro</button>
     </section>
 
   </section>
