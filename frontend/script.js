@@ -362,22 +362,28 @@ async function loadUsers() {
 /* ================= GALLERY ================= */
 function renderLoginGallery() {
   const box = qs("loginGallery");
+  if (!box) return;
+
   box.innerHTML = "";
+
   STATE.gallery.forEach(g => {
-    const w = document.createElement("div");
-    w.className = "login-gallery-item";
+    const wrap = document.createElement("div");
+    wrap.className = "login-gallery-item";
 
-    const i = document.createElement("img");
-    i.src = g.url;
-    i.loading = "lazy";
+    const a = document.createElement("a");
+    a.href = g.link || "#";
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
 
-    const c = document.createElement("div");
-    c.className = "login-gallery-caption";
-    c.textContent = g.caption || "";
+    const img = document.createElement("img");
+    img.src = g.url;
+    img.loading = "lazy";
+    img.alt = g.caption || "immagine";
 
-    w.appendChild(i);
-    w.appendChild(c);
-    box.appendChild(w);
+    a.appendChild(img);
+    wrap.appendChild(a);
+
+    box.appendChild(wrap);
   });
 }
 function renderGalleryAdmin() {
@@ -405,7 +411,8 @@ function addGalleryItem() {
   const url = qs("galleryUrl").value.trim();
   const cap = qs("galleryCaption").value.trim();
   if (!url) return;
-  STATE.galleryDraft.push({ url, caption: cap });
+  const link = qs("galleryLink").value = "";
+STATE.galleryDraft.push({ url, caption: cap, link });
   qs("galleryUrl").value = "";
   qs("galleryCaption").value = "";
   renderGalleryAdmin();

@@ -286,3 +286,16 @@ button:active {
     width: auto;
   }
 }
+.login-gallery-item a {
+  display: inline-block;
+}
+
+.login-gallery-item img {
+  cursor: pointer;
+  transition: transform .15s ease, opacity .15s ease;
+}
+
+.login-gallery-item img:hover {
+  transform: scale(1.05);
+  opacity: .9;
+}

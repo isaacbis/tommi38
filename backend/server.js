@@ -26,7 +26,7 @@ app.use(
         "base-uri": ["'self'"],
         "object-src": ["'none'"],
         "frame-ancestors": ["'self'"],
-        "img-src": ["'self'", "data:"],
+        "img-src": ["'self'", "data:", "https:"],
         "script-src": ["'self'"],
         "style-src": ["'self'"],
         "connect-src": ["'self'"],
