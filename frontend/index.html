@@ -12,163 +12,89 @@
   <link rel="stylesheet" href="/style.css" />
 </head>
 <body>
-  <header class="topbar">
-    <div class="brand">🌞 Prenotazione Campi</div>
-    <div class="top-actions">
-      <button id="logoutBtn" class="btn btn-ghost hidden">Logout</button>
-    </div>
-  </header>
 
-  <main class="wrap">
-    <!-- LOGIN -->
-    <section id="loginBox" class="card">
-      <h1>Benvenuto</h1>
-      <p class="muted">1 credito = 1 slot da 45 minuti (configurabile)</p>
+<header class="topbar">
+  <div class="brand">🌞 Prenotazione Campi</div>
+  <button id="logoutBtn" class="btn-ghost hidden">Logout</button>
+</header>
 
-      <div class="grid2">
-        <input id="username" type="text" placeholder="Username" autocomplete="username" />
-        <input id="password" type="password" placeholder="Password" autocomplete="current-password" />
+<main class="wrap">
+
+  <!-- LOGIN -->
+  <section id="loginBox" class="card">
+    <h1>Benvenuto</h1>
+    <p class="muted">1 credito = 1 slot da 45 minuti</p>
+
+    <input id="username" placeholder="Username">
+    <input id="password" type="password" placeholder="Password">
+
+    <button id="loginBtn" class="btn">Accedi</button>
+    <div id="loginErr" class="error hidden"></div>
+  </section>
+
+  <!-- APP -->
+  <section id="app" class="hidden">
+
+    <section class="card">
+      <h2 id="welcome"></h2>
+      <div id="creditsBox" class="muted"></div>
+      <span id="roleBadge" class="badge"></span>
+    </section>
+
+    <!-- NOTE ADMIN VISIBILI A TUTTI -->
+    <section class="card">
+      <h4>📌 Comunicazioni</h4>
+      <div id="notesView" class="muted"></div>
+    </section>
+
+    <!-- PRENOTAZIONI -->
+    <section class="card">
+      <h3>Prenota</h3>
+
+      <div class="grid3">
+        <input id="datePick" type="date">
+        <select id="fieldSelect"></select>
+        <select id="timeSelect"></select>
       </div>
-      <button id="loginBtn" class="btn">Accedi</button>
 
-      <p class="footerText">Assistenza: <a href="tel:3381523364">3381523364</a></p>
-      <div id="loginErr" class="error hidden"></div>
+      <button id="bookBtn" class="btn">Prenota</button>
+      <div id="bookMsg" class="muted"></div>
+
+      <hr class="sep">
+
+      <h3>Prenotazioni del giorno</h3>
+      <div id="reservationsList" class="list"></div>
     </section>
 
-    <!-- APP -->
-    <section id="app" class="hidden">
-      <section class="card">
-        <div class="row">
-          <div>
-            <h2 id="welcome">Ciao</h2>
-            <div id="creditsBox" class="muted"></div>
-          </div>
-          <div class="row right">
-            <span id="roleBadge" class="badge"></span>
-          </div>
-        </div>
-      </section>
+    <!-- ADMIN -->
+    <section id="adminPanel" class="card hidden">
+      <h3>👑 Area Admin</h3>
 
-      <!-- Tabs -->
-      <section class="tabs card">
-        <button class="tab active" data-tab="bookingTab">Prenotazioni</button>
-        <button class="tab" data-tab="adminTab" id="adminTabBtn">Admin</button>
-      </section>
+      <h4>Note</h4>
+      <textarea id="notesText"></textarea>
+      <button id="saveNotesBtn" class="btn">Salva note</button>
+      <div id="notesMsg" class="muted"></div>
 
-      <!-- PRENOTAZIONI -->
-      <section id="bookingTab" class="card">
-        <h3>Prenota</h3>
+      <hr class="sep">
 
-        <div class="grid3">
-          <div>
-            <label>Data</label>
-            <input id="datePick" type="date" />
-          </div>
-          <div>
-            <label>Campo</label>
-            <select id="fieldSelect"></select>
-          </div>
-          <div>
-            <label>Slot</label>
-            <select id="timeSelect"></select>
-          </div>
-        </div>
+      <h4>Campi</h4>
+      <input id="newFieldId" placeholder="id campo">
+      <input id="newFieldName" placeholder="nome campo">
+      <button id="addFieldBtn" class="btn">Aggiungi campo</button>
 
-        <div class="row">
-          <button id="bookBtn" class="btn">Prenota</button>
-          <div id="bookMsg" class="muted"></div>
-        </div>
+      <div id="fieldsList" class="list"></div>
+      <button id="saveFieldsBtn" class="btn">Salva campi</button>
+      <div id="fieldsMsg" class="muted"></div>
 
-        <hr class="sep" />
+      <hr class="sep">
 
-        <h3>Prenotazioni del giorno</h3>
-        <div id="reservationsList" class="list"></div>
-      </section>
-
-      <!-- ADMIN -->
-      <section id="adminTab" class="card hidden">
-        <h3>Area Admin</h3>
-
-        <div class="subtabs">
-          <button class="subtab active" data-sub="cfgSub">Config</button>
-          <button class="subtab" data-sub="notesSub">Note</button>
-          <button class="subtab" data-sub="fieldsSub">Campi</button>
-          <button class="subtab" data-sub="usersSub">Utenti</button>
-        </div>
-
-        <!-- CONFIG -->
-        <div id="cfgSub" class="subpanel">
-          <div class="grid4">
-            <div>
-              <label>Slot minuti</label>
-              <input id="slotMinutes" type="number" min="15" max="180" />
-            </div>
-            <div>
-              <label>Inizio giornata</label>
-              <input id="dayStart" type="time" />
-            </div>
-            <div>
-              <label>Fine giornata</label>
-              <input id="dayEnd" type="time" />
-            </div>
-            <div>
-              <label>Max prenotazioni/utente/giorno</label>
-              <input id="maxPerDay" type="number" min="1" max="10" />
-            </div>
-          </div>
-          <button id="saveCfgBtn" class="btn">Salva config</button>
-          <div id="cfgMsg" class="muted"></div>
-        </div>
-
-        <!-- NOTE -->
-        <div id="notesSub" class="subpanel hidden">
-          <label>Note</label>
-          <textarea id="notesText" rows="5"></textarea>
-          <button id="saveNotesBtn" class="btn">Salva note</button>
-          <div id="notesMsg" class="muted"></div>
-        </div>
-
-        <!-- CAMPI -->
-        <div id="fieldsSub" class="subpanel hidden">
-          <div class="row">
-            <div class="muted">Campi (id + nome). Esempio: <b>c1</b> / <b>Campo 1</b></div>
-          </div>
-
-          <div class="grid3">
-            <input id="newFieldId" placeholder="id (es: c1)" />
-            <input id="newFieldName" placeholder="nome (es: Campo 1)" />
-            <button id="addFieldBtn" class="btn">Aggiungi</button>
-          </div>
-
-          <div id="fieldsList" class="list"></div>
-          <button id="saveFieldsBtn" class="btn">Salva campi</button>
-          <div id="fieldsMsg" class="muted"></div>
-        </div>
-
-        <!-- UTENTI -->
-        <div id="usersSub" class="subpanel hidden">
-          <h4>Crea utente</h4>
-          <div class="grid4">
-            <input id="newUserUsername" placeholder="username" />
-            <input id="newUserPassword" placeholder="password" />
-            <select id="newUserRole">
-              <option value="user">user</option>
-              <option value="admin">admin</option>
-            </select>
-            <input id="newUserCredits" type="number" min="0" value="0" />
-          </div>
-          <button id="createUserBtn" class="btn">Crea</button>
-          <div id="createUserMsg" class="muted"></div>
-
-          <hr class="sep" />
-
-          <h4>Lista utenti</h4>
-          <div id="usersList" class="list"></div>
-        </div>
-      </section>
+      <h4>Utenti</h4>
+      <div id="usersList" class="list"></div>
     </section>
-  </main>
 
-  <script src="/script.js" defer></script>
+  </section>
+</main>
+
+<script src="/script.js" defer></script>
 </body>
 </html>
