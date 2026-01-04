@@ -1,601 +1,147 @@
-/* =================================================================
-   STYLE.CSS — Tommi 38 (Mobile-first, dark/light, emoji weather)
-   ================================================================= */
-
-/************************** RESET & BASE **************************/
-*{box-sizing:border-box;margin:0;padding:0}
-html{scroll-behavior:smooth;-webkit-text-size-adjust:100%;text-size-adjust:100%;width:100%;max-width:100vw;overflow-x:hidden}
-body{width:100%;max-width:100vw;overflow-x:hidden;font-family:"Poppins",system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;min-height:100dvh;display:flex;flex-direction:column}
-img{max-width:100%;height:auto;display:block}
-:focus-visible{outline:3px solid var(--focus);outline-offset:2px;border-radius:12px}
-@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
-
-/************************** TOKENS **************************/
 :root{
-  /* Dark di default */
-  --bg:#0A0B0D;
-  --surface:#131418;
-  --ink:#F5F7FA;
-  --ink-2:#C9D1D9;
-  --accent:#FF9100;
-  --accent-2:#00E6FF;
-  --ok:#22c55e;--warn:#facc15;--danger:#ef4444;--muted:#22242B;
-  --border:#2A2C31;
-  --focus:#22d3ee;
-  --radius:18px;--r-sm:12px;
-  --tap:52px;
-  --shadow:0 12px 28px rgba(0,0,0,.45);
-
-  --grad-accent:linear-gradient(90deg,#FFB703 0%,#FF9100 50%,#FF4D00 100%);
-
-  /* Safe areas */
-  --safe-top:env(safe-area-inset-top);
-  --safe-bot:env(safe-area-inset-bottom);
-  --safe-left:env(safe-area-inset-left);
-  --safe-right:env(safe-area-inset-right);
+  --bg1:#0b0f12;
+  --bg2:#151b20;
+  --card:#0f1418;
+  --text:#f3f4f6;
+  --muted:#9ca3af;
+  --accent:#f59e0b;
+  --accent2:#d97706;
+  --border:#26303a;
 }
-/* Light di sistema */
-@media (prefers-color-scheme:light){
-  :root{--bg:#FFF8F1;--surface:#FFFFFF;--ink:#0F172A;--ink-2:#374151;--border:#E5E7EB;--shadow:0 10px 24px rgba(0,0,0,.08)}
-}
-/* Forza light con <html class="light"> */
-html.light{--bg:#FFF8F1;--surface:#FFFFFF;--ink:#0F172A;--ink-2:#374151;--border:#E5E7EB;--shadow:0 10px 24px rgba(0,0,0,.08)}
 
-/************************** SFONDO & LAYOUT **************************/
+*{ box-sizing:border-box; }
+html,body{ height:100%; }
 body{
-  background:
-    radial-gradient(1200px 800px at 120% -10%,rgba(0,230,255,.12),transparent 60%),
-    radial-gradient(900px 700px at -15% 110%,rgba(255,145,0,.10),transparent 65%),
-    var(--bg);
-  color:var(--ink);
-  padding:0 clamp(8px,3vw,16px) max(10px,var(--safe-bot));
-  font-size:clamp(15px,3.2vw,17px);
-  line-height:1.5;
-}
-main{flex:1;max-width:430px;margin:8px auto;padding:0;max-width:100%;overflow-x:hidden}
-
-/************************** HEADER **************************/
-header{
-  position:sticky;top:0;z-index:50;
-  background:var(--surface);
-  border-bottom:2px solid var(--border);
-  padding:calc(var(--safe-top) + 6px) 10px 8px;
-  border-radius:0 0 20px 20px;
-  box-shadow:0 8px 24px rgba(0,0,0,.35);
-}
-.header-container{max-width:430px;margin:0 auto;display:flex;flex-direction:column;gap:4px}
-.header-top{display:flex;justify-content:flex-end}
-.logout{
-  display:inline-flex;gap:.35rem;align-items:center;font-weight:800;
-  background:linear-gradient(180deg,#0F172A,#0B1220);
-  color:#fff;border:1px solid #111827;border-radius:10px;
-  padding:4px 8px;min-height:30px;font-size:.78rem;text-decoration:none;
-  box-shadow:0 1px 0 rgba(0,0,0,.25),0 0 12px rgba(0,230,255,.08);
-  transition:transform .15s,filter .15s,box-shadow .2s;
-}
-.logout i{font-size:.85rem}
-.logout:hover{filter:brightness(1.05);transform:translateY(-1px)}
-.logout:active{transform:translateY(0) scale(.98)}
-
-/************************** CARD “GLASS” **************************/
-.card,.login-container,.user-credits,.date-picker,.buy-credits-section,.notes-section,.user-reservations-section,.field-box,.admin,.notification{
-  background:linear-gradient(180deg,rgba(17,18,23,.55),rgba(17,18,23,.42));
-  border:1.5px solid var(--border);
-  border-radius:var(--radius);
-  box-shadow:var(--shadow);
-  padding:12px;position:relative;overflow:hidden;
-}
-@supports not (backdrop-filter:blur(6px)){
-  .card,.login-container,.user-credits,.date-picker,.buy-credits-section,.notes-section,.user-reservations-section,.field-box,.admin,.notification{
-    background:color-mix(in oklab, var(--surface) 86%, black 14%);
-  }
+  margin:0;
+  font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+  color:var(--text);
+  background: radial-gradient(1200px 600px at 20% 10%, #1f2937, transparent),
+              radial-gradient(900px 500px at 10% 90%, #3b1d06, transparent),
+              linear-gradient(180deg, var(--bg1), var(--bg2));
 }
 
-/************************** LOGIN **************************/
-#login-area{display:flex;align-items:center;justify-content:center;min-height:100dvh;padding:24px 0}
-.login-container{width:100%;max-width:430px}
-.login-form h1{
-  font-size:clamp(1.45rem,6.2vw,1.85rem);
-  color:#0a0a0a;background:linear-gradient(180deg,#FFE8C7,#FFD99A);
-  border-radius:14px;padding:10px 12px;text-align:center;margin-bottom:10px;
-  text-shadow:0 1px 0 #fff8;
-}
-#login-images-container-top,#login-images-container-bottom{display:flex;gap:8px;overflow-x:auto;padding:2px 2px 6px}
-#login-images-container-top a img{max-width:54px;border-radius:14px}
-#login-images-container-bottom a img{max-width:72px;border-radius:16px}
+a{ color:var(--accent); text-decoration:none; }
+a:hover{ text-decoration:underline; }
 
-.login-form input{
-  width:100%;padding:13px 14px;margin:8px 0;border:1.5px solid var(--border);border-radius:12px;
-  background:linear-gradient(180deg,#0E1117,#0B0D12);color:var(--ink)
-}
-.login-form input::placeholder{color:#9CA3AF}
-.login-form input:focus{outline:none;border-color:#22d3ee;box-shadow:0 0 0 3px rgba(34,211,238,.18)}
-.login-form button{
-  width:100%;min-height:var(--tap);border-radius:999px;border:0;
-  font-weight:900;letter-spacing:.2px;color:#0b0b0b;background:var(--grad-accent);
-  box-shadow:0 8px 24px rgba(255,145,0,.22),inset 0 -2px 0 rgba(0,0,0,.25);
-  transition:transform .15s,filter .15s,box-shadow .2s;
-}
-.login-form button:hover{transform:translateY(-1px);filter:saturate(1.05)}
-.login-form button:active{transform:translateY(0) scale(.98)}
-/* Autofill dark */
-.login-form input:-webkit-autofill{
-  -webkit-text-fill-color:#F5F7FA !important;
-  box-shadow:0 0 0 1000px #0E1117 inset !important;
-  -webkit-box-shadow:0 0 0 1000px #0E1117 inset !important;
-  caret-color:#F5F7FA !important;
+.hidden{ display:none !important; }
+
+.topbar{
+  position:sticky; top:0;
+  display:flex; align-items:center; justify-content:space-between;
+  padding:14px 18px;
+  border-bottom:1px solid var(--border);
+  background:rgba(10,14,18,.85);
+  backdrop-filter: blur(8px);
 }
 
-/************************** SEZIONI UTENTE **************************/
-.circle-buttons-container{display:flex;flex-wrap:wrap;gap:10px;justify-content:center}
-.circle-button,button{
-  background:var(--grad-accent);color:#0b0b0b;border:0;border-radius:999px;
-  min-height:var(--tap);padding:10px 16px;font-weight:900;
-  box-shadow:0 2px 0 rgba(0,0,0,.25),0 0 24px rgba(255,145,0,.18);
-  transition:transform .12s,filter .12s,box-shadow .2s;
-}
-.circle-button:hover,button:hover{filter:brightness(1.08);transform:translateY(-1px)}
-.circle-button:active,button:active{transform:translateY(0) scale(.98)}
-.circle-button{width:42px;height:42px;font-size:.9rem}
+.brand{ font-weight:700; letter-spacing:.2px; }
+.wrap{ max-width:980px; margin:18px auto; padding:0 14px; }
 
-/************** CREDITI / DATA PICKER **************/
-#user-credits{
-  font-weight:900;font-size:1.08rem;color:#FFE8C7;background:linear-gradient(180deg,#0E1117,#0B0D12);
-  padding:10px 12px;border-radius:12px;text-align:center;border:1px solid var(--border)
-}
-.date-picker{
-  width:100%;max-width:100%;
-  display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;
-  padding-inline:8px;
-}
-#booking-date{
-  box-sizing:border-box;
-  width:min(360px,100%);      /* limite desktop */
-  max-width:100%;             /* non sfora mai su mobile */
-  margin:0 auto;display:block;
-  text-align:center;text-align-last:center;
-  font-weight:800;font-size:1.08rem;padding:12px;border-radius:12px;border:1.5px solid var(--border);
-  background:linear-gradient(180deg,#0E1117,#0B0D12);color:var(--ink);caret-color:var(--ink);
-  -webkit-appearance:none;
-}
-#booking-date::-webkit-datetime-edit{color:inherit;text-align:center;padding:0}
-#booking-date::-webkit-calendar-picker-indicator{filter:invert(1) brightness(1.2)}
-
-/************************** CAMPI & SLOT **************************/
-.fields-container{display:grid;grid-template-columns:1fr;gap:12px}
-@media (min-width:380px){.fields-container{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media (min-width:431px){.fields-container{grid-template-columns:repeat(2,minmax(0,1fr))}}
-
-.field-box{padding:10px;border-radius:22px}
-.field-box h3{
-  font-size:1.05rem;margin-bottom:8px;cursor:pointer;
-  background:linear-gradient(90deg,rgba(255,255,255,.06),transparent);
-  padding:6px 8px;border-radius:12px
-}
-.slot-info{display:flex;flex-direction:column;gap:8px;max-height:60vh;overflow-y:auto;-webkit-overflow-scrolling:touch}
-
-.slot{
-  min-height:calc(var(--tap) - 6px);
-  border-radius:16px;display:flex;align-items:center;justify-content:center;
-  padding:8px 10px;font-weight:900;text-align:center;
-  font-size:.86rem;line-height:1.2;border:1.5px solid var(--border);
-  box-shadow:0 2px 6px rgba(0,0,0,.25);
-  transition:transform .12s,filter .12s,box-shadow .2s,outline .2s;
-}
-.available{background:linear-gradient(180deg,#0D0F14,#0B0D12);color:#E7EEF5}
-@media (hover:hover){.slot.available:hover{box-shadow:0 0 0 3px rgba(255,145,0,.35),0 8px 20px rgba(255,145,0,.12);transform:translateY(-1px)}}
-.unavailable{
-  background:repeating-linear-gradient(135deg,rgba(239,68,68,.14) 0 10px,rgba(239,68,68,.18) 10px 20px),linear-gradient(180deg,#1A0F0F,#150C0C);
-  color:#FFC2C2;border-color:#B33C3C;
-}
-.my-booking{
-  background:radial-gradient(120% 120% at 20% -20%,rgba(250,204,21,.25),transparent 60%),linear-gradient(180deg,#FFD54A,#FFBE0B);
-  color:#111;border-color:#000;box-shadow:0 0 0 2px #111 inset,0 0 30px rgba(255,230,0,.35);
-  animation:pulseGlow 2.2s ease-in-out infinite;
-}
-@keyframes pulseGlow{0%,100%{box-shadow:0 0 0 2px #111 inset,0 0 18px rgba(255,230,0,.18)}50%{box-shadow:0 0 0 2px #111 inset,0 0 36px rgba(255,230,0,.36)}}
-
-/* Immagini app (header) */
-#app-images-container{
-  display:flex;
-  flex-direction:column;   /* una sotto l’altra */
-  align-items:center;      /* centrata orizzontalmente */
-  gap:10px;
-  margin-top:8px;
-}
-#app-images-container a img{width:100px;border-radius:18px;box-shadow:0 8px 18px rgba(0,0,0,.18)}
-.img-caption{display:inline-flex;flex-direction:column;align-items:center;width:84px;margin:4px 6px;vertical-align:top}
-.img-caption img{width:auto;height:72px;object-fit:cover;border-radius:12px;box-shadow:0 6px 14px rgba(0,0,0,.18)}
-.img-caption figcaption{font-size:.7rem;margin-top:3px;line-height:1.2;color:var(--ink-2);text-align:center}
-
-/************************** ADMIN (GESTIONE) **************************/
-#admin-area{width:100%;max-width:100%}
-.admin{padding:10px}
-.admin h2{font-size:clamp(.9rem,2.8vw,1.05rem);border-bottom:1.5px solid var(--border);padding-bottom:6px;margin-bottom:8px;text-wrap:balance}
-.scrollable-box{max-height:60vh;overflow:auto;-webkit-overflow-scrolling:touch}
-
-/* Tabelle area gestione – a capo automatico e font compatto */
-.admin table{width:100%;border-collapse:collapse;table-layout:fixed}
-.admin th,.admin td{
-  padding:.35rem .25rem;text-align:center;line-height:1.12;letter-spacing:-.1px;
-  /* 👉 riga a capo, anche parole lunghe/URL */
-  white-space:normal;overflow:visible;text-overflow:unset;
-  word-break:break-word;overflow-wrap:anywhere;hyphens:auto;
-  font-size:clamp(.45rem,1.5vw,.7rem);
-}
-@media(max-width:480px){
-  .admin th,.admin td{font-size:.42rem} /* più piccolo su mobile, come richiesto */
-}
-.admin thead th{font-weight:800;position:sticky;top:0;z-index:1;background:linear-gradient(180deg,rgba(255,255,255,.06),transparent)}
-/* colonne più strette facoltative */
-.admin thead th:nth-child(1){max-width:56px}
-.admin thead th:nth-child(2){max-width:74px}
-.admin thead th:nth-child(3){max-width:46px}
-.admin thead th:nth-child(4){max-width:88px}
-.admin thead th:nth-child(5){max-width:40px}
-.admin #credits-table button,.admin table button{
-  min-height:30px;border-radius:10px;font-size:clamp(.55rem,2.2vw,.8rem);padding:.25rem .45rem;line-height:1.15;
-  background:linear-gradient(180deg,#141821,#0D1117);color:#E7EEF5;border:1px solid #222733
-}
-.admin #credits-table button:hover,.admin table button:hover{filter:brightness(1.05);transform:translateY(-1px)}
-.admin #credits-table button:active,.admin table button:active{transform:translateY(0) scale(.98)}
-
-/************************** NOTIFICHE **************************/
-#notification-container{position:fixed;top:calc(var(--safe-top) + 10px);right:10px;z-index:10050}
-.notification{
-  padding:10px 12px;margin-bottom:10px;border-radius:12px;border:1.5px solid var(--border);
-  background:linear-gradient(180deg,#0E1117,#0B0D12);
-  box-shadow:0 12px 28px rgba(0,0,0,.4),0 0 24px rgba(0,230,255,.12);
-  color:#F8FAFC;font-weight:700;
-}
-.notification.success{ border-left:4px solid var(--ok) }
-.notification.warn   { border-left:4px solid var(--warn) }
-.notification.error  { border-left:4px solid var(--danger) }
-html.light .notification{background:#FFFFFF;color:#0F172A;border-color:#E5E7EB;box-shadow:0 8px 20px rgba(0,0,0,.08)}
-
-/************************** METEO A EMOJI (sotto Logout, IN COLONNA) **************************/
-.hourly-weather{
-  display:flex;
-  flex-direction:column;   /* 👈 verticale come richiesto */
-  gap:8px;
-  padding:6px 2px;
-  margin-top:6px;
-  align-items:center;
-  max-height:320px;
-  overflow-y:auto;
-}
-.hour-chip{
-  display:flex;flex-direction:column;align-items:center;justify-content:center;
-  width:42px;min-width:42px;height:48px;border:1px solid var(--border);border-radius:12px;
-  background:linear-gradient(180deg,#0E1117,#0B0D12);box-shadow:0 2px 6px rgba(0,0,0,.25);
-  color:var(--ink);
-}
-.hour-chip .em{font-size:1.12rem;line-height:1}
-.hour-chip .hh{font-size:.62rem;opacity:.95;margin-top:2px;font-weight:800}
-
-/* Light mode: colori leggibili (forzati) */
-@media (prefers-color-scheme: light){
-  .hour-chip{ background:#FFFFFF; border-color:#E5E7EB; }
-  .hour-chip,.hour-chip .em,.hour-chip .hh{ color:#111827 !important; }
-}
-/* Se forzi la light mode con <html class="light"> */
-html.light .hour-chip{ background:#FFFFFF; border-color:#E5E7EB; }
-html.light .hour-chip,.hour-chip .em,.hour-chip .hh{ color:#111827 !important; }
-
-/************************** LIGHT: input & datepicker leggibili e contenuti **************************/
-@media (prefers-color-scheme: light){
-  .date-picker label{ color:#0F172A }
-  #booking-date{
-    background:#FFFFFF !important;color:#0F172A !important;border:1.5px solid #111827 !important;caret-color:#0F172A !important;
-    width:min(360px,100%) !important;max-width:100% !important;margin:0 auto !important;display:block !important;
-    text-align:center !important;text-align-last:center !important;
-  }
-  #booking-date::-webkit-calendar-picker-indicator{ filter:none !important; }
-  .login-form input{
-    background:#FFFFFF !important;color:#0F172A !important;border:1.5px solid #111827 !important;caret-color:#0F172A !important;
-  }
-  .login-form input::placeholder{ color:#6B7280 !important; }
-  .login-form input:focus{ border-color:#0EA5E9 !important; box-shadow:0 0 0 3px rgba(14,165,233,.18) !important; }
-}
-/* Se forzi il light con la classe */
-html.light .date-picker label{ color:#0F172A !important; }
-html.light #booking-date{
-  background:#FFFFFF !important;color:#0F172A !important;border:1.5px solid #111827 !important;caret-color:#0F172A !important;
-  width:min(360px,100%) !important;max-width:100% !important;margin:0 auto !important;display:block !important;
-  text-align:center !important;text-align-last:center !important;
-}
-html.light #booking-date::-webkit-calendar-picker-indicator{ filter:none !important; }
-html.light .login-form input{
-  background:#FFFFFF !important;color:#0F172A !important;border:1.5px solid #111827 !important;caret-color:#0F172A !important;
-}
-html.light .login-form input::placeholder{ color:#6B7280 !important; }
-html.light .login-form input:focus{ border-color:#0EA5E9 !important; box-shadow:0 0 0 3px rgba(14,165,233,.18) !important; }
-
-/************************** RESPONSIVE **************************/
-@media (max-width:340px){
-  .circle-button{width:38px;height:38px;font-size:.84rem}
-  #booking-date{font-size:1rem}
-  .slot{font-size:.8rem}
+.card{
+  background:rgba(15,20,24,.92);
+  border:1px solid var(--border);
+  border-radius:14px;
+  padding:16px;
+  box-shadow: 0 10px 40px rgba(0,0,0,.35);
+  margin-bottom:14px;
 }
 
-/************************** UTILS **************************/
-.hidden{display:none!important}
+h1,h2,h3,h4{ margin:8px 0 10px; }
+.muted{ color:var(--muted); }
+.error{ color:#fecaca; background:rgba(127,29,29,.35); border:1px solid rgba(248,113,113,.35); padding:10px; border-radius:10px; margin-top:10px; }
 
+.footerText{ margin-top:14px; font-size:14px; color:var(--muted); }
 
-/* 2. Meteo - Giorni leggibili in dark */
-.hour-chip .hh {
-  color: var(--ink) !important;   /* testo chiaro leggibile */
-}
-html.light .hour-chip .hh {
-  color: #111827 !important;      /* testo scuro leggibile in light */
-}
+.grid2{ display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.grid3{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; }
+.grid4{ display:grid; grid-template-columns:1fr 1fr 1fr 1fr; gap:10px; }
 
-/* 3. Fix overflow riquadro Data in LIGHT su mobile */
-@media (prefers-color-scheme: light) {
-  #booking-date {
-    width: min(360px, 100%) !important;
-    max-width: 100% !important;   /* non sfora più */
-    margin: 0 auto !important;
-    display: block !important;
-    overflow: hidden !important;
-  }
-}
-@media (max-width: 430px) {
-  html.light #booking-date {
-    width: 100% !important;
-    max-width: 100% !important;
-    margin: 0 !important;
-    display: block !important;
-    overflow: hidden !important;
-  }
-}
-.card, .field-box, .login-container {
-  animation: fadeUp .5s ease both;
-}
-@keyframes fadeUp {
-  from {opacity:0; transform: translateY(12px);}
-  to   {opacity:1; transform: translateY(0);}
-}
-.slot.available:hover {
-  filter: brightness(1.15);
-  cursor: pointer;
-}
-#user-credits {
-  display: inline-block;
-  padding: 6px 12px;
-  border-radius: 999px;
-  font-weight: bold;
-  background: var(--grad-accent);
-  color: #111;
-}
-.hour-chip.today {
-  border: 2px solid var(--accent);
-  box-shadow: 0 0 12px rgba(255,145,0,.4);
-}
-.user-credits {
-  position: sticky;
-  bottom: 0;
-  background: var(--surface);
-  z-index: 30;
-}
-.login-form input, #booking-date {
-  font-size: 16px;
-}
-header {
-  background: linear-gradient(180deg, var(--surface) 70%, transparent);
-  backdrop-filter: blur(12px);
-}
-.notes-section {
-  background: #fff8c2;
-  border: 1px dashed #facc15;
-  color: #111;
-}
-.notification.success::before {content:"✅ "; }
-.notification.error::before   {content:"❌ "; }
-.notification.warn::before    {content:"⚠️ "; }
-
-/* =================================================================
-   EXTRA: toggle tema, "le mie prenotazioni", modalità admin pulita
-   ================================================================= */
-
-/* Toggle tema in header */
-#theme-toggle {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  margin-right: 8px;
-  width: 32px;
-  height: 32px;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  background: radial-gradient(circle at 30% 0%, rgba(255,255,255,.08), transparent 60%),
-              linear-gradient(180deg, #0E1117, #050609);
-  color: var(--ink-2);
-  box-shadow: 0 2px 8px rgba(0,0,0,.45);
-  cursor: pointer;
-  font-size: 0.9rem;
-  transition: transform .12s, filter .12s, box-shadow .16s;
-}
-#theme-toggle:hover {
-  filter: brightness(1.1);
-  transform: translateY(-1px);
-  box-shadow: 0 4px 14px rgba(0,0,0,.6);
-}
-#theme-toggle:active {
-  transform: translateY(0) scale(.96);
+@media (max-width:760px){
+  .grid2,.grid3,.grid4{ grid-template-columns:1fr; }
 }
 
-/* In light mode: bottone più chiaro */
-html.light #theme-toggle {
-  background: radial-gradient(circle at 30% 0%, rgba(255,255,255,.9), transparent 60%),
-              #FFFFFF;
-  color: #111827;
-  box-shadow: 0 2px 8px rgba(0,0,0,.12);
+input, select, textarea{
+  width:100%;
+  padding:10px 12px;
+  border-radius:10px;
+  border:1px solid var(--border);
+  background:rgba(8,12,16,.85);
+  color:var(--text);
+  outline:none;
+}
+textarea{ resize:vertical; min-height:90px; }
+
+label{ display:block; margin:6px 0 6px; color:var(--muted); font-size:13px; }
+
+.btn{
+  background: linear-gradient(180deg, var(--accent), var(--accent2));
+  border:0;
+  color:#111827;
+  font-weight:700;
+  padding:10px 14px;
+  border-radius:12px;
+  cursor:pointer;
+}
+.btn:hover{ filter:brightness(1.02); }
+.btn:active{ transform: translateY(1px); }
+
+.btn-ghost{
+  background:transparent;
+  border:1px solid var(--border);
+  color:var(--text);
+  padding:9px 12px;
+  border-radius:12px;
+  cursor:pointer;
+}
+.btn-ghost:hover{ border-color:rgba(245,158,11,.55); }
+
+.row{ display:flex; gap:10px; align-items:center; justify-content:space-between; }
+.right{ justify-content:flex-end; }
+
+.badge{
+  display:inline-flex;
+  padding:6px 10px;
+  border-radius:999px;
+  border:1px solid rgba(245,158,11,.35);
+  color:var(--accent);
+  font-weight:700;
+  font-size:12px;
 }
 
-/* “Le mie prenotazioni” – card singole cliccabili */
-.user-reservations-section {
-  margin-top: 10px;
-}
-.user-reservations-section h2 {
-  margin-bottom: 8px;
-}
-.user-reservation-item {
-  padding: 8px 10px;
-  margin-bottom: 6px;
-  border-radius: 12px;
-  background: linear-gradient(180deg, #0E1117, #050608);
-  border: 1px solid var(--border);
-  font-size: 0.8rem;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  box-shadow: 0 2px 6px rgba(0,0,0,.35);
-  transition: transform .12s, box-shadow .16s, filter .12s;
-}
-.user-reservation-item::after {
-  content: "↗";
-  opacity: .8;
-  font-size: 0.75rem;
-}
-.user-reservation-item:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(0,0,0,.5);
-  filter: brightness(1.05);
-}
-html.light .user-reservation-item {
-  background: #FFFFFF;
-  border-color: #E5E7EB;
-  box-shadow: 0 2px 8px rgba(0,0,0,.08);
-}
+.sep{ border:0; border-top:1px solid var(--border); margin:14px 0; }
 
-/* Scrollbar compatta per riquadri scrollabili */
-.scrollable-box::-webkit-scrollbar,
-.slot-info::-webkit-scrollbar,
-.hourly-weather::-webkit-scrollbar {
-  width: 5px;
+.tabs{ display:flex; gap:10px; padding:10px; }
+.tab{
+  flex:1;
+  border:1px solid var(--border);
+  background:rgba(8,12,16,.65);
+  color:var(--text);
+  padding:10px;
+  border-radius:12px;
+  cursor:pointer;
+  font-weight:700;
 }
-.scrollable-box::-webkit-scrollbar-track,
-.slot-info::-webkit-scrollbar-track,
-.hourly-weather::-webkit-scrollbar-track {
-  background: transparent;
-}
-.scrollable-box::-webkit-scrollbar-thumb,
-.slot-info::-webkit-scrollbar-thumb,
-.hourly-weather::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, .7);
-  border-radius: 999px;
-}
-html.light .scrollable-box::-webkit-scrollbar-thumb,
-html.light .slot-info::-webkit-scrollbar-thumb,
-html.light .hourly-weather::-webkit-scrollbar-thumb {
-  background: rgba(148, 163, 184, .9);
-}
+.tab.active{ border-color:rgba(245,158,11,.6); color:var(--accent); }
 
-/* Modalità admin: interfaccia più pulita, focus solo su gestione */
-body.admin-visible header,
-body.admin-visible .hourly-weather,
-body.admin-visible #app-images-container,
-body.admin-visible .buy-credits-section,
-body.admin-visible #user-credits-section,
-body.admin-visible .user-reservations-section,
-body.admin-visible .notes-section {
-  display: none !important;
+.subtabs{ display:flex; gap:10px; margin-bottom:10px; flex-wrap:wrap; }
+.subtab{
+  border:1px solid var(--border);
+  background:rgba(8,12,16,.65);
+  color:var(--text);
+  padding:8px 12px;
+  border-radius:12px;
+  cursor:pointer;
+  font-weight:700;
 }
+.subtab.active{ border-color:rgba(245,158,11,.6); color:var(--accent); }
 
-body.admin-visible main {
-  max-width: 1024px;
-  margin: 12px auto;
+.list{ display:flex; flex-direction:column; gap:10px; margin-top:10px; }
+.item{
+  border:1px solid var(--border);
+  border-radius:12px;
+  padding:10px;
+  background:rgba(8,12,16,.55);
 }
-
-body.admin-visible #admin-area {
-  margin-top: 4px;
-}
-
-/* Leggera rifinitura titoli admin */
-#admin-area .admin h2 {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 6px;
-}
-#admin-area .admin h2::after {
-  content: "▼";
-  font-size: 0.7rem;
-  opacity: 0.65;
-}
-
-/* =========================
-   FIX ALLINEAMENTO HEADER
-   ========================= */
-
-/* Contenitore dei pulsanti in alto */
-.header-top{
-  display: flex;
-  justify-content: flex-end; /* entrambi a destra */
-  align-items: center;       /* allineamento verticale perfetto */
-  gap: 8px;                  /* spazio costante tra i due */
-}
-
-/* Toggle tema: stessa altezza del tasto Esci */
-#theme-toggle{
-  margin: 0;                 /* togliamo il vecchio margin-right */
-  width: 34px;
-  height: 34px;
-  min-width: 34px;
-  min-height: 34px;
-}
-
-/* Tasto Esci allineato e “pill” come il bottone */
-.logout{
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 34px;          /* stessa altezza del toggle */
-  padding: 0 12px;
-  column-gap: 6px;
-  font-size: 0.78rem;
-}
-
-/* Iconcina leggermente più grande ma centrata */
-.logout i{
-  font-size: 0.9rem;
-}
-/* HEADER: pulsanti uno sopra l'altro */
-.header-top{
-  display: flex;
-  flex-direction: column;   /* verticale */
-  align-items: center;
-   /* allineati a destra */
-  gap: 4px;                 /* spazietto tra i due */
-}
-
-/* Tolgo il margine laterale del toggle tema */
-#theme-toggle{
-  margin-right: 0;
-}
-
-/* Immagini promo sotto il meteo: colonna */
-#app-images-container{
-  display: flex;
-  flex-direction: column;   /* una sotto l’altra */
-  align-items: center;      /* centrate */
-  gap: 10px;
-  margin-top: 8px;
-}
-
-/* Stile immagini (desktop/tablet) */
-#app-images-container a img{
-  width: 100px;             /* come le avevi prima */
-  border-radius: 18px;
-  box-shadow: 0 8px 18px rgba(0,0,0,.18);
-}
-
-/* 📱 Solo su cellulare: stessa larghezza del meteo (~42px) */
-@media (max-width: 768px){
-  #app-images-container a img{
-    width: 42px;            /* circa come le .hour-chip del meteo */
-  }
-}
+.item .top{ display:flex; justify-content:space-between; gap:10px; align-items:center; }
+.item .small{ color:var(--muted); font-size:13px; margin-top:6px; }
+.item .actions{ display:flex; gap:8px; flex-wrap:wrap; justify-content:flex-end; }
