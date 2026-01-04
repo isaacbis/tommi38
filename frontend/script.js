@@ -1,22 +1,24 @@
+/* ================= CONFIG ================= */
 const API = "/api";
 const qs = id => document.getElementById(id);
 const show = el => el.classList.remove("hidden");
 const hide = el => el.classList.add("hidden");
 
+/* ================= STATE ================= */
 let STATE = {
   me: null,
+  config: {},
   fields: [],
   fieldsDraft: [],
   notes: "",
-  // prenotazioni del giorno (TUTTE, serve per "occupato")
-  dayReservationsAll: [],
-  // prenotazioni visibili (filtrate per user se non admin)
-  reservations: [],
   users: [],
-  config: {}
+  reservations: [],
+  dayReservationsAll: [],
+  gallery: [],
+  galleryDraft: []
 };
 
-/* ===== DATE/ORARI (LOCALE, NON UTC) ===== */
+/* ================= DATE / TIME ================= */
 function localISODate(d = new Date()) {
   const tz = d.getTimezoneOffset() * 60000;
   return new Date(d.getTime() - tz).toISOString().slice(0, 10);
@@ -34,7 +36,7 @@ function timeStr(m) {
          String(m % 60).padStart(2, "0");
 }
 
-/* ===== API ===== */
+/* ================= API ================= */
 async function api(path, options = {}) {
   const r = await fetch(API + path, {
     credentials: "include",
@@ -46,7 +48,7 @@ async function api(path, options = {}) {
   return j;
 }
 
-/* ===== AUTH ===== */
+/* ================= AUTH ================= */
 async function login() {
   try {
     await api("/login", {
@@ -67,22 +69,17 @@ async function logout() {
   location.reload();
 }
 
-/* ===== UI ADMIN NAV ===== */
-function openAdmin(sectionId) {
-  ["adminMenu","adminConfig","adminNotes","adminFields","adminUsers"]
-    .forEach(id => hide(qs(id)));
-  show(qs(sectionId));
-}
-
-/* ===== LOAD ===== */
+/* ================= LOAD ================= */
 async function loadAll({ setDateToToday = false } = {}) {
   STATE.me = await api("/me");
   const pub = await api("/public/config");
 
+  STATE.config = pub;
   STATE.fields = pub.fields || [];
   STATE.fieldsDraft = [...STATE.fields];
   STATE.notes = pub.notesText || "";
-  STATE.config = pub;
+  STATE.gallery = pub.gallery || [];
+  STATE.galleryDraft = [...STATE.gallery];
 
   qs("welcome").textContent = `Ciao ${STATE.me.username}`;
   qs("creditsBox").textContent = `Crediti: ${STATE.me.credits}`;
@@ -93,43 +90,41 @@ async function loadAll({ setDateToToday = false } = {}) {
   show(qs("app"));
   show(qs("logoutBtn"));
 
-  // set data: SOLO al primo login / primo load, non ad ogni refresh
   if (setDateToToday || !qs("datePick").value) {
     qs("datePick").value = localISODate();
   }
 
-  renderFields(); // riempie fieldSelect
+  renderLoginGallery();
+  renderFields();
 
   if (STATE.me.role === "admin") {
     show(qs("adminMenu"));
-    // popola config admin
+
     qs("cfgSlotMinutes").value = pub.slotMinutes;
     qs("cfgDayStart").value = pub.dayStart;
     qs("cfgDayEnd").value = pub.dayEnd;
     qs("cfgMaxPerDay").value = pub.maxBookingsPerUserPerDay;
     qs("cfgMaxActive").value = pub.maxActiveBookingsPerUser;
 
-    // per admin, di default mostra il menu (non lascia tutto nascosto)
-    openAdmin("adminMenu");
-
-    await loadUsers();
-    renderFieldsAdmin();
     qs("notesText").value = STATE.notes;
+    renderFieldsAdmin();
+    renderGalleryAdmin();
+    await loadUsers();
   }
 
   await loadReservations();
 }
 
-/* ===== RESERVATIONS ===== */
+/* ================= RESERVATIONS ================= */
 async function loadReservations() {
   const date = qs("datePick").value || localISODate();
   const res = await api(`/reservations?date=${date}`);
 
   STATE.dayReservationsAll = res.items || [];
-
-  STATE.reservations = (STATE.me.role === "admin")
-    ? STATE.dayReservationsAll
-    : STATE.dayReservationsAll.filter(r => r.user === STATE.me.username);
+  STATE.reservations =
+    STATE.me.role === "admin"
+      ? STATE.dayReservationsAll
+      : STATE.dayReservationsAll.filter(r => r.user === STATE.me.username);
 
   renderTimeSelect();
   renderReservations();
@@ -143,11 +138,12 @@ function renderTimeSelect() {
   const start = minutes(STATE.config.dayStart || "09:00");
   const end = minutes(STATE.config.dayEnd || "20:00");
   const field = qs("fieldSelect").value;
+  const isToday = qs("datePick").value === localISODate();
 
-  const isToday = (qs("datePick").value === localISODate());
   const taken = new Set(
-    // IMPORTANT: "occupato" dipende da TUTTE le prenotazioni del giorno
-    STATE.dayReservationsAll.filter(r => r.fieldId === field).map(r => r.time)
+    STATE.dayReservationsAll
+      .filter(r => r.fieldId === field)
+      .map(r => r.time)
   );
 
   for (let m = start; m + slot <= end; m += slot) {
@@ -179,28 +175,19 @@ async function book() {
         time: qs("timeSelect").value
       })
     });
-
     qs("bookMsg").textContent = "Prenotazione effettuata ✅";
-    await refreshAfterAction();
+    await loadAll({ setDateToToday: false });
   } catch (e) {
     qs("bookMsg").textContent =
       e?.error === "ACTIVE_BOOKING_LIMIT"
-        ? "❌ Hai già una prenotazione attiva (deve finire prima di poterne fare un'altra)."
-        : e?.error === "SLOT_TAKEN"
-          ? "❌ Slot già occupato."
-          : "Errore prenotazione ❌";
+        ? "Hai già una prenotazione attiva"
+        : "Errore prenotazione";
   }
 }
 
 async function deleteReservation(id) {
   if (!confirm("Cancellare la prenotazione?")) return;
   await api(`/reservations/${id}`, { method: "DELETE" });
-  await refreshAfterAction();
-}
-
-// evita che loadAll resetti la data
-async function refreshAfterAction() {
-  // aggiorna crediti e note/config/fields senza toccare datePick
   await loadAll({ setDateToToday: false });
 }
 
@@ -216,15 +203,13 @@ function renderReservations() {
   STATE.reservations.forEach(r => {
     const d = document.createElement("div");
     d.className = "item";
+    d.textContent =
+      `${r.time} – ${r.fieldId}` +
+      (STATE.me.role === "admin" ? ` – ${r.user}` : "");
 
-    const label =
-      `${r.time} – ${r.fieldId}` + (STATE.me.role === "admin" ? ` – ${r.user}` : "");
-    const info = document.createElement("div");
-    info.textContent = label;
+    const canDelete =
+      STATE.me.role === "admin" || r.user === STATE.me.username;
 
-    d.appendChild(info);
-
-    const canDelete = (STATE.me.role === "admin") || (r.user === STATE.me.username);
     if (canDelete) {
       const b = document.createElement("button");
       b.className = "btn-ghost";
@@ -232,12 +217,11 @@ function renderReservations() {
       b.onclick = () => deleteReservation(r.id);
       d.appendChild(b);
     }
-
     list.appendChild(d);
   });
 }
 
-/* ===== FIELDS ===== */
+/* ================= FIELDS ================= */
 function renderFields() {
   const s = qs("fieldSelect");
   s.innerHTML = "";
@@ -248,123 +232,97 @@ function renderFields() {
     s.appendChild(o);
   });
 }
-
 function renderFieldsAdmin() {
-  const list = qs("fieldsList");
-  if (!list) return;
-  list.innerHTML = "";
-  STATE.fieldsDraft.forEach((f, idx) => {
-    const row = document.createElement("div");
-    row.className = "item";
-    row.textContent = `${f.id} – ${f.name}`;
+  const l = qs("fieldsList");
+  l.innerHTML = "";
+  STATE.fieldsDraft.forEach((f, i) => {
+    const d = document.createElement("div");
+    d.className = "item";
+    d.textContent = `${f.id} – ${f.name}`;
 
-    const del = document.createElement("button");
-    del.className = "btn-ghost";
-    del.textContent = "🗑️ Rimuovi";
-    del.onclick = () => {
-      STATE.fieldsDraft.splice(idx, 1);
+    const b = document.createElement("button");
+    b.className = "btn-ghost";
+    b.textContent = "🗑️";
+    b.onclick = () => {
+      STATE.fieldsDraft.splice(i, 1);
       renderFieldsAdmin();
     };
 
-    row.appendChild(del);
-    list.appendChild(row);
+    d.appendChild(b);
+    l.appendChild(d);
   });
 }
-
 async function addField() {
   const id = qs("newFieldId").value.trim();
   const name = qs("newFieldName").value.trim();
   if (!id || !name) return;
-
   STATE.fieldsDraft.push({ id, name });
   qs("newFieldId").value = "";
   qs("newFieldName").value = "";
   renderFieldsAdmin();
 }
-
 async function saveFields() {
-  try {
-    await api("/admin/fields", {
-      method: "PUT",
-      body: JSON.stringify({ fields: STATE.fieldsDraft })
-    });
-    qs("fieldsMsg").textContent = "Campi salvati ✅";
-    await loadAll({ setDateToToday: false });
-  } catch {
-    qs("fieldsMsg").textContent = "Errore salvataggio campi ❌";
-  }
+  await api("/admin/fields", {
+    method: "PUT",
+    body: JSON.stringify({ fields: STATE.fieldsDraft })
+  });
+  await loadAll({ setDateToToday: false });
 }
 
-/* ===== NOTES ===== */
+/* ================= NOTES ================= */
 async function saveNotes() {
-  try {
-    await api("/admin/notes", {
-      method: "PUT",
-      body: JSON.stringify({ text: qs("notesText").value })
-    });
-    qs("notesView").textContent = qs("notesText").value || "Nessuna comunicazione.";
-  } catch {
-    // opzionale: msg
-  }
+  await api("/admin/notes", {
+    method: "PUT",
+    body: JSON.stringify({ text: qs("notesText").value })
+  });
+  await loadAll({ setDateToToday: false });
 }
 
-/* ===== CONFIG ===== */
+/* ================= CONFIG ================= */
 async function saveConfig() {
-  try {
-    await api("/admin/config", {
-      method: "PUT",
-      body: JSON.stringify({
-        slotMinutes: Number(qs("cfgSlotMinutes").value),
-        dayStart: qs("cfgDayStart").value,
-        dayEnd: qs("cfgDayEnd").value,
-        maxBookingsPerUserPerDay: Number(qs("cfgMaxPerDay").value),
-        maxActiveBookingsPerUser: Number(qs("cfgMaxActive").value)
-      })
-    });
-    qs("configMsg").textContent = "Config salvata ✅";
-    await loadAll({ setDateToToday: false });
-  } catch {
-    qs("configMsg").textContent = "Errore salvataggio config ❌";
-  }
+  await api("/admin/config", {
+    method: "PUT",
+    body: JSON.stringify({
+      slotMinutes: Number(qs("cfgSlotMinutes").value),
+      dayStart: qs("cfgDayStart").value,
+      dayEnd: qs("cfgDayEnd").value,
+      maxBookingsPerUserPerDay: Number(qs("cfgMaxPerDay").value),
+      maxActiveBookingsPerUser: Number(qs("cfgMaxActive").value)
+    })
+  });
+  await loadAll({ setDateToToday: false });
 }
 
-/* ===== USERS (ADMIN) ===== */
+/* ================= USERS ================= */
 async function loadUsers() {
   const r = await api("/admin/users");
-  STATE.users = r.items || [];
-
+  STATE.users = r.items;
   const l = qs("usersList");
   l.innerHTML = "";
 
   STATE.users.forEach(u => {
-    const row = document.createElement("div");
-    row.className = "item";
-
-    const info = document.createElement("div");
-    info.textContent = `${u.username} – crediti ${u.credits}` + (u.disabled ? " (DISABILITATO)" : "");
-    row.appendChild(info);
+    const d = document.createElement("div");
+    d.className = "item";
+    d.textContent = `${u.username} – crediti ${u.credits}`;
 
     const edit = document.createElement("button");
     edit.className = "btn-ghost";
     edit.textContent = "✏️ Crediti";
     edit.onclick = async () => {
-      const v = prompt("Crediti per " + u.username, String(u.credits));
+      const v = prompt("Crediti:", u.credits);
       if (v === null) return;
-      const newCredits = Number(v);
-      if (Number.isNaN(newCredits) || newCredits < 0) return;
-
       await api("/admin/users/credits", {
         method: "PUT",
-        body: JSON.stringify({ username: u.username, delta: newCredits - u.credits })
+        body: JSON.stringify({ username: u.username, delta: v - u.credits })
       });
-      await loadUsers();
+      loadUsers();
     };
 
     const reset = document.createElement("button");
     reset.className = "btn-ghost";
     reset.textContent = "🔑 Reset PW";
     reset.onclick = async () => {
-      const p = prompt("Nuova password per " + u.username);
+      const p = prompt("Nuova password");
       if (!p) return;
       await api("/admin/users/password", {
         method: "PUT",
@@ -380,18 +338,83 @@ async function loadUsers() {
         method: "PUT",
         body: JSON.stringify({ username: u.username, disabled: !u.disabled })
       });
-      await loadUsers();
+      loadUsers();
     };
 
-    row.appendChild(edit);
-    row.appendChild(reset);
-    row.appendChild(toggle);
-
-    l.appendChild(row);
+    d.appendChild(edit);
+    d.appendChild(reset);
+    d.appendChild(toggle);
+    l.appendChild(d);
   });
 }
 
-/* ===== INIT ===== */
+/* ================= GALLERY ================= */
+function renderLoginGallery() {
+  const box = qs("loginGallery");
+  box.innerHTML = "";
+  STATE.gallery.forEach(g => {
+    const w = document.createElement("div");
+    w.className = "login-gallery-item";
+
+    const i = document.createElement("img");
+    i.src = g.url;
+    i.loading = "lazy";
+
+    const c = document.createElement("div");
+    c.className = "login-gallery-caption";
+    c.textContent = g.caption || "";
+
+    w.appendChild(i);
+    w.appendChild(c);
+    box.appendChild(w);
+  });
+}
+function renderGalleryAdmin() {
+  const l = qs("galleryList");
+  l.innerHTML = "";
+  STATE.galleryDraft.forEach((g, i) => {
+    const d = document.createElement("div");
+    d.className = "item";
+    d.textContent = g.caption || g.url;
+
+    const b = document.createElement("button");
+    b.className = "btn-ghost";
+    b.textContent = "🗑️";
+    b.onclick = () => {
+      STATE.galleryDraft.splice(i, 1);
+      renderGalleryAdmin();
+    };
+
+    d.appendChild(b);
+    l.appendChild(d);
+  });
+}
+function addGalleryItem() {
+  if (STATE.galleryDraft.length >= 10) return alert("Max 10 immagini");
+  const url = qs("galleryUrl").value.trim();
+  const cap = qs("galleryCaption").value.trim();
+  if (!url) return;
+  STATE.galleryDraft.push({ url, caption: cap });
+  qs("galleryUrl").value = "";
+  qs("galleryCaption").value = "";
+  renderGalleryAdmin();
+}
+async function saveGallery() {
+  await api("/admin/gallery", {
+    method: "PUT",
+    body: JSON.stringify({ images: STATE.galleryDraft })
+  });
+  await loadAll({ setDateToToday: false });
+}
+
+/* ================= ADMIN NAV ================= */
+function openAdmin(id) {
+  ["adminMenu","adminConfig","adminNotes","adminFields","adminUsers","adminGallery"]
+    .forEach(s => hide(qs(s)));
+  show(qs(id));
+}
+
+/* ================= INIT ================= */
 document.addEventListener("DOMContentLoaded", () => {
   qs("loginBtn").onclick = login;
   qs("logoutBtn").onclick = logout;
@@ -400,19 +423,21 @@ document.addEventListener("DOMContentLoaded", () => {
   qs("datePick").onchange = loadReservations;
   qs("fieldSelect").onchange = renderTimeSelect;
 
-  // admin nav
   qs("btnAdminConfig").onclick = () => openAdmin("adminConfig");
   qs("btnAdminNotes").onclick = () => openAdmin("adminNotes");
   qs("btnAdminFields").onclick = () => openAdmin("adminFields");
   qs("btnAdminUsers").onclick = () => openAdmin("adminUsers");
+  qs("btnAdminGallery").onclick = () => openAdmin("adminGallery");
+
   document.querySelectorAll(".backAdmin")
     .forEach(b => b.onclick = () => openAdmin("adminMenu"));
 
-  // admin actions
   qs("saveConfigBtn").onclick = saveConfig;
   qs("saveNotesBtn").onclick = saveNotes;
   qs("addFieldBtn").onclick = addField;
   qs("saveFieldsBtn").onclick = saveFields;
+  qs("addGalleryBtn").onclick = addGalleryItem;
+  qs("saveGalleryBtn").onclick = saveGallery;
 
   loadAll({ setDateToToday: true }).catch(() => {});
 });
