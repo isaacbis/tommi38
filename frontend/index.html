@@ -85,6 +85,9 @@
       <label>Max prenotazioni per utente (al giorno)</label>
       <input id="cfgMaxPerDay" type="number" min="1">
 
+      <label>Max prenotazioni ATTIVE per utente</label>
+      <input id="cfgMaxActive" type="number" min="1">
+
       <button id="saveConfigBtn" class="btn">Salva</button>
       <div id="configMsg" class="muted"></div>
 
@@ -105,8 +108,12 @@
       <input id="newFieldId" placeholder="id campo">
       <input id="newFieldName" placeholder="nome campo">
       <button id="addFieldBtn" class="btn">Aggiungi</button>
+
       <div id="fieldsList" class="list"></div>
+
       <button id="saveFieldsBtn" class="btn">Salva campi</button>
+      <div id="fieldsMsg" class="muted"></div>
+
       <button class="btn-ghost backAdmin">⬅ Indietro</button>
     </section>
 
