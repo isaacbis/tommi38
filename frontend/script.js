@@ -109,13 +109,58 @@ async function book(){
 }
 
 function renderReservations(){
-  const list=qs("reservationsList");
-  list.innerHTML="";
-  STATE.reservations.forEach(r=>{
-    const d=document.createElement("div");
-    d.className="item";
-    d.textContent=`${r.time} – ${r.fieldId}`;
+  const list = qs("reservationsList");
+  list.innerHTML = "";
+
+  if (STATE.reservations.length === 0) {
+    const d = document.createElement("div");
+    d.className = "muted";
+    d.textContent = "Nessuna prenotazione per questo giorno.";
     list.appendChild(d);
+    return;
+  }
+
+  STATE.reservations.forEach(r => {
+    const item = document.createElement("div");
+    item.className = "item";
+
+    const info = document.createElement("div");
+    info.textContent =
+      `${r.time} – ${r.fieldId}` +
+      (STATE.me.role === "admin" ? ` – utente: ${r.user}` : "");
+
+    item.appendChild(info);
+
+    // 🔴 pulsante cancella (admin SEMPRE, user solo le proprie)
+    const canDelete =
+      STATE.me.role === "admin" ||
+      r.user === STATE.me.username;
+
+    if (canDelete) {
+      const btn = document.createElement("button");
+      btn.className = "btn-ghost";
+      btn.textContent = "❌ Cancella";
+
+      btn.addEventListener("click", async () => {
+        if (!confirm("Vuoi cancellare questa prenotazione?")) return;
+
+        try {
+          await api(`/reservations/${r.id}`, {
+            method: "DELETE"
+          });
+
+          // aggiorna lista + crediti
+          await loadReservations();
+          await loadAll(); // ricarica crediti se admin/user
+        } catch {
+          alert("Errore cancellazione");
+        }
+      });
+
+      item.appendChild(btn);
+    }
+
+    list.appendChild(item);
   });
 }
 
