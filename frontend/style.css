@@ -357,3 +357,26 @@ button:active{ transform: scale(.97); }
   .login-gallery-item{ width: 78px; }
   .login-gallery-item img{ width: 78px; height: 58px; }
 }
+/* ===== FIX: centra la data su mobile ===== */
+@media (max-width: 767px) {
+  .grid3 {
+    justify-items: center;   /* centra gli elementi nel grid */
+  }
+
+  /* input data centrato e senza “spinta” a destra */
+  #datePick {
+    width: min(420px, 100%);
+    justify-self: center;
+    text-align: center;
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  /* anche select allineati bene come la data */
+  #fieldSelect,
+  #timeSelect {
+    width: min(420px, 100%);
+    justify-self: center;
+    text-align: center;
+  }
+}
