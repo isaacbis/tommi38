@@ -4,17 +4,6 @@ const qs = id => document.getElementById(id);
 const show = el => el.classList.remove("hidden");
 const hide = el => el.classList.add("hidden");
 
-async function loadPublicLoginGallery() {
-  try {
-    const pub = await api("/public/config");
-    STATE.gallery = pub.gallery || [];
-    renderLoginGallery();
-  } catch {
-    // silenzioso
-  }
-}
-
-
 /* ================= STATE ================= */
 let STATE = {
   me: null,
@@ -59,6 +48,15 @@ async function api(path, options = {}) {
   return j;
 }
 
+/* ================= PUBLIC (LOGIN) ================= */
+async function loadPublicLoginGallery() {
+  try {
+    const pub = await api("/public/config");
+    STATE.gallery = pub.gallery || [];
+    renderLoginGallery();
+  } catch {}
+}
+
 /* ================= AUTH ================= */
 async function login() {
   try {
@@ -69,7 +67,7 @@ async function login() {
         password: qs("password").value.trim()
       })
     });
-    await loadAll({ setDateToToday: true });
+    await loadAll(true);
   } catch {
     qs("loginErr").textContent = "Login fallito";
     show(qs("loginErr"));
@@ -80,8 +78,8 @@ async function logout() {
   location.reload();
 }
 
-/* ================= LOAD ================= */
-async function loadAll({ setDateToToday = false } = {}) {
+/* ================= LOAD BASE ================= */
+async function loadAll(setDateToday = false) {
   STATE.me = await api("/me");
   const pub = await api("/public/config");
 
@@ -92,31 +90,29 @@ async function loadAll({ setDateToToday = false } = {}) {
   STATE.gallery = pub.gallery || [];
   STATE.galleryDraft = [...STATE.gallery];
 
+  hide(qs("loginBox"));
+  show(qs("app"));
+  show(qs("logoutBtn"));
+
   qs("welcome").textContent = `Ciao ${STATE.me.username}`;
   qs("creditsBox").textContent = `Crediti: ${STATE.me.credits}`;
   qs("roleBadge").textContent = STATE.me.role;
   qs("notesView").textContent = STATE.notes || "Nessuna comunicazione.";
 
-  hide(qs("loginBox"));
-  show(qs("app"));
-  show(qs("logoutBtn"));
-
-  if (setDateToToday || !qs("datePick").value) {
+  if (setDateToday || !qs("datePick").value) {
     qs("datePick").value = localISODate();
   }
 
-  renderLoginGallery();
   renderFields();
+  renderLoginGallery();
 
   if (STATE.me.role === "admin") {
     show(qs("adminMenu"));
-
     qs("cfgSlotMinutes").value = pub.slotMinutes;
     qs("cfgDayStart").value = pub.dayStart;
     qs("cfgDayEnd").value = pub.dayEnd;
     qs("cfgMaxPerDay").value = pub.maxBookingsPerUserPerDay;
     qs("cfgMaxActive").value = pub.maxActiveBookingsPerUser;
-
     qs("notesText").value = STATE.notes;
     renderFieldsAdmin();
     renderGalleryAdmin();
@@ -128,7 +124,7 @@ async function loadAll({ setDateToToday = false } = {}) {
 
 /* ================= RESERVATIONS ================= */
 async function loadReservations() {
-  const date = qs("datePick").value || localISODate();
+  const date = qs("datePick").value;
   const res = await api(`/reservations?date=${date}`);
 
   STATE.dayReservationsAll = res.items || [];
@@ -176,30 +172,63 @@ function renderTimeSelect() {
   }
 }
 
+/* ===== PRENOTA (UI OTTIMISTICA) ===== */
 async function book() {
+  const fieldId = qs("fieldSelect").value;
+  const date = qs("datePick").value;
+  const time = qs("timeSelect").value;
+
+  qs("bookBtn").disabled = true;
+  qs("bookBtn").textContent = "Salvataggio…";
+
+  // UI immediata
+  STATE.reservations.push({
+    id: "tmp_" + Date.now(),
+    fieldId,
+    date,
+    time,
+    user: STATE.me.username
+  });
+  renderReservations();
+  renderTimeSelect();
+
   try {
     await api("/reservations", {
       method: "POST",
-      body: JSON.stringify({
-        fieldId: qs("fieldSelect").value,
-        date: qs("datePick").value,
-        time: qs("timeSelect").value
-      })
+      body: JSON.stringify({ fieldId, date, time })
     });
+
     qs("bookMsg").textContent = "Prenotazione effettuata ✅";
-    await loadAll({ setDateToToday: false });
+    await refreshCredits();
+    await loadReservations();
+
   } catch (e) {
     qs("bookMsg").textContent =
       e?.error === "ACTIVE_BOOKING_LIMIT"
         ? "Hai già una prenotazione attiva"
         : "Errore prenotazione";
+    await loadReservations();
   }
+
+  qs("bookBtn").disabled = false;
+  qs("bookBtn").textContent = "Prenota";
 }
 
 async function deleteReservation(id) {
   if (!confirm("Cancellare la prenotazione?")) return;
-  await api(`/reservations/${id}`, { method: "DELETE" });
-  await loadAll({ setDateToToday: false });
+
+  // UI immediata
+  STATE.reservations = STATE.reservations.filter(r => r.id !== id);
+  renderReservations();
+  renderTimeSelect();
+
+  try {
+    await api(`/reservations/${id}`, { method: "DELETE" });
+    await refreshCredits();
+    await loadReservations();
+  } catch {
+    await loadReservations();
+  }
 }
 
 function renderReservations() {
@@ -218,18 +247,23 @@ function renderReservations() {
       `${r.time} – ${r.fieldId}` +
       (STATE.me.role === "admin" ? ` – ${r.user}` : "");
 
-    const canDelete =
-      STATE.me.role === "admin" || r.user === STATE.me.username;
-
-    if (canDelete) {
+    if (STATE.me.role === "admin" || r.user === STATE.me.username) {
       const b = document.createElement("button");
       b.className = "btn-ghost";
       b.textContent = "❌ Cancella";
       b.onclick = () => deleteReservation(r.id);
       d.appendChild(b);
     }
+
     list.appendChild(d);
   });
+}
+
+/* ================= CREDITI ================= */
+async function refreshCredits() {
+  const me = await api("/me");
+  STATE.me.credits = me.credits;
+  qs("creditsBox").textContent = `Crediti: ${me.credits}`;
 }
 
 /* ================= FIELDS ================= */
@@ -277,7 +311,6 @@ async function saveFields() {
     method: "PUT",
     body: JSON.stringify({ fields: STATE.fieldsDraft })
   });
-  await loadAll({ setDateToToday: false });
 }
 
 /* ================= NOTES ================= */
@@ -286,7 +319,6 @@ async function saveNotes() {
     method: "PUT",
     body: JSON.stringify({ text: qs("notesText").value })
   });
-  await loadAll({ setDateToToday: false });
 }
 
 /* ================= CONFIG ================= */
@@ -301,7 +333,6 @@ async function saveConfig() {
       maxActiveBookingsPerUser: Number(qs("cfgMaxActive").value)
     })
   });
-  await loadAll({ setDateToToday: false });
 }
 
 /* ================= USERS ================= */
@@ -320,7 +351,7 @@ async function loadUsers() {
     edit.className = "btn-ghost";
     edit.textContent = "✏️ Crediti";
     edit.onclick = async () => {
-      const v = prompt("Crediti:", u.credits);
+      const v = prompt("Nuovi crediti", u.credits);
       if (v === null) return;
       await api("/admin/users/credits", {
         method: "PUT",
@@ -365,7 +396,6 @@ function renderLoginGallery() {
   if (!box) return;
 
   box.innerHTML = "";
-
   STATE.gallery.forEach(g => {
     if (!g.url || !g.link) return;
 
@@ -376,22 +406,18 @@ function renderLoginGallery() {
     a.href = g.link;
     a.target = "_blank";
     a.rel = "noopener noreferrer";
-
-    // 🔒 BLOCCA EVENTI SPA
-    a.addEventListener("click", e => {
-      e.stopPropagation();
-    });
+    a.addEventListener("click", e => e.stopPropagation());
 
     const img = document.createElement("img");
     img.src = g.url;
     img.loading = "lazy";
-    img.alt = g.caption || "immagine";
 
     a.appendChild(img);
     wrap.appendChild(a);
     box.appendChild(wrap);
   });
 }
+
 function renderGalleryAdmin() {
   const l = qs("galleryList");
   l.innerHTML = "";
@@ -416,11 +442,15 @@ function addGalleryItem() {
   if (STATE.galleryDraft.length >= 10) return alert("Max 10 immagini");
   const url = qs("galleryUrl").value.trim();
   const cap = qs("galleryCaption").value.trim();
-  if (!url) return;
-  const link = qs("galleryLink").value = "";
-STATE.galleryDraft.push({ url, caption: cap, link });
+  const link = qs("galleryLink").value.trim();
+  if (!url || !link.startsWith("http")) {
+    alert("URL e link devono essere validi");
+    return;
+  }
+  STATE.galleryDraft.push({ url, caption: cap, link });
   qs("galleryUrl").value = "";
   qs("galleryCaption").value = "";
+  qs("galleryLink").value = "";
   renderGalleryAdmin();
 }
 async function saveGallery() {
@@ -428,7 +458,6 @@ async function saveGallery() {
     method: "PUT",
     body: JSON.stringify({ images: STATE.galleryDraft })
   });
-  await loadAll({ setDateToToday: false });
 }
 
 /* ================= ADMIN NAV ================= */
@@ -464,6 +493,5 @@ document.addEventListener("DOMContentLoaded", () => {
   qs("saveGalleryBtn").onclick = saveGallery;
 
   loadPublicLoginGallery();
-loadAll({ setDateToToday: true }).catch(() => {});
-
+  loadAll(true).catch(() => {});
 });
