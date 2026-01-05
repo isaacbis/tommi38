@@ -18,6 +18,31 @@ let STATE = {
   galleryDraft: []
 };
 
+let AUTO_REFRESH_TIMER = null;
+
+function startAutoRefresh() {
+  stopAutoRefresh();
+  AUTO_REFRESH_TIMER = setInterval(async () => {
+    try {
+      // aggiorna prenotazioni (e quindi timeline, stato, ecc.)
+      await loadReservations();
+
+      // aggiorna crediti (solo se user)
+      if (STATE.me && STATE.me.role === "user") {
+        await refreshCredits();
+      }
+    } catch (e) {
+      // se la sessione è scaduta o il server dorme, non blocchiamo la UI
+      console.warn("Auto-refresh fallito", e);
+    }
+  }, 60_000);
+}
+
+function stopAutoRefresh() {
+  if (AUTO_REFRESH_TIMER) clearInterval(AUTO_REFRESH_TIMER);
+  AUTO_REFRESH_TIMER = null;
+}
+
 /* ================= DATE / TIME ================= */
 function localISODate(d = new Date()) {
   const tz = d.getTimezoneOffset() * 60000;
@@ -247,8 +272,7 @@ function renderFieldInfo() {
     <div class="field-countdown">${countdownText}</div>
   `;
 
-  renderTimeline(fieldId); // ⬅️ AGGIUNGI QUESTA RIGA
-}
+  renderTimeline(fieldId);
 
 function renderTimeline(fieldId) {
   const slot = STATE.config.slotMinutes || 45;
@@ -266,12 +290,27 @@ function renderTimeline(fieldId) {
 
   box.innerHTML = "";
 
+  // slot bar
   for (let m = start; m + slot <= end; m += slot) {
     const t = timeStr(m);
     const el = document.createElement("div");
     el.className = "slot " + (taken.has(t) ? "busy" : "free");
     box.appendChild(el);
   }
+
+  // ===== ORA marker =====
+  const marker = document.createElement("div");
+  marker.className = "now-marker";
+  box.appendChild(marker);
+
+  const now = nowMinutes();
+  if (now < start || now > end) {
+    marker.style.display = "none";
+    return;
+  }
+
+  const pct = ((now - start) / (end - start)) * 100;
+  marker.style.left = `${pct}%`;
 }
 
 function renderTimeSelect() {
@@ -619,6 +658,7 @@ document.addEventListener("DOMContentLoaded", () => {
 };
 
 
+
   qs("btnAdminConfig").onclick = () => openAdmin("adminConfig");
   qs("btnAdminNotes").onclick = () => openAdmin("adminNotes");
   qs("btnAdminFields").onclick = () => openAdmin("adminFields");
@@ -639,10 +679,10 @@ loadPublicLoginGallery();
 
 loadAll(true)
   .then(() => {
-    // forza il meteo per gli utenti
     if (STATE.me && STATE.me.role === "user") {
       loadWeather();
     }
+    startAutoRefresh(); // ⬅️ avvia refresh ogni 60s
   })
   .catch(err => console.error(err));
 

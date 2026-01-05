@@ -554,3 +554,102 @@ button:active{ transform: scale(.97); }
     0 0 14px rgba(255,179,71,.35),
     0 0 42px rgba(255,122,89,.22);
 }
+/* ===== NOW MARKER (ORA) ===== */
+.timeline { position: relative; } /* necessario per posizionare la linea */
+
+.now-marker{
+  position: absolute;
+  top: -6px;
+  bottom: -6px;
+  width: 2px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(248,211,138,.0), rgba(248,211,138,.95), rgba(77,208,225,.85));
+  box-shadow:
+    0 0 10px rgba(255,179,71,.55),
+    0 0 28px rgba(77,208,225,.22);
+  transform: translateX(-1px);
+  animation: nowPulse 1.2s var(--ease) infinite;
+}
+
+@keyframes nowPulse{
+  0%   { opacity: .55; filter: saturate(1); }
+  50%  { opacity: 1;   filter: saturate(1.25); }
+  100% { opacity: .55; filter: saturate(1); }
+}
+/* ===== TECH CARD (rim neon + scanline) ===== */
+.card-tech{
+  border: 1px solid rgba(255,255,255,.10);
+}
+
+.card-tech::after{
+  border: 1px solid rgba(255,179,71,.10);
+}
+
+.card-tech::before{
+  opacity: 1;
+}
+
+.card-tech{
+  box-shadow:
+    0 22px 55px rgba(0,0,0,.55),
+    0 0 0 1px rgba(77,208,225,.06),
+    0 0 40px rgba(77,208,225,.06);
+}
+
+/* scanline soft */
+.card-tech .scanline,
+.card-tech::marker{ /* no-op, solo per compat */
+}
+
+.card-tech{
+  position: relative;
+}
+
+.card-tech::selection{ background: rgba(255,179,71,.25); }
+
+.card-tech::before{
+  /* già usi ::before per rim light: lo lasciamo, e aggiungiamo scanline con un overlay */
+}
+
+.card-tech::after{
+  pointer-events:none;
+}
+
+.card-tech::before{
+  pointer-events:none;
+}
+
+.card-tech::before{
+  /* rim light già presente nel tuo .card::before, qui non serve duplicare */
+}
+
+.card-tech .timeline{
+  margin-top: 12px;
+}
+
+/* ===== TIMELINE SLOT “TECH” ===== */
+.slot{
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.10);
+}
+
+.slot.free{
+  background: linear-gradient(180deg, rgba(77,208,225,.40), rgba(77,208,225,.22));
+}
+
+.slot.busy{
+  background: linear-gradient(180deg, rgba(255,122,89,.55), rgba(255,122,89,.28));
+}
+
+.slot:hover{
+  box-shadow:
+    inset 0 0 0 1px rgba(255,255,255,.14),
+    0 0 18px rgba(77,208,225,.10),
+    0 0 22px rgba(255,179,71,.10);
+}
+
+/* ===== MICRO-ANIMAZIONE CARD TECH (solo hover desktop) ===== */
+@media (hover:hover) {
+  .card-tech:hover{
+    transform: translateY(-1px);
+  }
+}
