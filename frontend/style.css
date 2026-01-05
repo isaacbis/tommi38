@@ -499,3 +499,8 @@ button:active{ transform: scale(.97); }
     width: 100%;
   }
 }
+/* ===== METEO 3B METEO ===== */
+#weatherBox iframe {
+  background: #0b1020;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.08);
+}
