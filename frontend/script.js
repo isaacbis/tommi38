@@ -170,7 +170,6 @@ async function loadAll(setDateToday = false) {
   }
 
   await loadReservations();
-loadWeather();
 
 }
 
@@ -548,4 +547,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
   loadPublicLoginGallery();
   loadAll(true).catch(() => {});
+// meteo SOLO dopo che l'app è visibile
+setTimeout(() => {
+  if (STATE.me) loadWeather();
+}, 300);
 });
