@@ -273,6 +273,7 @@ function renderFieldInfo() {
   `;
 
   renderTimeline(fieldId);
+}
 
 
 function renderTimeSelect() {
@@ -309,6 +310,7 @@ function renderTimeSelect() {
     sel.appendChild(o);
   }
 }
+
 function renderTimeline(fieldId) {
   const slot = STATE.config.slotMinutes || 45;
   const start = minutes(STATE.config.dayStart);
