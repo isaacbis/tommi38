@@ -1,17 +1,18 @@
 const CACHE_NAME = "tommi38-pwa-v1";
 
-const OFFLINE_FILES = [
+const ASSETS = [
   "/",
   "/index.html",
   "/style.css",
   "/script.js",
-  "/manifest.json"
+  "/icon-192.png",
+  "/icon-512.png"
 ];
 
 // Install
 self.addEventListener("install", event => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(OFFLINE_FILES))
+    caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS))
   );
   self.skipWaiting();
 });
