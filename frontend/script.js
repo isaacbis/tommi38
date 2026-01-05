@@ -48,6 +48,38 @@ function weatherEmoji(code) {
   return "❓";
 }
 
+// ===== STATO CAMPO =====
+function getFieldStatus(fieldId) {
+  const now = nowMinutes();
+  const slot = STATE.config.slotMinutes || 45;
+
+  const current = STATE.dayReservationsAll.find(r => {
+    if (r.fieldId !== fieldId) return false;
+    const start = minutes(r.time);
+    return now >= start && now < start + slot;
+  });
+
+  if (current) return { status: "playing", user: current.user };
+
+  const todayHas = STATE.dayReservationsAll.some(r => r.fieldId === fieldId);
+  if (todayHas) return { status: "busy" };
+
+  return { status: "free" };
+}
+
+// ===== COUNTDOWN PROSSIMA PARTITA =====
+function getNextMatchCountdown(fieldId) {
+  const now = nowMinutes();
+
+  const next = STATE.dayReservationsAll
+    .filter(r => r.fieldId === fieldId)
+    .map(r => minutes(r.time))
+    .filter(t => t > now)
+    .sort((a, b) => a - b)[0];
+
+  return next ? next - now : null;
+}
+
 
 /* ================= API ================= */
 async function api(path, options = {}) {
@@ -188,6 +220,58 @@ async function loadReservations() {
 
   renderTimeSelect();
   renderReservations();
+renderFieldInfo();
+
+}
+
+function renderFieldInfo() {
+  const fieldId = qs("fieldSelect").value;
+  const box = qs("fieldInfo");
+
+  if (!box) return;
+
+  const status = getFieldStatus(fieldId);
+  const countdown = getNextMatchCountdown(fieldId);
+
+  let statusText = "🟢 Campo libero";
+  if (status.status === "playing") statusText = "🟡 Partita in corso";
+  if (status.status === "busy") statusText = "🔴 Campo occupato oggi";
+
+  let countdownText = "Nessuna partita prevista";
+  if (countdown !== null) {
+    countdownText = `⏳ Prossima partita tra ${countdown} min`;
+  }
+
+  box.innerHTML = `
+    <div class="field-status glow">${statusText}</div>
+    <div class="field-countdown">${countdownText}</div>
+  `;
+
+  renderTimeline(fieldId); // ⬅️ AGGIUNGI QUESTA RIGA
+}
+
+function renderTimeline(fieldId) {
+  const slot = STATE.config.slotMinutes || 45;
+  const start = minutes(STATE.config.dayStart);
+  const end = minutes(STATE.config.dayEnd);
+
+  const taken = new Set(
+    STATE.dayReservationsAll
+      .filter(r => r.fieldId === fieldId)
+      .map(r => r.time)
+  );
+
+  const box = qs("timeline");
+  if (!box) return;
+
+  box.innerHTML = "";
+
+  for (let m = start; m + slot <= end; m += slot) {
+    const t = timeStr(m);
+    const el = document.createElement("div");
+    el.className = "slot " + (taken.has(t) ? "busy" : "free");
+    box.appendChild(el);
+  }
 }
 
 function renderTimeSelect() {
@@ -529,7 +613,11 @@ document.addEventListener("DOMContentLoaded", () => {
   qs("bookBtn").onclick = book;
 
   qs("datePick").onchange = loadReservations;
-  qs("fieldSelect").onchange = renderTimeSelect;
+  qs("fieldSelect").onchange = () => {
+  renderTimeSelect();
+  renderFieldInfo();
+};
+
 
   qs("btnAdminConfig").onclick = () => openAdmin("adminConfig");
   qs("btnAdminNotes").onclick = () => openAdmin("adminNotes");

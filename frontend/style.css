@@ -514,3 +514,43 @@ button:active{ transform: scale(.97); }
   font-weight:800;
   text-decoration:none;
 }
+/* ===== FIELD STATUS ===== */
+.field-status {
+  font-weight: 900;
+  font-size: 16px;
+  margin-bottom: 6px;
+}
+.field-countdown {
+  font-size: 14px;
+  color: var(--muted);
+}
+
+/* ===== TIMELINE ===== */
+.timeline {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin-top: 10px;
+}
+.slot {
+  flex: 1;
+  height: 10px;
+  border-radius: 6px;
+  transition: transform .2s ease, box-shadow .2s ease;
+}
+.slot.free {
+  background: rgba(77,208,225,.45);
+}
+.slot.busy {
+  background: rgba(255,122,89,.55);
+}
+.slot:hover {
+  transform: scaleY(1.6);
+}
+
+/* ===== GLOW ===== */
+.glow {
+  box-shadow:
+    0 0 14px rgba(255,179,71,.35),
+    0 0 42px rgba(255,122,89,.22);
+}
