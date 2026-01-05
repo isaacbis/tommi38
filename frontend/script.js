@@ -556,3 +556,5 @@ loadAll(true)
   .catch(() => {
     // ignore
   });
+
+}); // ⬅️ CHIUSURA DOMContentLoaded (OBBLIGATORIA)
