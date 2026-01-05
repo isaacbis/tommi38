@@ -270,4 +270,22 @@ router.put("/admin/users/password", requireAdmin, async (req, res) => {
   res.json({ ok: true });
 });
 
+// ===== METEO (proxy backend per CSP) =====
+router.get("/weather", async (req, res) => {
+  try {
+    const lat = 43.716;
+    const lon = 13.218;
+
+    const r = await fetch(
+      `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=weathercode&timezone=Europe/Rome`
+    );
+
+    const data = await r.json();
+    res.json(data);
+  } catch (e) {
+    res.status(500).json({ error: "WEATHER_ERROR" });
+  }
+});
+
+
 export default router;

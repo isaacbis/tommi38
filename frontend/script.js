@@ -84,9 +84,8 @@ async function loadWeather() {
     const lat = 43.716;
     const lon = 13.218;
 
-    const res = await fetch(
-      `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=weathercode&timezone=Europe/Rome`
-    );
+    const res = await api("/weather");
+
     const data = await res.json();
 
     row.innerHTML = "";
