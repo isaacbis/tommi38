@@ -181,9 +181,10 @@ async function loadReservations() {
 
   STATE.dayReservationsAll = res.items || [];
   STATE.reservations =
-    STATE.me.role === "admin"
-      ? STATE.dayReservationsAll
-      : STATE.dayReservationsAll.filter(r => r.user === STATE.me.username);
+  STATE.me.role === "admin"
+    ? STATE.dayReservationsAll
+    : STATE.dayReservationsAll.filter(r => r.user === STATE.me.username);
+
 
   renderTimeSelect();
   renderReservations();
@@ -295,9 +296,11 @@ function renderReservations() {
   STATE.reservations.forEach(r => {
     const d = document.createElement("div");
     d.className = "item";
+
     d.textContent =
-      `${r.time} – ${r.fieldId}` +
-      (STATE.me.role === "admin" ? ` – ${r.user}` : "");
+      STATE.me.role === "admin"
+        ? `${r.time} – ${r.fieldId} – 👤 ${r.user}`
+        : `${r.time} – ${r.fieldId}`;
 
     if (STATE.me.role === "admin" || r.user === STATE.me.username) {
       const b = document.createElement("button");
