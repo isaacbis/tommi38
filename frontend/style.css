@@ -431,3 +431,33 @@ button:active{ transform: scale(.97); }
     margin-top: 6px;
   }
 }
+/* ===== METEO SETTIMANA ===== */
+.weather-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.weather-day {
+  flex: 1;
+  text-align: center;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.weather-emoji {
+  font-size: 20px;
+  display: block;
+  margin-top: 4px;
+}
+
+/* mobile: più compatto */
+@media (max-width: 767px) {
+  .weather-day {
+    font-size: 12px;
+  }
+  .weather-emoji {
+    font-size: 18px;
+  }
+}

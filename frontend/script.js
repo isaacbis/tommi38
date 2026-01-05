@@ -36,6 +36,19 @@ function timeStr(m) {
          String(m % 60).padStart(2, "0");
 }
 
+function weatherEmoji(code) {
+  if (code === 0) return "☀️";
+  if (code <= 2) return "🌤️";
+  if (code <= 3) return "☁️";
+  if (code <= 48) return "🌫️";
+  if (code <= 67) return "🌧️";
+  if (code <= 77) return "🌨️";
+  if (code <= 82) return "🌦️";
+  if (code <= 99) return "⛈️";
+  return "❓";
+}
+
+
 /* ================= API ================= */
 async function api(path, options = {}) {
   const r = await fetch(API + path, {
@@ -56,6 +69,43 @@ async function loadPublicLoginGallery() {
     renderLoginGallery();
   } catch {}
 }
+
+async function loadWeather() {
+  try {
+    // 📍 Senigallia
+    const lat = 43.716;
+    const lon = 13.218;
+
+    const res = await fetch(
+      `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=weathercode&timezone=Europe/Rome`
+    );
+    const data = await res.json();
+
+    const row = qs("weatherRow");
+    row.innerHTML = "";
+
+    const days = data.daily.time;
+    const codes = data.daily.weathercode;
+
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(days[i]);
+      const name = d.toLocaleDateString("it-IT", { weekday: "short" });
+
+      const el = document.createElement("div");
+      el.className = "weather-day";
+      el.innerHTML = `
+        ${name}
+        <span class="weather-emoji">${weatherEmoji(codes[i])}</span>
+      `;
+      row.appendChild(el);
+    }
+
+    show(qs("weatherBox"));
+  } catch {
+    // se l'API non risponde non succede nulla
+  }
+}
+
 
 /* ================= AUTH ================= */
 async function login() {
@@ -120,7 +170,11 @@ async function loadAll(setDateToday = false) {
   }
 
   await loadReservations();
+loadWeather();
+
 }
+
+
 
 /* ================= RESERVATIONS ================= */
 async function loadReservations() {
