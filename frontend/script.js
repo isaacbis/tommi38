@@ -546,9 +546,12 @@ document.addEventListener("DOMContentLoaded", () => {
   qs("saveGalleryBtn").onclick = saveGallery;
 
   loadPublicLoginGallery();
-  loadAll(true).catch(() => {});
-// meteo SOLO dopo che l'app è visibile
-setTimeout(() => {
-  if (STATE.me) loadWeather();
-}, 300);
+
+loadAll(true)
+  .then(() => {
+    if (STATE.me && STATE.me.role === "user") {
+      loadWeather();
+    }
+  })
+  .catch(()
 });
