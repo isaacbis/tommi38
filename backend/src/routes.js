@@ -40,7 +40,6 @@ function localISODate() {
   return new Date(d.getTime() - tz).toISOString().slice(0, 10);
 }
 
-// 🔄 Cancella automaticamente le prenotazioni terminate
 async function cleanupExpiredReservations() {
   const now = Date.now();
   if (now - lastCleanup < CLEANUP_COOLDOWN_MS) return;
@@ -51,7 +50,6 @@ async function cleanupExpiredReservations() {
   const slotMinutes = Number(cfg.slotMinutes || 45);
 
   const today = localISODate();
-
   const nowMinutes = new Date().getHours() * 60 + new Date().getMinutes();
 
   const snap = await db
@@ -66,15 +64,20 @@ async function cleanupExpiredReservations() {
   snap.forEach(doc => {
     const r = doc.data();
 
-    const endMinutes =
-      r.date === today
-        ? timeToMinutes(r.time) + slotMinutes
-        : 0;
+    let expired = false;
 
-    const expired =
-      r.date < today ||
-      (r.date === today && endMinutes <= nowMinutes);
+    // 🔥 TUTTO quello che è prima di oggi → via
+    if (r.date < today) {
+      expired = true;
+    }
 
+    // 🔥 oggi ma orario finito → via
+    if (r.date === today) {
+      const end = timeToMinutes(r.time) + slotMinutes;
+      if (end <= nowMinutes) expired = true;
+    }
+
+    // ❗ NESSUNA distinzione admin/user
     if (expired) {
       batch.delete(doc.ref);
     }
