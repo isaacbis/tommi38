@@ -71,8 +71,16 @@ async function loadPublicLoginGallery() {
 }
 
 async function loadWeather() {
+  const box = document.getElementById("weatherBox");
+  const row = document.getElementById("weatherRow");
+
+  if (!box || !row) {
+    console.error("weatherBox o weatherRow non trovati");
+    return;
+  }
+
   try {
-    // 📍 Senigallia
+    // Senigallia
     const lat = 43.716;
     const lon = 13.218;
 
@@ -81,28 +89,26 @@ async function loadWeather() {
     );
     const data = await res.json();
 
-    const row = qs("weatherRow");
     row.innerHTML = "";
 
-    const days = data.daily.time;
-    const codes = data.daily.weathercode;
-
     for (let i = 0; i < 7; i++) {
-      const d = new Date(days[i]);
-      const name = d.toLocaleDateString("it-IT", { weekday: "short" });
+      const d = new Date(data.daily.time[i]);
+      const day = d.toLocaleDateString("it-IT", { weekday: "short" });
 
       const el = document.createElement("div");
       el.className = "weather-day";
       el.innerHTML = `
-        ${name}
-        <span class="weather-emoji">${weatherEmoji(codes[i])}</span>
+        ${day}
+        <span class="weather-emoji">${weatherEmoji(data.daily.weathercode[i])}</span>
       `;
       row.appendChild(el);
     }
 
-    show(qs("weatherBox"));
-  } catch {
-    // se l'API non risponde non succede nulla
+    // 🔴 QUESTA ERA LA PARTE CHE NON AVVENIVA MAI
+    box.classList.remove("hidden");
+
+  } catch (e) {
+    console.error("Errore meteo", e);
   }
 }
 
@@ -549,12 +555,9 @@ loadPublicLoginGallery();
 
 loadAll(true)
   .then(() => {
+    // forza il meteo per gli utenti
     if (STATE.me && STATE.me.role === "user") {
       loadWeather();
     }
   })
-  .catch(() => {
-    // ignore
-  });
-
-}); // ⬅️ CHIUSURA DOMContentLoaded (OBBLIGATORIA)
+  .catch(err => console.error(err));
