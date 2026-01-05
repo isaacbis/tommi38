@@ -191,7 +191,8 @@ router.post("/reservations", requireAuth, async (req, res) => {
   const cfg = cfgSnap.exists ? cfgSnap.data() : {};
   const slotMinutes = Number(cfg.slotMinutes || 45);
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localISODate();
+
   const nowMinutes = new Date().getHours() * 60 + new Date().getMinutes();
 
   /* 🔒 UNA SOLA PRENOTAZIONE TOTALE PER USER */
@@ -251,7 +252,7 @@ router.delete("/reservations/:id", requireAuth, async (req, res) => {
     return res.status(403).json({ error: "NOT_ALLOWED" });
   }
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localISODate();
 
   /* recupero credito SOLO se futuro */
   if (!isAdmin && r.date > today) {
