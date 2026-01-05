@@ -380,3 +380,54 @@ button:active{ transform: scale(.97); }
     text-align: center;
   }
 }
+/* =======================================================
+   MOBILE FIX – CONFIG ORARI + ADMIN USERS
+   ======================================================= */
+@media (max-width: 767px) {
+
+  /* ---------- CONFIG: orari centrati ---------- */
+  #adminConfig input[type="time"],
+  #adminConfig input[type="number"] {
+    width: min(420px, 100%);
+    margin-left: auto;
+    margin-right: auto;
+    display: block;
+    text-align: center;
+  }
+
+  #adminConfig h4 {
+    text-align: center;
+  }
+
+  /* ---------- ADMIN USERS: niente overflow ---------- */
+  #adminUsers .item {
+    flex-direction: column;        /* stack verticale */
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  #adminUsers .item {
+    font-size: 14px;               /* testo più piccolo */
+    line-height: 1.3;
+    word-break: break-word;        /* spezza username lunghi */
+    overflow-wrap: anywhere;
+  }
+
+  /* username e info non escono più dallo schermo */
+  #adminUsers .item span,
+  #adminUsers .item div {
+    max-width: 100%;
+  }
+
+  /* ---------- BOTTONI UTENTE: più compatti ---------- */
+  #adminUsers .item button {
+    font-size: 13px;
+    padding: 8px 10px;
+    width: 100%;                   /* full width, touch-friendly */
+  }
+
+  /* spazio tra i bottoni */
+  #adminUsers .item button + button {
+    margin-top: 6px;
+  }
+}
