@@ -274,44 +274,6 @@ function renderFieldInfo() {
 
   renderTimeline(fieldId);
 
-function renderTimeline(fieldId) {
-  const slot = STATE.config.slotMinutes || 45;
-  const start = minutes(STATE.config.dayStart);
-  const end = minutes(STATE.config.dayEnd);
-
-  const taken = new Set(
-    STATE.dayReservationsAll
-      .filter(r => r.fieldId === fieldId)
-      .map(r => r.time)
-  );
-
-  const box = qs("timeline");
-  if (!box) return;
-
-  box.innerHTML = "";
-
-  // slot bar
-  for (let m = start; m + slot <= end; m += slot) {
-    const t = timeStr(m);
-    const el = document.createElement("div");
-    el.className = "slot " + (taken.has(t) ? "busy" : "free");
-    box.appendChild(el);
-  }
-
-  // ===== ORA marker =====
-  const marker = document.createElement("div");
-  marker.className = "now-marker";
-  box.appendChild(marker);
-
-  const now = nowMinutes();
-  if (now < start || now > end) {
-    marker.style.display = "none";
-    return;
-  }
-
-  const pct = ((now - start) / (end - start)) * 100;
-  marker.style.left = `${pct}%`;
-}
 
 function renderTimeSelect() {
   const sel = qs("timeSelect");
@@ -346,6 +308,42 @@ function renderTimeSelect() {
 
     sel.appendChild(o);
   }
+}
+function renderTimeline(fieldId) {
+  const slot = STATE.config.slotMinutes || 45;
+  const start = minutes(STATE.config.dayStart);
+  const end = minutes(STATE.config.dayEnd);
+
+  const taken = new Set(
+    STATE.dayReservationsAll
+      .filter(r => r.fieldId === fieldId)
+      .map(r => r.time)
+  );
+
+  const box = qs("timeline");
+  if (!box) return;
+
+  box.innerHTML = "";
+
+  for (let m = start; m + slot <= end; m += slot) {
+    const t = timeStr(m);
+    const el = document.createElement("div");
+    el.className = "slot " + (taken.has(t) ? "busy" : "free");
+    box.appendChild(el);
+  }
+
+  const marker = document.createElement("div");
+  marker.className = "now-marker";
+  box.appendChild(marker);
+
+  const now = nowMinutes();
+  if (now < start || now > end) {
+    marker.style.display = "none";
+    return;
+  }
+
+  const pct = ((now - start) / (end - start)) * 100;
+  marker.style.left = `${pct}%`;
 }
 
 /* ===== PRENOTA (UI OTTIMISTICA) ===== */
