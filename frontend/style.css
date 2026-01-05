@@ -461,3 +461,41 @@ button:active{ transform: scale(.97); }
     font-size: 18px;
   }
 }
+/* =======================================================
+   FIX DEFINITIVO MOBILE – INPUT ORARI ADMIN CONFIG
+   ======================================================= */
+@media (max-width: 767px) {
+
+  /* contenitore config */
+  #adminConfig {
+    display: flex;
+    flex-direction: column;
+    align-items: center; /* CENTRA TUTTO */
+  }
+
+  /* wrapper implicito degli input */
+  #adminConfig input[type="time"],
+  #adminConfig input[type="number"] {
+    width: 100%;
+    max-width: 360px;
+    margin-left: auto;
+    margin-right: auto;
+
+    /* reset padding “strano” mobile */
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+
+    /* centra il testo visivo */
+    text-align: center;
+
+    /* forza allineamento interno */
+    appearance: none;
+    -webkit-appearance: none;
+  }
+
+  /* etichette visivamente centrate */
+  #adminConfig h4 {
+    text-align: center;
+    width: 100%;
+  }
+}
