@@ -561,3 +561,5 @@ loadAll(true)
     }
   })
   .catch(err => console.error(err));
+
+}); // ⬅️ CHIUSURA DOMContentLoaded (OBBLIGATORIA)
