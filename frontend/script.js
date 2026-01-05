@@ -683,7 +683,7 @@ loadAll(true)
       loadWeather();
     }
     startAutoRefresh();
-  });
+  })
   .catch(err => console.error(err));
 
 }); // ⬅️ CHIUSURA DOMContentLoaded (OBBLIGATORIA)
