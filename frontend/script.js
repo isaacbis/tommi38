@@ -682,8 +682,8 @@ loadAll(true)
     if (STATE.me && STATE.me.role === "user") {
       loadWeather();
     }
-    startAutoRefresh(); // ⬅️ avvia refresh ogni 60s
-  })
+    startAutoRefresh();
+  });
   .catch(err => console.error(err));
 
 }); // ⬅️ CHIUSURA DOMContentLoaded (OBBLIGATORIA)
