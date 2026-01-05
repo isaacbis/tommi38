@@ -682,7 +682,7 @@ loadAll(true)
     if (STATE.me && STATE.me.role === "user") {
       loadWeather();
     }
-    startAutoRefresh();
+    startAutoRefresh(); // ⬅️ avvia refresh ogni 60s
   })
   .catch(err => console.error(err));
 
