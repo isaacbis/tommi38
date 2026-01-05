@@ -545,7 +545,7 @@ document.addEventListener("DOMContentLoaded", () => {
   qs("addGalleryBtn").onclick = addGalleryItem;
   qs("saveGalleryBtn").onclick = saveGallery;
 
-  loadPublicLoginGallery();
+loadPublicLoginGallery();
 
 loadAll(true)
   .then(() => {
@@ -553,5 +553,6 @@ loadAll(true)
       loadWeather();
     }
   })
-  .catch(()
-});
+  .catch(() => {
+    // ignore
+  });
