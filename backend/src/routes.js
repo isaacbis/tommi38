@@ -4,6 +4,9 @@ import rateLimit from "express-rate-limit";
 import { z } from "zod";
 import { db, FieldValue } from "./db.js";
 
+let lastCleanup = 0;
+const CLEANUP_COOLDOWN_MS = 60_000; // 1 minuto
+
 const router = express.Router();
 
 /* =================== MIDDLEWARE =================== */
@@ -31,6 +34,49 @@ function timeToMinutes(t) {
   const [h, m] = t.split(":").map(Number);
   return h * 60 + m;
 }
+
+// 🔄 Cancella automaticamente le prenotazioni terminate
+async function cleanupExpiredReservations() {
+  const now = Date.now();
+  if (now - lastCleanup < CLEANUP_COOLDOWN_MS) return;
+  lastCleanup = now;
+
+  const cfgSnap = await db.collection("admin").doc("config").get();
+  const cfg = cfgSnap.exists ? cfgSnap.data() : {};
+  const slotMinutes = Number(cfg.slotMinutes || 45);
+
+  const today = new Date().toISOString().slice(0, 10);
+  const nowMinutes = new Date().getHours() * 60 + new Date().getMinutes();
+
+  const snap = await db
+    .collection("reservations")
+    .where("date", "<=", today)
+    .get();
+
+  if (snap.empty) return;
+
+  const batch = db.batch();
+
+  snap.forEach(doc => {
+    const r = doc.data();
+
+    const endMinutes =
+      r.date === today
+        ? timeToMinutes(r.time) + slotMinutes
+        : 0;
+
+    const expired =
+      r.date < today ||
+      (r.date === today && endMinutes <= nowMinutes);
+
+    if (expired) {
+      batch.delete(doc.ref);
+    }
+  });
+
+  await batch.commit();
+}
+
 
 /* =================== AUTH =================== */
 router.post("/login", loginLimiter, async (req, res) => {
@@ -101,6 +147,8 @@ router.get("/public/config", async (req, res) => {
 
 /* =================== RESERVATIONS =================== */
 router.get("/reservations", requireAuth, async (req, res) => {
+  await cleanupExpiredReservations(); // ⬅️ QUI
+
   const date = String(req.query.date || "");
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
     return res.status(400).json({ error: "BAD_DATE" });
@@ -116,6 +164,8 @@ router.get("/reservations", requireAuth, async (req, res) => {
 });
 
 router.post("/reservations", requireAuth, async (req, res) => {
+  await cleanupExpiredReservations(); // ⬅️ QUI
+
   const schema = z.object({
     fieldId: z.string(),
     date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
