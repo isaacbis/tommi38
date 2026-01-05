@@ -74,19 +74,11 @@ async function loadWeather() {
   const box = document.getElementById("weatherBox");
   const row = document.getElementById("weatherRow");
 
-  if (!box || !row) {
-    console.error("weatherBox o weatherRow non trovati");
-    return;
-  }
+  if (!box || !row) return;
 
   try {
-    // Senigallia
-    const lat = 43.716;
-    const lon = 13.218;
-
-    const res = await api("/weather");
-
-    const data = await res.json();
+    // ⚠️ api() restituisce GIÀ il JSON
+    const data = await api("/weather");
 
     row.innerHTML = "";
 
@@ -98,16 +90,18 @@ async function loadWeather() {
       el.className = "weather-day";
       el.innerHTML = `
         ${day}
-        <span class="weather-emoji">${weatherEmoji(data.daily.weathercode[i])}</span>
+        <span class="weather-emoji">
+          ${weatherEmoji(data.daily.weathercode[i])}
+        </span>
       `;
       row.appendChild(el);
     }
 
-    // 🔴 QUESTA ERA LA PARTE CHE NON AVVENIVA MAI
+    // MOSTRA LA CARD
     box.classList.remove("hidden");
 
   } catch (e) {
-    console.error("Errore meteo", e);
+    console.error("Errore meteo frontend", e);
   }
 }
 
