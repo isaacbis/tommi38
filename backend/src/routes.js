@@ -34,6 +34,11 @@ function timeToMinutes(t) {
   const [h, m] = t.split(":").map(Number);
   return h * 60 + m;
 }
+function localISODate() {
+  const d = new Date();
+  const tz = d.getTimezoneOffset() * 60000;
+  return new Date(d.getTime() - tz).toISOString().slice(0, 10);
+}
 
 // 🔄 Cancella automaticamente le prenotazioni terminate
 async function cleanupExpiredReservations() {
@@ -45,7 +50,8 @@ async function cleanupExpiredReservations() {
   const cfg = cfgSnap.exists ? cfgSnap.data() : {};
   const slotMinutes = Number(cfg.slotMinutes || 45);
 
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localISODate();
+
   const nowMinutes = new Date().getHours() * 60 + new Date().getMinutes();
 
   const snap = await db
