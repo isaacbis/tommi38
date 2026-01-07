@@ -713,3 +713,15 @@ button:active{ transform: scale(.97); }
   pointer-events: none;
   white-space: nowrap;
 }
+/* ===== MOBILE ===== */
+@media (max-width: 600px) {
+  .slot {
+    flex: 0 1 25px;   /* 👈 cellulare */
+    max-width: 25px;
+    min-height: 24px;
+  }
+
+  .slot-time {
+    font-size: 9px;   /* testo più compatto */
+  }
+}
