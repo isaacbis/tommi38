@@ -711,5 +711,10 @@ loadAll(true)
     startAutoRefresh(); // ⬅️ avvia refresh ogni 60s
   })
   .catch(err => console.error(err));
+// 🔁 KEEP SERVER SVEGLIO (Render free)
+setInterval(() => {
+  fetch("/api/health").catch(() => {});
+}, 5 * 60 * 1000); // ogni 5 minuti
+
 
 }); // ⬅️ CHIUSURA DOMContentLoaded (OBBLIGATORIA)
