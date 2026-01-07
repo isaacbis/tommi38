@@ -182,6 +182,9 @@ router.post("/reservations", requireAuth, async (req, res) => {
   const cfgSnap = await db.collection("admin").doc("config").get();
   const cfg = cfgSnap.exists ? cfgSnap.data() : {};
   const slotMinutes = Number(cfg.slotMinutes || 45);
+const maxPerDay = Number(cfg.maxBookingsPerUserPerDay || 1);
+const maxActive = Number(cfg.maxActiveBookingsPerUser || 1);
+
 
   const today = localISODate();
 const nowMinutes = new Date().getHours() * 60 + new Date().getMinutes();
@@ -200,28 +203,43 @@ if (date === today) {
 }
 
 
-  /* 🔒 UNA SOLA PRENOTAZIONE TOTALE PER USER */
-  if (!isAdmin) {
-    const activeSnap = await db.collection("reservations")
-      .where("user", "==", username)
-      .get();
+  /* 🔒 LIMITI PRENOTAZIONI (per giorno + attive totali) */
+if (!isAdmin) {
+  const userSnap = await db.collection("reservations")
+    .where("user", "==", username)
+    .get();
 
-    let activeCount = 0;
+  let activeCount = 0;
+  let perDayCount = 0;
 
-    activeSnap.forEach(doc => {
-      const r = doc.data();
-      if (r.date > today) {
-        activeCount++;
-      } else if (r.date === today) {
-        const end = timeToMinutes(r.time) + slotMinutes;
-        if (end > nowMinutes) activeCount++;
-      }
-    });
+  userSnap.forEach(doc => {
+    const r = doc.data();
 
-    if (activeCount >= 1) {
-      return res.status(403).json({ error: "ACTIVE_BOOKING_LIMIT" });
+    // conteggio prenotazioni per la data selezionata
+    if (r.date === date) {
+      perDayCount++;
     }
+
+    // conteggio prenotazioni "attive" (future + oggi non ancora finita)
+    if (r.date > today) {
+      activeCount++;
+    } else if (r.date === today) {
+      const end = timeToMinutes(r.time) + slotMinutes;
+      if (end > nowMinutes) activeCount++;
+    }
+  });
+
+  // limite per giorno (es. max 2 prenotazioni nella stessa data)
+  if (perDayCount >= maxPerDay) {
+    return res.status(403).json({ error: "MAX_PER_DAY_LIMIT" });
   }
+
+  // limite prenotazioni attive totali (es. max 1 attiva)
+  if (activeCount >= maxActive) {
+    return res.status(403).json({ error: "ACTIVE_BOOKING_LIMIT" });
+  }
+}
+
 
   const id = `${fieldId}_${date}_${time}`;
   const ref = db.collection("reservations").doc(id);
