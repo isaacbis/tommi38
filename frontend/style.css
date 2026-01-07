@@ -543,7 +543,7 @@ button:active{ transform: scale(.97); }
 }
 .slot {
   flex: 0 0 auto;
-  width: 40px;          /* 👈 QUI LI STRINGI DAVVERO */
+  width: 30px;          /* 👈 QUI LI STRINGI DAVVERO */
   min-height: 28px;
   border-radius: 6px;
   display: flex;
