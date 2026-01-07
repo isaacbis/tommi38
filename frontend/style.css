@@ -545,8 +545,8 @@ button:active{ transform: scale(.97); }
 }
 .slot {
   flex: 0 1 40px;   /* 👈 PUÒ ANDARE A CAPO */
-  max-width: 40px;
-  width: 40px;          /* 👈 QUI LI STRINGI DAVVERO */
+  max-width: 45px;
+  width: 45px;          /* 👈 QUI LI STRINGI DAVVERO */
   min-height: 28px;
   border-radius: 999px;
   display: flex;
@@ -716,8 +716,8 @@ button:active{ transform: scale(.97); }
 /* ===== MOBILE ===== */
 @media (max-width: 600px) {
   .slot {
-    flex: 0 1 25px;   /* 👈 cellulare */
-    max-width: 25px;
+    flex: 0 1 28px;   /* 👈 cellulare */
+    max-width: 28px;
     min-height: 24px;
   }
 
