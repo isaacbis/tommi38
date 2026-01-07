@@ -52,6 +52,10 @@ function localISODate(d = new Date()) {
   const tz = d.getTimezoneOffset() * 60000;
   return new Date(d.getTime() - tz).toISOString().slice(0, 10);
 }
+function nowMinutes() {
+  const d = new Date();
+  return d.getHours() * 60 + d.getMinutes();
+}
 
 function isPastTimeToday(dateStr, timeStr) {
   if (dateStr !== localISODate()) return false;
@@ -271,7 +275,8 @@ async function loadReservations() {
 }
 
 function renderFieldInfo() {
-  const fieldId = qs("fieldSelect").value;
+  const fieldId = qs("fieldSelect")?.value;
+  if (!fieldId) return;
   const box = qs("fieldInfo");
 
   if (!box) return;
