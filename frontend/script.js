@@ -183,6 +183,23 @@ async function loadReservations() {
 }
 
 async function book() {
+const today = localISODate();
+const selectedDate = qs("datePick").value;
+
+if (selectedDate < today) {
+  qs("bookMsg").textContent = "❌ Non puoi prenotare nei giorni passati";
+  return;
+}
+if (selectedDate === today) {
+  const now = nowMinutes();
+  const selectedTime = minutes(qs("timeSelect").value);
+
+  if (selectedTime <= now) {
+    qs("bookMsg").textContent = "❌ Questo orario è già passato";
+    return;
+  }
+}
+
   const fieldId = qs("fieldSelect").value;
   const date = qs("datePick").value;
   const time = qs("timeSelect").value;

@@ -63,6 +63,7 @@ async function cleanupExpiredReservations() {
   const today = localISODate();
   const nowMinutes = new Date().getHours() * 60 + new Date().getMinutes();
 
+
   const snap = await db
     .collection("reservations")
     .where("date", "<=", today)
@@ -211,6 +212,22 @@ router.post("/reservations", requireAuth, async (req, res) => {
   }
 
   const { fieldId, date, time } = parsed.data;
+// 🚫 BLOCCO DATE PASSATE (per tutti)
+const today = localISODate();
+if (date < today) {
+  return res.status(400).json({ error: "PAST_DATE_NOT_ALLOWED" });
+}
+
+// 🚫 BLOCCO ORARI PASSATI OGGI
+if (date === today) {
+  const nowMinutes = new Date().getHours() * 60 + new Date().getMinutes();
+  const start = timeToMinutes(time);
+
+  if (start <= nowMinutes) {
+    return res.status(400).json({ error: "PAST_TIME_NOT_ALLOWED" });
+  }
+}
+
   const username = req.session.user.username;
   const isAdmin = req.session.user.role === "admin";
 
