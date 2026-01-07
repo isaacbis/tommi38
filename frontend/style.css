@@ -528,12 +528,22 @@ button:active{ transform: scale(.97); }
 /* ===== TIMELINE ===== */
 .timeline {
   display: flex;
-  gap: 6px;
-  align-items: center;
-  margin-top: 10px;
+  gap: 4px;
+  overflow-x: auto;        /* 👈 scroll */
+  padding-bottom: 6px;
+}
+
+.timeline::-webkit-scrollbar {
+  height: 6px;
+}
+
+.timeline::-webkit-scrollbar-thumb {
+  background: rgba(0,0,0,0.2);
+  border-radius: 4px;
 }
 .slot {
-  flex: 1;
+  flex: 0 0 auto;   /* 👈 NON comprimere */
+  min-width: 64px;  /* spazio per orario */
   height: 10px;
   border-radius: 6px;
   transition: transform .2s ease, box-shadow .2s ease;
