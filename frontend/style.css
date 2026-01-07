@@ -542,10 +542,13 @@ button:active{ transform: scale(.97); }
   border-radius: 4px;
 }
 .slot {
-  flex: 0 0 auto;   /* 👈 NON comprimere */
-  min-width: 64px;  /* spazio per orario */
-  height: 10px;
+  flex: 0 0 auto;
+  width: 40px;          /* 👈 QUI LI STRINGI DAVVERO */
+  min-height: 28px;
   border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   transition: transform .2s ease, box-shadow .2s ease;
 }
 .slot.free {
