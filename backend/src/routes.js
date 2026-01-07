@@ -63,7 +63,6 @@ async function cleanupExpiredReservations() {
   const today = localISODate();
   const nowMinutes = new Date().getHours() * 60 + new Date().getMinutes();
 
-
   const snap = await db
     .collection("reservations")
     .where("date", "<=", today)
@@ -212,21 +211,22 @@ router.post("/reservations", requireAuth, async (req, res) => {
   }
 
   const { fieldId, date, time } = parsed.data;
-// 🚫 BLOCCO DATE PASSATE (per tutti)
-const today = localISODate();
-if (date < today) {
-  return res.status(400).json({ error: "PAST_DATE_NOT_ALLOWED" });
-}
 
-// 🚫 BLOCCO ORARI PASSATI OGGI
-if (date === today) {
+  const today = localISODate();
   const nowMinutes = new Date().getHours() * 60 + new Date().getMinutes();
-  const start = timeToMinutes(time);
 
-  if (start <= nowMinutes) {
-    return res.status(400).json({ error: "PAST_TIME_NOT_ALLOWED" });
+  // 🚫 BLOCCO DATE PASSATE
+  if (date < today) {
+    return res.status(400).json({ error: "PAST_DATE_NOT_ALLOWED" });
   }
-}
+
+  // 🚫 BLOCCO ORARI PASSATI OGGI
+  if (date === today) {
+    const start = timeToMinutes(time);
+    if (start <= nowMinutes) {
+      return res.status(400).json({ error: "PAST_TIME_NOT_ALLOWED" });
+    }
+  }
 
   const username = req.session.user.username;
   const isAdmin = req.session.user.role === "admin";
@@ -234,9 +234,6 @@ if (date === today) {
   const cfgSnap = await db.collection("admin").doc("config").get();
   const cfg = cfgSnap.exists ? cfgSnap.data() : {};
   const slotMinutes = Number(cfg.slotMinutes || 45);
-
-  const today = localISODate();
-  const nowMinutes = new Date().getHours() * 60 + new Date().getMinutes();
 
   if (!isAdmin) {
     const activeSnap = await db
