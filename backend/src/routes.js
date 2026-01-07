@@ -50,11 +50,6 @@ async function cleanupExpiredReservations() {
   const slotMinutes = Number(cfg.slotMinutes || 45);
 
   const today = localISODate();
-// ❌ BLOCCO DATE PASSATE (anche per admin)
-if (date < today) {
-  return res.status(400).json({ error: "PAST_DATE_NOT_ALLOWED" });
-}
-
   const nowMinutes = new Date().getHours() * 60 + new Date().getMinutes();
 
   const snap = await db
@@ -68,24 +63,16 @@ if (date < today) {
 
   snap.forEach(doc => {
     const r = doc.data();
-
     let expired = false;
 
-    // 🔥 TUTTO quello che è prima di oggi → via
-    if (r.date < today) {
-      expired = true;
-    }
+    if (r.date < today) expired = true;
 
-    // 🔥 oggi ma orario finito → via
     if (r.date === today) {
       const end = timeToMinutes(r.time) + slotMinutes;
       if (end <= nowMinutes) expired = true;
     }
 
-    // ❗ NESSUNA distinzione admin/user
-    if (expired) {
-      batch.delete(doc.ref);
-    }
+    if (expired) batch.delete(doc.ref);
   });
 
   await batch.commit();

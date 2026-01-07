@@ -52,9 +52,6 @@ function localISODate(d = new Date()) {
   const tz = d.getTimezoneOffset() * 60000;
   return new Date(d.getTime() - tz).toISOString().slice(0, 10);
 }
-function isPastDate(dateStr) {
-  return dateStr < localISODate();
-}
 
 function isPastTimeToday(dateStr, timeStr) {
   if (dateStr !== localISODate()) return false;
