@@ -700,11 +700,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
   qs("datePick").onchange = loadReservations;
   qs("fieldSelect").onchange = () => {
-  renderTimeSelect();
-  renderFieldInfo();
-};
-
-
+    renderTimeSelect();
+    renderFieldInfo();
+  };
 
   qs("btnAdminConfig").onclick = () => openAdmin("adminConfig");
   qs("btnAdminNotes").onclick = () => openAdmin("adminNotes");
@@ -722,21 +720,19 @@ document.addEventListener("DOMContentLoaded", () => {
   qs("addGalleryBtn").onclick = addGalleryItem;
   qs("saveGalleryBtn").onclick = saveGallery;
 
-loadPublicLoginGallery();
+  // login gallery pubblica
+  loadPublicLoginGallery();
 
-loadAll(true)
-  .then(() => {
-    if (STATE.me) {
-  loadWeather();
-}
+  // avvio APP
+  loadAll(true)
+    .then(() => {
+      loadWeather();        // meteo DOPO che tutto è pronto
+      startAutoRefresh();  // UNA SOLA VOLTA
+    })
+    .catch(err => console.error("INIT ERROR", err));
 
-    startAutoRefresh(); // ⬅️ avvia refresh ogni 60s
-  })
-  .catch(err => console.error(err));
-// 🔁 KEEP SERVER SVEGLIO (Render free)
-setInterval(() => {
-  fetch("/api/health").catch(() => {});
-}, 5 * 60 * 1000); // ogni 5 minuti
-
-
-}); // ⬅️ CHIUSURA DOMContentLoaded (OBBLIGATORIA)
+  // 🔁 KEEP SERVER SVEGLIO (Render free)
+  setInterval(() => {
+    fetch("/api/health").catch(() => {});
+  }, 5 * 60 * 1000);
+});
