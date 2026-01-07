@@ -182,7 +182,7 @@ async function login() {
         password: qs("password").value.trim()
       })
     });
-    await loadAll(true);
+    location.reload(); // 🔁 lascia che sia INIT a fare loadAll
   } catch {
     qs("loginErr").textContent = "Login fallito";
     show(qs("loginErr"));
@@ -218,7 +218,12 @@ async function loadAll(setDateToday = false) {
     qs("datePick").value = localISODate();
   }
 
-  renderFields();
+renderFields();
+
+// 👇 AGGIUNGI QUESTO
+if (STATE.fields.length > 0) {
+  qs("fieldSelect").value = STATE.fields[0].id;
+}
   renderLoginGallery();
 
   if (STATE.me.role === "admin") {
