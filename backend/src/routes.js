@@ -4,12 +4,19 @@ import rateLimit from "express-rate-limit";
 import { z } from "zod";
 import { db, FieldValue } from "./db.js";
 
-let lastCleanup = 0;
-const CLEANUP_COOLDOWN_MS = 60_000; // 1 minuto
-
 const router = express.Router();
 
-/* =================== MIDDLEWARE =================== */
+/* =====================================================
+   RATE LIMIT
+   ===================================================== */
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+});
+
+/* =====================================================
+   AUTH MIDDLEWARE
+   ===================================================== */
 function requireAuth(req, res, next) {
   if (!req.session?.user) {
     return res.status(401).json({ error: "NOT_AUTHENTICATED" });
@@ -24,21 +31,25 @@ function requireAdmin(req, res, next) {
   next();
 }
 
-const loginLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 10
-});
-
-/* =================== UTILS =================== */
+/* =====================================================
+   UTILS
+   ===================================================== */
 function timeToMinutes(t) {
   const [h, m] = t.split(":").map(Number);
   return h * 60 + m;
 }
+
 function localISODate() {
   const d = new Date();
   const tz = d.getTimezoneOffset() * 60000;
   return new Date(d.getTime() - tz).toISOString().slice(0, 10);
 }
+
+/* =====================================================
+   CLEANUP PRENOTAZIONI SCADUTE
+   ===================================================== */
+let lastCleanup = 0;
+const CLEANUP_COOLDOWN_MS = 60_000;
 
 async function cleanupExpiredReservations() {
   const now = Date.now();
@@ -63,60 +74,68 @@ async function cleanupExpiredReservations() {
 
   snap.forEach(doc => {
     const r = doc.data();
-
     let expired = false;
 
-    // 🔥 TUTTO quello che è prima di oggi → via
-    if (r.date < today) {
-      expired = true;
-    }
-
-    // 🔥 oggi ma orario finito → via
+    if (r.date < today) expired = true;
     if (r.date === today) {
       const end = timeToMinutes(r.time) + slotMinutes;
       if (end <= nowMinutes) expired = true;
     }
 
-    // ❗ NESSUNA distinzione admin/user
-    if (expired) {
-      batch.delete(doc.ref);
-    }
+    if (expired) batch.delete(doc.ref);
   });
 
   await batch.commit();
 }
 
+/* =====================================================
+   CSRF TOKEN
+   ===================================================== */
+router.get("/csrf", (req, res) => {
+  res.json({ csrfToken: req.csrfToken() });
+});
 
-/* =================== AUTH =================== */
+/* =====================================================
+   AUTH
+   ===================================================== */
 router.post("/login", loginLimiter, async (req, res) => {
   const schema = z.object({
     username: z.string().min(1),
-    password: z.string().min(1)
+    password: z.string().min(1),
   });
+
   const parsed = schema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: "BAD_BODY" });
+  if (!parsed.success) {
+    return res.status(400).json({ error: "BAD_BODY" });
+  }
 
   const { username, password } = parsed.data;
   const ref = db.collection("users").doc(username);
   const snap = await ref.get();
 
-  if (!snap.exists) return res.status(401).json({ error: "INVALID_LOGIN" });
+  if (!snap.exists) {
+    return res.status(401).json({ error: "INVALID_LOGIN" });
+  }
 
   const user = snap.data();
-  if (user.disabled) return res.status(403).json({ error: "USER_DISABLED" });
+  if (user.disabled) {
+    return res.status(403).json({ error: "USER_DISABLED" });
+  }
 
   const ok = await bcrypt.compare(password, user.passwordHash);
-  if (!ok) return res.status(401).json({ error: "INVALID_LOGIN" });
+  if (!ok) {
+    return res.status(401).json({ error: "INVALID_LOGIN" });
+  }
 
   req.session.user = {
     username,
-    role: user.role || "user"
+    role: user.role || "user",
   };
 
   res.json({ ok: true });
 });
 
-router.post("/logout", (req, res) => {
+router.post("/logout", requireAuth, (req, res) => {
   req.session.destroy(() => res.json({ ok: true }));
 });
 
@@ -129,11 +148,13 @@ router.get("/me", requireAuth, async (req, res) => {
     username,
     role: u.role || "user",
     credits: u.credits ?? 0,
-    disabled: !!u.disabled
+    disabled: !!u.disabled,
   });
 });
 
-/* =================== PUBLIC CONFIG =================== */
+/* =====================================================
+   PUBLIC CONFIG
+   ===================================================== */
 router.get("/public/config", async (req, res) => {
   const cfgSnap = await db.collection("admin").doc("config").get();
   const fieldsSnap = await db.collection("admin").doc("fields").get();
@@ -148,22 +169,25 @@ router.get("/public/config", async (req, res) => {
     dayEnd: cfg.dayEnd || "20:00",
     maxBookingsPerUserPerDay: Number(cfg.maxBookingsPerUserPerDay || 1),
     maxActiveBookingsPerUser: Number(cfg.maxActiveBookingsPerUser || 1),
-    fields: fieldsSnap.exists ? (fieldsSnap.data().fields || []) : [],
-    notesText: notesSnap.exists ? (notesSnap.data().text || "") : "",
-    gallery: gallerySnap.exists ? (gallerySnap.data().images || []) : []
+    fields: fieldsSnap.exists ? fieldsSnap.data().fields || [] : [],
+    notesText: notesSnap.exists ? notesSnap.data().text || "" : "",
+    gallery: gallerySnap.exists ? gallerySnap.data().images || [] : [],
   });
 });
 
-/* =================== RESERVATIONS =================== */
+/* =====================================================
+   RESERVATIONS
+   ===================================================== */
 router.get("/reservations", requireAuth, async (req, res) => {
-  await cleanupExpiredReservations(); // ⬅️ QUI
+  await cleanupExpiredReservations();
 
   const date = String(req.query.date || "");
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
     return res.status(400).json({ error: "BAD_DATE" });
   }
 
-  const snap = await db.collection("reservations")
+  const snap = await db
+    .collection("reservations")
     .where("date", "==", date)
     .get();
 
@@ -173,15 +197,18 @@ router.get("/reservations", requireAuth, async (req, res) => {
 });
 
 router.post("/reservations", requireAuth, async (req, res) => {
-  await cleanupExpiredReservations(); // ⬅️ QUI
+  await cleanupExpiredReservations();
 
   const schema = z.object({
     fieldId: z.string(),
     date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-    time: z.string().regex(/^\d{2}:\d{2}$/)
+    time: z.string().regex(/^\d{2}:\d{2}$/),
   });
+
   const parsed = schema.safeParse(req.body);
-  if (!parsed.success) return res.status(400).json({ error: "BAD_BODY" });
+  if (!parsed.success) {
+    return res.status(400).json({ error: "BAD_BODY" });
+  }
 
   const { fieldId, date, time } = parsed.data;
   const username = req.session.user.username;
@@ -192,12 +219,11 @@ router.post("/reservations", requireAuth, async (req, res) => {
   const slotMinutes = Number(cfg.slotMinutes || 45);
 
   const today = localISODate();
-
   const nowMinutes = new Date().getHours() * 60 + new Date().getMinutes();
 
-  /* 🔒 UNA SOLA PRENOTAZIONE TOTALE PER USER */
   if (!isAdmin) {
-    const activeSnap = await db.collection("reservations")
+    const activeSnap = await db
+      .collection("reservations")
       .where("user", "==", username)
       .get();
 
@@ -205,9 +231,8 @@ router.post("/reservations", requireAuth, async (req, res) => {
 
     activeSnap.forEach(doc => {
       const r = doc.data();
-      if (r.date > today) {
-        activeCount++;
-      } else if (r.date === today) {
+      if (r.date > today) activeCount++;
+      else if (r.date === today) {
         const end = timeToMinutes(r.time) + slotMinutes;
         if (end > nowMinutes) activeCount++;
       }
@@ -220,6 +245,7 @@ router.post("/reservations", requireAuth, async (req, res) => {
 
   const id = `${fieldId}_${date}_${time}`;
   const ref = db.collection("reservations").doc(id);
+
   if ((await ref.get()).exists) {
     return res.status(409).json({ error: "SLOT_TAKEN" });
   }
@@ -229,11 +255,13 @@ router.post("/reservations", requireAuth, async (req, res) => {
     date,
     time,
     user: username,
-    createdAt: FieldValue.serverTimestamp()
+    createdAt: FieldValue.serverTimestamp(),
   });
 
   if (!isAdmin) {
-    await db.collection("users").doc(username)
+    await db
+      .collection("users")
+      .doc(username)
       .update({ credits: FieldValue.increment(-1) });
   }
 
@@ -254,9 +282,10 @@ router.delete("/reservations/:id", requireAuth, async (req, res) => {
 
   const today = localISODate();
 
-  /* recupero credito SOLO se futuro */
   if (!isAdmin && r.date > today) {
-    await db.collection("users").doc(username)
+    await db
+      .collection("users")
+      .doc(username)
       .update({ credits: FieldValue.increment(1) });
   }
 
@@ -264,21 +293,26 @@ router.delete("/reservations/:id", requireAuth, async (req, res) => {
   res.json({ ok: true });
 });
 
-/* =================== ADMIN =================== */
+/* =====================================================
+   ADMIN
+   ===================================================== */
 router.put("/admin/config", requireAdmin, async (req, res) => {
-  await db.collection("admin").doc("config")
-    .set(req.body || {}, { merge: true });
+  await db.collection("admin").doc("config").set(req.body || {}, { merge: true });
   res.json({ ok: true });
 });
 
 router.put("/admin/notes", requireAdmin, async (req, res) => {
-  await db.collection("admin").doc("notes")
+  await db
+    .collection("admin")
+    .doc("notes")
     .set({ text: req.body.text || "" }, { merge: true });
   res.json({ ok: true });
 });
 
 router.put("/admin/fields", requireAdmin, async (req, res) => {
-  await db.collection("admin").doc("fields")
+  await db
+    .collection("admin")
+    .doc("fields")
     .set({ fields: req.body.fields || [] }, { merge: true });
   res.json({ ok: true });
 });
@@ -287,12 +321,16 @@ router.put("/admin/gallery", requireAdmin, async (req, res) => {
   const images = Array.isArray(req.body.images)
     ? req.body.images.slice(0, 10)
     : [];
-  await db.collection("admin").doc("gallery")
+  await db
+    .collection("admin")
+    .doc("gallery")
     .set({ images }, { merge: true });
   res.json({ ok: true });
 });
 
-/* =================== ADMIN USERS =================== */
+/* =====================================================
+   ADMIN USERS
+   ===================================================== */
 router.get("/admin/users", requireAdmin, async (req, res) => {
   const snap = await db.collection("users").get();
   const items = [];
@@ -302,7 +340,7 @@ router.get("/admin/users", requireAdmin, async (req, res) => {
       username: d.id,
       role: u.role || "user",
       credits: u.credits ?? 0,
-      disabled: !!u.disabled
+      disabled: !!u.disabled,
     });
   });
   res.json({ items });
@@ -310,27 +348,29 @@ router.get("/admin/users", requireAdmin, async (req, res) => {
 
 router.put("/admin/users/credits", requireAdmin, async (req, res) => {
   const { username, delta } = req.body;
-  await db.collection("users").doc(username)
+  await db
+    .collection("users")
+    .doc(username)
     .update({ credits: FieldValue.increment(delta) });
   res.json({ ok: true });
 });
 
 router.put("/admin/users/status", requireAdmin, async (req, res) => {
   const { username, disabled } = req.body;
-  await db.collection("users").doc(username)
-    .update({ disabled });
+  await db.collection("users").doc(username).update({ disabled });
   res.json({ ok: true });
 });
 
 router.put("/admin/users/password", requireAdmin, async (req, res) => {
   const { username, newPassword } = req.body;
   const hash = await bcrypt.hash(newPassword, 10);
-  await db.collection("users").doc(username)
-    .update({ passwordHash: hash });
+  await db.collection("users").doc(username).update({ passwordHash: hash });
   res.json({ ok: true });
 });
 
-// ===== METEO (proxy backend per CSP) =====
+/* =====================================================
+   METEO (PROXY BACKEND)
+   ===================================================== */
 router.get("/weather", async (req, res) => {
   try {
     const lat = 43.716;
@@ -342,10 +382,9 @@ router.get("/weather", async (req, res) => {
 
     const data = await r.json();
     res.json(data);
-  } catch (e) {
+  } catch {
     res.status(500).json({ error: "WEATHER_ERROR" });
   }
 });
-
 
 export default router;
