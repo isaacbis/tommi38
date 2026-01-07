@@ -299,12 +299,14 @@ function renderFieldInfo() {
   }
 
   box.innerHTML = `
-    <div class="field-status glow">${statusText}</div>
-    <div class="field-countdown">${countdownText}</div>
-  `;
+  <div class="field-status glow">${statusText}</div>
+  <div class="field-countdown">${countdownText}</div>
 
-  renderTimeline(fieldId);
-}
+  <!-- TIMELINE GIORNATA -->
+  <div id="timeline" class="timeline"></div>
+`;
+
+renderTimeline(fieldId);
 
 
 function renderTimeSelect() {
