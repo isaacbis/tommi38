@@ -368,11 +368,23 @@ function renderTimeline(fieldId) {
   box.innerHTML = "";
 
   for (let m = start; m + slot <= end; m += slot) {
-    const t = timeStr(m);
-    const el = document.createElement("div");
-    el.className = "slot " + (taken.has(t) ? "busy" : "free");
-    box.appendChild(el);
-  }
+  const t = timeStr(m);
+
+  const startLabel = timeStr(m);
+  const endLabel = timeStr(m + slot);
+
+  const el = document.createElement("div");
+  el.className = "slot " + (taken.has(t) ? "busy" : "free");
+
+  el.innerHTML = `
+    <div class="slot-time">
+      ${startLabel}–${endLabel}
+    </div>
+  `;
+
+  box.appendChild(el);
+}
+
 
   const marker = document.createElement("div");
   marker.className = "now-marker";
