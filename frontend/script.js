@@ -44,6 +44,10 @@ function stopAutoRefresh() {
 }
 
 /* ================= DATE / TIME ================= */
+function isPastDate(dateStr) {
+  return dateStr < localISODate();
+}
+
 function localISODate(d = new Date()) {
   const tz = d.getTimezoneOffset() * 60000;
   return new Date(d.getTime() - tz).toISOString().slice(0, 10);
@@ -234,19 +238,35 @@ async function loadAll(setDateToday = false) {
 /* ================= RESERVATIONS ================= */
 async function loadReservations() {
   const date = qs("datePick").value;
+
+  // ❌ BLOCCO GIORNI PASSATI
+  if (isPastDate(date)) {
+    qs("bookBtn").disabled = true;
+    qs("bookMsg").textContent = "❌ Non puoi prenotare una giornata passata";
+
+    STATE.dayReservationsAll = [];
+    STATE.reservations = [];
+
+    renderTimeSelect();
+    renderReservations();
+    renderFieldInfo();
+    return;
+  }
+
+  qs("bookBtn").disabled = false;
+  qs("bookMsg").textContent = "";
+
   const res = await api(`/reservations?date=${date}`);
 
   STATE.dayReservationsAll = res.items || [];
   STATE.reservations =
-  STATE.me.role === "admin"
-    ? STATE.dayReservationsAll
-    : STATE.dayReservationsAll.filter(r => r.user === STATE.me.username);
-
+    STATE.me.role === "admin"
+      ? STATE.dayReservationsAll
+      : STATE.dayReservationsAll.filter(r => r.user === STATE.me.username);
 
   renderTimeSelect();
   renderReservations();
-renderFieldInfo();
-
+  renderFieldInfo();
 }
 
 function renderFieldInfo() {
@@ -353,6 +373,12 @@ async function book() {
   const fieldId = qs("fieldSelect").value;
   const date = qs("datePick").value;
   const time = qs("timeSelect").value;
+
+  // ❌ BLOCCO GIORNI PASSATI
+  if (isPastDate(date)) {
+    qs("bookMsg").textContent = "❌ Non puoi prenotare una data passata";
+    return;
+  }
 
   qs("bookBtn").disabled = true;
   qs("bookBtn").textContent = "Salvataggio…";
