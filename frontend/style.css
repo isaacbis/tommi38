@@ -529,7 +529,7 @@ button:active{ transform: scale(.97); }
 .timeline {
   display: flex;
   gap: 2px;
-  overflow-x: auto;        /* 👈 scroll */
+  overflow-x: auto;
   padding-bottom: 6px;
 }
 
