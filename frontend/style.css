@@ -653,3 +653,26 @@ button:active{ transform: scale(.97); }
     transform: translateY(-1px);
   }
 }
+.weather-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.weather-day {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-size: 14px;
+}
+
+.weather-emoji {
+  font-size: 22px;
+  margin-top: 4px;
+}
+
+.weather-title {
+  font-weight: bold;
+  margin-bottom: 6px;
+}
