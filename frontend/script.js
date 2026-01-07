@@ -52,9 +52,13 @@ function localISODate(d = new Date()) {
   const tz = d.getTimezoneOffset() * 60000;
   return new Date(d.getTime() - tz).toISOString().slice(0, 10);
 }
-function nowMinutes() {
-  const d = new Date();
-  return d.getHours() * 60 + d.getMinutes();
+function isPastDate(dateStr) {
+  return dateStr < localISODate();
+}
+
+function isPastTimeToday(dateStr, timeStr) {
+  if (dateStr !== localISODate()) return false;
+  return minutes(timeStr) <= nowMinutes();
 }
 function minutes(t) {
   const [h, m] = t.split(":").map(Number);
@@ -317,10 +321,15 @@ function renderTimeSelect() {
     const o = document.createElement("option");
     o.value = t;
 
-    if (isToday && m <= nowMinutes()) {
-      o.textContent = `${t} ⏰ Terminato`;
-      o.disabled = true;
-    } else if (taken.has(t)) {
+    if (isPastDate(qs("datePick").value)) {
+  o.textContent = `${t} ⛔ Giorno passato`;
+  o.disabled = true;
+}
+else if (isToday && m <= nowMinutes()) {
+  o.textContent = `${t} ⏰ Orario passato`;
+  o.disabled = true;
+}
+ else if (taken.has(t)) {
       o.textContent = `${t} ❌ Occupato`;
       o.disabled = true;
     } else {
@@ -376,9 +385,15 @@ async function book() {
 
   // ❌ BLOCCO GIORNI PASSATI
   if (isPastDate(date)) {
-    qs("bookMsg").textContent = "❌ Non puoi prenotare una data passata";
-    return;
-  }
+  qs("bookMsg").textContent = "❌ Non puoi prenotare un giorno passato";
+  return;
+}
+
+if (isPastTimeToday(date, time)) {
+  qs("bookMsg").textContent = "❌ Orario già passato";
+  return;
+}
+
 
   qs("bookBtn").disabled = true;
   qs("bookBtn").textContent = "Salvataggio…";

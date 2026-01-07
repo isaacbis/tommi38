@@ -197,8 +197,21 @@ router.post("/reservations", requireAuth, async (req, res) => {
   const slotMinutes = Number(cfg.slotMinutes || 45);
 
   const today = localISODate();
+const nowMinutes = new Date().getHours() * 60 + new Date().getMinutes();
 
-  const nowMinutes = new Date().getHours() * 60 + new Date().getMinutes();
+// ❌ BLOCCO GIORNI PASSATI
+if (date < today) {
+  return res.status(400).json({ error: "PAST_DATE_NOT_ALLOWED" });
+}
+
+// ❌ BLOCCO ORARI PASSATI (OGGI)
+if (date === today) {
+  const end = timeToMinutes(time) + slotMinutes;
+  if (end <= nowMinutes) {
+    return res.status(400).json({ error: "PAST_TIME_NOT_ALLOWED" });
+  }
+}
+
 
   /* 🔒 UNA SOLA PRENOTAZIONE TOTALE PER USER */
   if (!isAdmin) {
