@@ -422,12 +422,16 @@ if (isPastTimeToday(date, time)) {
     await loadReservations();
 
   } catch (e) {
-    qs("bookMsg").textContent =
-      e?.error === "ACTIVE_BOOKING_LIMIT"
-        ? "Hai già una prenotazione attiva"
-        : "Errore prenotazione";
-    await loadReservations();
-  }
+  qs("bookMsg").textContent =
+    e?.error === "ACTIVE_BOOKING_LIMIT"
+      ? "Hai raggiunto il limite di prenotazioni attive"
+      : e?.error === "MAX_PER_DAY_LIMIT"
+      ? "Hai raggiunto il limite di prenotazioni per questo giorno"
+      : "Errore prenotazione";
+
+  await loadReservations();
+}
+
 
   qs("bookBtn").disabled = false;
   qs("bookBtn").textContent = "Prenota";
@@ -722,9 +726,10 @@ loadPublicLoginGallery();
 
 loadAll(true)
   .then(() => {
-    if (STATE.me && STATE.me.role === "user") {
-      loadWeather();
-    }
+    if (STATE.me) {
+  loadWeather();
+}
+
     startAutoRefresh(); // ⬅️ avvia refresh ogni 60s
   })
   .catch(err => console.error(err));
