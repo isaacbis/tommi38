@@ -751,13 +751,20 @@ loadAll(true)
   .then(() => {
     setTimeout(() => {
       loadWeather();
-    }, 1000); // 1 secondo dopo
+    }, 1000);
 
     startAutoRefresh();
     appLoader?.remove();
   })
-  .catch(err => console.error("INIT ERROR", err));
+  .catch(err => {
+    console.warn("INIT ERROR (non loggato)", err);
 
+    // 👉 MOSTRA LOGIN, NASCONDE APP E LOADER
+    show(qs("loginBox"));
+    hide(qs("app"));
+    hide(qs("logoutBtn"));
+    hide(appLoader);
+  });
 
   // 🔁 KEEP SERVER SVEGLIO (Render free)
   setInterval(() => {
