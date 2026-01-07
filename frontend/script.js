@@ -307,6 +307,8 @@ function renderFieldInfo() {
 `;
 
 renderTimeline(fieldId);
+}
+
 
 
 function renderTimeSelect() {
