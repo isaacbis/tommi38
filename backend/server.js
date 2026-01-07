@@ -1,51 +1,22 @@
-// =======================
-// ENV
-// =======================
 import "dotenv/config";
-
-// =======================
-// CORE
-// =======================
 import express from "express";
 import path from "path";
 import { fileURLToPath } from "url";
-
-// =======================
-// SECURITY
-// =======================
 import helmet from "helmet";
 import cookieParser from "cookie-parser";
 import session from "express-session";
-import csrf from "csurf";
 
-// =======================
-// REDIS SESSION STORE
-// =======================
-import { RedisStore } from "connect-redis";
-import { createClient } from "redis";
-
-// =======================
-// ROUTES
-// =======================
 import routes from "./src/routes.js";
 
-// =======================
-// PATH FIX (ESM)
-// =======================
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// =======================
-// APP
-// =======================
 const app = express();
 
-// Render / reverse proxy (OBBLIGATORIO)
+// Render / reverse proxy
 app.set("trust proxy", 1);
 
-// =======================
-// HELMET + CSP
-// =======================
+// CSP: niente inline script/style
 app.use(
   helmet({
     contentSecurityPolicy: {
@@ -65,39 +36,11 @@ app.use(
   })
 );
 
-// =======================
-// BODY + COOKIE
-// =======================
 app.use(express.json());
 app.use(cookieParser());
 
-// =======================
-// REDIS CLIENT
-// =======================
-if (!process.env.REDIS_URL) {
-  console.error("❌ REDIS_URL mancante nelle variabili ambiente");
-  process.exit(1);
-}
-
-const redisClient = createClient({
-  url: process.env.REDIS_URL,
-});
-
-redisClient.on("error", err => {
-  console.error("❌ Redis error:", err);
-});
-
-await redisClient.connect();
-
-// =======================
-// SESSION (REDIS STORE)
-// =======================
 app.use(
   session({
-    store: new RedisStore({
-      client: redisClient,
-      prefix: "tommi38:sess:",
-    }),
     name: process.env.SESSION_COOKIE_NAME || "tommi38sid",
     secret: process.env.SESSION_SECRET,
     resave: false,
@@ -107,50 +50,26 @@ app.use(
       httpOnly: true,
       sameSite: "lax",
       secure: process.env.NODE_ENV === "production",
-      maxAge: 1000 * 60 * 60 * 8, // 8 ore
     },
   })
 );
 
-// =======================
-// CSRF (USA SESSION)
-// =======================
-const csrfProtection = csrf({ cookie: false });
-app.use(csrfProtection);
-
-// =======================
 // API
-// =======================
 app.use("/api", routes);
 
-// =======================
-// FRONTEND STATIC
-// =======================
+// Frontend static
 const frontendPath = path.join(__dirname, "../frontend");
 app.use(express.static(frontendPath));
 
-// =======================
-// HEALTHCHECK
-// =======================
+// Health
 app.get("/api/health", (req, res) => {
-  res.json({
-    ok: true,
-    time: new Date().toISOString(),
-    redis: redisClient.isReady,
-  });
+  res.json({ ok: true, time: new Date().toISOString() });
 });
 
-// =======================
-// SPA FALLBACK
-// =======================
+// SPA fallback
 app.get("*", (req, res) => {
   res.sendFile(path.join(frontendPath, "index.html"));
 });
 
-// =======================
-// START SERVER
-// =======================
 const PORT = Number(process.env.PORT || 3001);
-app.listen(PORT, () => {
-  console.log("✅ Tommi38 server avviato sulla porta", PORT);
-});
+app.listen(PORT, () => console.log("Server unico avviato sulla porta", PORT));
