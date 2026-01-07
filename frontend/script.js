@@ -703,6 +703,8 @@ function openAdmin(id) {
 
 /* ================= INIT ================= */
 document.addEventListener("DOMContentLoaded", () => {
+const appLoader = qs("appLoader");
+
   qs("loginBtn").onclick = login;
   qs("logoutBtn").onclick = logout;
   qs("bookBtn").onclick = book;
@@ -733,12 +735,17 @@ document.addEventListener("DOMContentLoaded", () => {
   loadPublicLoginGallery();
 
   // avvio APP
-  loadAll(true)
-    .then(() => {
-      loadWeather();        // meteo DOPO che tutto è pronto
-      startAutoRefresh();  // UNA SOLA VOLTA
-    })
-    .catch(err => console.error("INIT ERROR", err));
+loadAll(true)
+  .then(() => {
+    setTimeout(() => {
+      loadWeather();
+    }, 1000); // 1 secondo dopo
+
+    startAutoRefresh();
+    appLoader?.remove();
+  })
+  .catch(err => console.error("INIT ERROR", err));
+
 
   // 🔁 KEEP SERVER SVEGLIO (Render free)
   setInterval(() => {
