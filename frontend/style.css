@@ -528,10 +528,12 @@ button:active{ transform: scale(.97); }
 /* ===== TIMELINE ===== */
 .timeline {
   display: flex;
-  gap: 2px;
-  overflow-x: auto;
+  flex-wrap: wrap;        /* 👈 ORA VA A CAPO */
+  gap: 4px;
+  overflow-x: hidden;     /* 👈 BLOCCA LO SCROLL */
   padding-bottom: 6px;
 }
+
 
 .timeline::-webkit-scrollbar {
   height: 6px;
@@ -542,7 +544,8 @@ button:active{ transform: scale(.97); }
   border-radius: 4px;
 }
 .slot {
-  flex: 0 0 auto;
+  flex: 0 1 40px;   /* 👈 PUÒ ANDARE A CAPO */
+  max-width: 40px;
   width: 40px;          /* 👈 QUI LI STRINGI DAVVERO */
   min-height: 28px;
   border-radius: 999px;
