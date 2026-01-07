@@ -545,7 +545,7 @@ button:active{ transform: scale(.97); }
   flex: 0 0 auto;
   width: 30px;          /* 👈 QUI LI STRINGI DAVVERO */
   min-height: 28px;
-  border-radius: 10px;
+  border-radius: 980px;
   display: flex;
   align-items: center;
   justify-content: center;
