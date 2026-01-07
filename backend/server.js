@@ -21,7 +21,7 @@ import csrf from "csurf";
 // =======================
 // REDIS SESSION STORE
 // =======================
-import RedisStore from "connect-redis";
+import { RedisStore } from "connect-redis";
 import { createClient } from "redis";
 
 // =======================
