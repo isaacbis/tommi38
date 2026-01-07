@@ -371,16 +371,16 @@ function renderTimeline(fieldId) {
   const t = timeStr(m);
 
   const startLabel = timeStr(m);
-  const endLabel = timeStr(m + slot);
 
-  const el = document.createElement("div");
-  el.className = "slot " + (taken.has(t) ? "busy" : "free");
+const el = document.createElement("div");
+el.className = "slot " + (taken.has(t) ? "busy" : "free");
 
-  el.innerHTML = `
-    <div class="slot-time">
-      ${startLabel}–${endLabel}
-    </div>
-  `;
+el.innerHTML = `
+  <div class="slot-time">
+    ${startLabel}
+  </div>
+`;
+
 
   box.appendChild(el);
 }
