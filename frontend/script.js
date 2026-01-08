@@ -35,7 +35,7 @@ function startAutoRefresh() {
       // se la sessione è scaduta o il server dorme, non blocchiamo la UI
       console.warn("Auto-refresh fallito", e);
     }
-  }, 5_000);
+  }, 1_000);
 }
 
 function stopAutoRefresh() {
@@ -137,37 +137,57 @@ async function loadPublicLoginGallery() {
 }
 
 async function loadWeather() {
-  const box = document.getElementById("weatherBox");
-  const row = document.getElementById("weatherRow");
-
+  const box = qs("weatherBox");
+  const row = qs("weatherRow");
   if (!box || !row) return;
 
+  const CACHE_KEY = "weather_cache";
+  const CACHE_TTL = 30 * 60 * 1000; // 30 minuti
+
   try {
-    // ⚠️ api() restituisce GIÀ il JSON
-    const data = await api("/weather");
+    const cached = JSON.parse(localStorage.getItem(CACHE_KEY) || "null");
+    const now = Date.now();
 
-    row.innerHTML = "";
-
-    for (let i = 0; i < 7; i++) {
-      const d = new Date(data.daily.time[i]);
-      const day = d.toLocaleDateString("it-IT", { weekday: "short" });
-
-      const el = document.createElement("div");
-      el.className = "weather-day";
-      el.innerHTML = `
-        ${day}
-        <span class="weather-emoji">
-          ${weatherEmoji(data.daily.weathercode[i])}
-        </span>
-      `;
-      row.appendChild(el);
+    // ✅ usa cache se valida
+    if (cached && now - cached.time < CACHE_TTL) {
+      renderWeather(cached.data);
+      box.classList.remove("hidden");
+      return;
     }
 
-    // MOSTRA LA CARD
+    // 🔄 fetch reale
+    const data = await api("/weather");
+
+    localStorage.setItem(
+      CACHE_KEY,
+      JSON.stringify({ time: now, data })
+    );
+
+    renderWeather(data);
     box.classList.remove("hidden");
 
   } catch (e) {
-    console.error("Errore meteo frontend", e);
+    console.error("Errore meteo", e);
+  }
+}
+
+function renderWeather(data) {
+  const row = qs("weatherRow");
+  row.innerHTML = "";
+
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(data.daily.time[i]);
+    const day = d.toLocaleDateString("it-IT", { weekday: "short" });
+
+    const el = document.createElement("div");
+    el.className = "weather-day";
+    el.innerHTML = `
+      ${day}
+      <span class="weather-emoji">
+        ${weatherEmoji(data.daily.weathercode[i])}
+      </span>
+    `;
+    row.appendChild(el);
   }
 }
 
@@ -761,9 +781,8 @@ const appLoader = qs("appLoader");
   // avvio APP
 loadAll(true)
   .then(() => {
-    setTimeout(() => {
-      loadWeather();
-    }, 1000);
+    loadWeather();
+
 
     startAutoRefresh();
     appLoader?.remove();
