@@ -403,7 +403,13 @@ function renderTimeline(fieldId) {
   const boxRect = box.getBoundingClientRect();
 
   marker.style.display = "block";
-  marker.style.left = `${slotRect.left - boxRect.left + slotRect.width / 2}px`;
+
+marker.style.left =
+  `${slotRect.left - boxRect.left + slotRect.width / 2}px`;
+
+marker.style.top =
+  `${slotRect.top - boxRect.top + (slotRect.height - marker.offsetHeight) / 2}px`;
+
 }
 
 /* ===== PRENOTA (UI OTTIMISTICA) ===== */

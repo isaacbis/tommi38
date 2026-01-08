@@ -572,16 +572,25 @@ button:active{ transform: scale(.97); }
 
 .now-marker{
   position: absolute;
-  top: -6px;
-  bottom: -6px;
   width: 2px;
+  height: 28px;          /* desktop */
   border-radius: 999px;
-  background: linear-gradient(180deg, rgba(248,211,138,.0), rgba(248,211,138,.95), rgba(77,208,225,.85));
+  background: linear-gradient(
+    180deg,
+    rgba(248,211,138,.2),
+    rgba(248,211,138,.95),
+    rgba(77,208,225,.85)
+  );
   box-shadow:
     0 0 10px rgba(255,179,71,.55),
     0 0 28px rgba(77,208,225,.22);
-  transform: translateX(-1px);
-  animation: nowPulse 1.2s var(--ease) infinite;
+  animation: nowPulse 1.2s ease-in-out infinite;
+  pointer-events: none;
+}
+@media (max-width: 600px) {
+  .now-marker{
+    height: 24px;
+  }
 }
 
 @keyframes nowPulse{
