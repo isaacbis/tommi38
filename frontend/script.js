@@ -352,52 +352,58 @@ else if (isToday && m <= nowMinutes()) {
 }
 
 function renderTimeline(fieldId) {
-  const slot = STATE.config.slotMinutes || 45;
+  const slotMinutes = STATE.config.slotMinutes || 45;
   const start = minutes(STATE.config.dayStart);
   const end = minutes(STATE.config.dayEnd);
-
-  const taken = new Set(
-    STATE.dayReservationsAll
-      .filter(r => r.fieldId === fieldId)
-      .map(r => r.time)
-  );
+  const now = nowMinutes();
 
   const box = qs("timeline");
   if (!box) return;
-
   box.innerHTML = "";
 
-  for (let m = start; m + slot <= end; m += slot) {
-  const t = timeStr(m);
+  const slots = [];
 
-  const startLabel = timeStr(m);
+  for (let m = start; m + slotMinutes <= end; m += slotMinutes) {
+    const t = timeStr(m);
+    const el = document.createElement("div");
 
-const el = document.createElement("div");
-el.className = "slot " + (taken.has(t) ? "busy" : "free");
+    const isBusy = STATE.dayReservationsAll.some(
+      r => r.fieldId === fieldId && r.time === t
+    );
 
-el.innerHTML = `
-  <div class="slot-time">
-    ${startLabel}
-  </div>
-`;
+    el.className = "slot " + (isBusy ? "busy" : "free");
+    el.dataset.start = m;
 
+    el.innerHTML = `<div class="slot-time">${t}</div>`;
+    box.appendChild(el);
+    slots.push(el);
+  }
 
-  box.appendChild(el);
-}
-
-
+  // === MARKER ORA ===
   const marker = document.createElement("div");
   marker.className = "now-marker";
   box.appendChild(marker);
 
-  const now = nowMinutes();
+  // fuori orario → nasconde
   if (now < start || now > end) {
     marker.style.display = "none";
     return;
   }
 
-  const pct = ((now - start) / (end - start)) * 100;
-  marker.style.left = `${pct}%`;
+  // trova lo slot corretto
+  const currentIndex = Math.floor((now - start) / slotMinutes);
+  const currentSlot = slots[currentIndex];
+  if (!currentSlot) {
+    marker.style.display = "none";
+    return;
+  }
+
+  // posiziona la linea sopra lo slot reale
+  const slotRect = currentSlot.getBoundingClientRect();
+  const boxRect = box.getBoundingClientRect();
+
+  marker.style.display = "block";
+  marker.style.left = `${slotRect.left - boxRect.left + slotRect.width / 2}px`;
 }
 
 /* ===== PRENOTA (UI OTTIMISTICA) ===== */
