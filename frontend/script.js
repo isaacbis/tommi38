@@ -35,7 +35,7 @@ function startAutoRefresh() {
       // se la sessione è scaduta o il server dorme, non blocchiamo la UI
       console.warn("Auto-refresh fallito", e);
     }
-  }, 1_000);
+  }, 5_000);
 }
 
 function stopAutoRefresh() {
