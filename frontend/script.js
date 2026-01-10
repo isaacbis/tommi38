@@ -811,7 +811,11 @@ loadAll(true)
 
 
     startAutoRefresh();
-    appLoader?.remove();
+    if (appLoader) {
+  appLoader.classList.add("hide");
+  setTimeout(() => appLoader.remove(), 450);
+}
+
   })
   .catch(err => {
     console.warn("INIT ERROR (non loggato)", err);
