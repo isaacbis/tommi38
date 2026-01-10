@@ -331,6 +331,64 @@ router.get("/admin/users", requireAdmin, async (req, res) => {
   res.json({ items });
 });
 
+/* =================== RENAME USER =================== */
+router.post("/admin/users/rename", requireAdmin, async (req, res) => {
+  const { oldUsername, newUsername } = req.body;
+
+  if (!oldUsername || !newUsername) {
+    return res.status(400).json({ error: "Missing parameters" });
+  }
+
+  if (oldUsername === "admin" || newUsername === "admin") {
+    return res.status(400).json({ error: "Cannot rename admin" });
+  }
+
+  if (!/^[a-zA-Z0-9_]+$/.test(newUsername)) {
+  return res.status(400).json({
+    error: "Username can contain only letters, numbers and underscore"
+  });
+}
+
+
+  const oldRef = db.collection("users").doc(oldUsername);
+  const newRef = db.collection("users").doc(newUsername);
+
+  const oldSnap = await oldRef.get();
+  if (!oldSnap.exists) {
+    return res.status(404).json({ error: "Old user not found" });
+  }
+
+  const newSnap = await newRef.get();
+  if (newSnap.exists) {
+    return res.status(409).json({ error: "New username already exists" });
+  }
+
+  const userData = oldSnap.data();
+
+  const batch = db.batch();
+
+  // crea nuovo utente con stessi dati
+  batch.set(newRef, { ...userData });
+
+  // aggiorna prenotazioni
+  const resSnap = await db
+    .collection("reservations")
+    .where("user", "==", oldUsername)
+    .get();
+
+  resSnap.forEach(doc => {
+    batch.update(doc.ref, { user: newUsername });
+  });
+
+  // elimina vecchio utente
+  batch.delete(oldRef);
+
+  await batch.commit();
+
+  res.json({ ok: true });
+});
+
+
 router.put("/admin/users/credits", requireAdmin, async (req, res) => {
   const { username, delta } = req.body;
   await db.collection("users").doc(username)
@@ -376,6 +434,7 @@ router.put("/admin/users/username", requireAdmin, async (req, res) => {
 
   res.json({ ok: true });
 });
+
 
 // ===== METEO (proxy backend per CSP) =====
 router.get("/weather", async (req, res) => {
