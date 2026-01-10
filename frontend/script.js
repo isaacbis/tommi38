@@ -256,9 +256,7 @@ if (STATE.fields.length > 0) {
     qs("notesText").value = STATE.notes;
     renderFieldsAdmin();
     renderGalleryAdmin();
-    qs("usersList").innerHTML = "⏳ Caricamento utenti…";
-await loadUsers();
-
+    await loadUsers();
   }
 
   await loadReservations();
@@ -591,6 +589,16 @@ async function saveFields() {
     method: "PUT",
     body: JSON.stringify({ fields: STATE.fieldsDraft })
   });
+
+  // 🔄 ricarica campi aggiornati
+  const pub = await api("/public/config");
+  STATE.fields = pub.fields || [];
+  STATE.fieldsDraft = [...STATE.fields];
+
+  renderFields();
+  renderFieldsAdmin();
+
+  alert("Campi aggiornati ✅");
 }
 
 /* ================= NOTES ================= */
@@ -599,6 +607,11 @@ async function saveNotes() {
     method: "PUT",
     body: JSON.stringify({ text: qs("notesText").value })
   });
+
+  STATE.notes = qs("notesText").value;
+  qs("notesView").textContent = STATE.notes || "Nessuna comunicazione.";
+
+  alert("Note aggiornate ✅");
 }
 
 /* ================= CONFIG ================= */
@@ -613,73 +626,73 @@ async function saveConfig() {
       maxActiveBookingsPerUser: Number(qs("cfgMaxActive").value)
     })
   });
+
+  // 🔄 ricarica config aggiornata
+  const pub = await api("/public/config");
+  STATE.config = pub;
+
+  // 🔁 aggiorna UI che dipende dagli orari
+  renderTimeSelect();
+  renderFieldInfo();
+  await loadReservations();
+
+  alert("Configurazione aggiornata ✅");
 }
 
 /* ================= USERS ================= */
 async function loadUsers() {
-  qs("usersList").innerHTML = "⏳ Caricamento utenti…";
-
   const r = await api("/admin/users");
   STATE.users = r.items;
-
-  renderUsers();
-}
-
-function renderUsers(filter = "") {
   const l = qs("usersList");
   l.innerHTML = "";
 
-  STATE.users
-    .filter(u => u.username.toLowerCase().includes(filter.toLowerCase()))
-    .forEach(renderSingleUser);
+  STATE.users.forEach(u => {
+    const d = document.createElement("div");
+    d.className = "item";
+    d.textContent = `${u.username} – crediti ${u.credits}`;
+
+    const edit = document.createElement("button");
+    edit.className = "btn-ghost";
+    edit.textContent = "✏️ Crediti";
+    edit.onclick = async () => {
+      const v = prompt("Nuovi crediti", u.credits);
+      if (v === null) return;
+      await api("/admin/users/credits", {
+        method: "PUT",
+        body: JSON.stringify({ username: u.username, delta: v - u.credits })
+      });
+      loadUsers();
+    };
+
+    const reset = document.createElement("button");
+    reset.className = "btn-ghost";
+    reset.textContent = "🔑 Reset PW";
+    reset.onclick = async () => {
+      const p = prompt("Nuova password");
+      if (!p) return;
+      await api("/admin/users/password", {
+        method: "PUT",
+        body: JSON.stringify({ username: u.username, newPassword: p })
+      });
+    };
+
+    const toggle = document.createElement("button");
+    toggle.className = "btn-ghost";
+    toggle.textContent = u.disabled ? "✅ Abilita" : "⛔ Disabilita";
+    toggle.onclick = async () => {
+      await api("/admin/users/status", {
+        method: "PUT",
+        body: JSON.stringify({ username: u.username, disabled: !u.disabled })
+      });
+      loadUsers();
+    };
+
+    d.appendChild(edit);
+    d.appendChild(reset);
+    d.appendChild(toggle);
+    l.appendChild(d);
+  });
 }
-
-qs("userSearch").oninput = e => {
-  renderUsers(e.target.value);
-};
-function renderSingleUser(u) {
-  const d = document.createElement("div");
-  d.className = "item";
-  d.textContent = `${u.username} – crediti ${u.credits}`;
-
-  // ✏️ CAMBIA USERNAME
-  const rename = document.createElement("button");
-  rename.className = "btn-ghost";
-  rename.textContent = "✏️ Username";
-  rename.onclick = async () => {
-    const nu = prompt("Nuovo username", u.username);
-    if (!nu || nu === u.username) return;
-
-    await api("/admin/users/username", {
-      method: "PUT",
-      body: JSON.stringify({
-        oldUsername: u.username,
-        newUsername: nu
-      })
-    });
-
-    loadUsers();
-  };
-
-  // ✏️ CREDITI
-  const edit = document.createElement("button");
-  edit.className = "btn-ghost";
-  edit.textContent = "💰 Crediti";
-  edit.onclick = async () => {
-    const v = prompt("Nuovi crediti", u.credits);
-    if (v === null) return;
-    await api("/admin/users/credits", {
-      method: "PUT",
-      body: JSON.stringify({ username: u.username, delta: v - u.credits })
-    });
-    loadUsers();
-  };
-
-  d.appendChild(rename);
-  d.appendChild(edit);
-  qs("usersList").appendChild(d);
-}
-
 
 /* ================= GALLERY ================= */
 function renderLoginGallery() {
