@@ -820,3 +820,73 @@ button:active{ transform: scale(.97); }
   border: 1px solid rgba(255,255,255,0.1);
   padding: 6px;
 }
+/* ===== BACKGROUND ANIMATO DINAMICO ===== */
+body::after {
+  animation: driftSlow 30s ease-in-out infinite alternate;
+}
+
+@keyframes driftSlow {
+  0% {
+    transform: translate3d(-1%, -1%, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(1%, 0.5%, 0) scale(1.03);
+  }
+  100% {
+    transform: translate3d(0.5%, 1%, 0) scale(1.01);
+  }
+}
+/* ===== ONDE MARINE SOFT ===== */
+body::before {
+  background-size: 120% 120%;
+  animation: waveMove 40s linear infinite;
+}
+
+@keyframes waveMove {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 60%; }
+  100% { background-position: 0% 50%; }
+}
+/* ===== CARD BREATHING ===== */
+.card {
+  animation: breathe 6s ease-in-out infinite;
+}
+
+@keyframes breathe {
+  0%   { box-shadow: 0 18px 40px rgba(0,0,0,.45); }
+  50%  { box-shadow: 0 22px 48px rgba(0,0,0,.55); }
+  100% { box-shadow: 0 18px 40px rgba(0,0,0,.45); }
+}
+.btn {
+  animation: pulseGlow 3.5s ease-in-out infinite;
+}
+
+@keyframes pulseGlow {
+  0%   { box-shadow: 0 16px 34px rgba(255,179,71,.20); }
+  50%  { box-shadow: 0 20px 50px rgba(255,179,71,.35); }
+  100% { box-shadow: 0 16px 34px rgba(255,179,71,.20); }
+}
+.timeline::after {
+  content:"";
+  position:absolute;
+  inset:0;
+  background: linear-gradient(
+    120deg,
+    transparent 40%,
+    rgba(255,255,255,.05),
+    transparent 60%
+  );
+  animation: scan 3s linear infinite;
+  pointer-events:none;
+}
+
+@keyframes scan {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(100%); }
+}
+.slot:hover {
+  transform: scale(1.15);
+  box-shadow:
+    0 0 12px rgba(255,179,71,.35),
+    0 0 22px rgba(77,208,225,.25);
+}
