@@ -646,82 +646,93 @@ async function loadUsers() {
   const l = qs("usersList");
   l.innerHTML = "";
 
-  STATE.users.forEach(u => {
-    const d = document.createElement("div");
-    d.className = "item";
-    d.innerHTML = `
-  <strong>${u.username}</strong> – crediti ${u.credits}
-  <br>
-  <input
-  type="text"
-  placeholder="Nuovo username"
-  class="rename-input"
-  style="width:120px;margin-top:4px;"
->
-`;
-    const edit = document.createElement("button");
-    edit.className = "btn-ghost";
-    edit.textContent = "✏️ Crediti";
-    edit.onclick = async () => {
-      const v = prompt("Nuovi crediti", u.credits);
-      if (v === null) return;
-      await api("/admin/users/credits", {
-        method: "PUT",
-        body: JSON.stringify({ username: u.username, delta: v - u.credits })
-      });
-      loadUsers();
-    };
-    const rename = document.createElement("button");
-    rename.className = "btn-ghost";
-    rename.textContent = "✏️ Rinomina";
-    rename.onclick = async () => {
-      const input = d.querySelector(".rename-input");
-      const newUsername = input.value.trim();
-      if (!newUsername) return alert("Inserisci il nuovo username");
+  function renderUsers(filter = "") {
+  const l = qs("usersList");
+  l.innerHTML = "";
 
-      if (!confirm(`Rinominare ${u.username} in ${newUsername}?`)) return;
+  STATE.users
+    .filter(u =>
+      u.username.toLowerCase().includes(filter.toLowerCase())
+    )
+    .forEach(u => {
+      const d = document.createElement("div");
+      d.className = "item";
 
-      await api("/admin/users/rename", {
-        method: "POST",
-        body: JSON.stringify({
-          oldUsername: u.username,
-          newUsername
-        })
-      });
+      d.innerHTML = `
+        <strong>${u.username}</strong> – crediti ${u.credits}
+        <br>
+        <input
+          type="text"
+          placeholder="Nuovo username"
+          class="rename-input"
+          style="width:120px;margin-top:4px;"
+        >
+      `;
 
-      loadUsers();
-    };
+      /* BOTTONI (uguali a prima) */
+      const edit = document.createElement("button");
+      edit.className = "btn-ghost";
+      edit.textContent = "✏️ Crediti";
+      edit.onclick = async () => {
+        const v = prompt("Nuovi crediti", u.credits);
+        if (v === null) return;
+        await api("/admin/users/credits", {
+          method: "PUT",
+          body: JSON.stringify({ username: u.username, delta: v - u.credits })
+        });
+        loadUsers();
+      };
 
-    const reset = document.createElement("button");
-    reset.className = "btn-ghost";
-    reset.textContent = "🔑 Reset PW";
-    reset.onclick = async () => {
-      const p = prompt("Nuova password");
-      if (!p) return;
-      await api("/admin/users/password", {
-        method: "PUT",
-        body: JSON.stringify({ username: u.username, newPassword: p })
-      });
-    };
+      const rename = document.createElement("button");
+      rename.className = "btn-ghost";
+      rename.textContent = "✏️ Rinomina";
+      rename.onclick = async () => {
+        const newUsername = d.querySelector(".rename-input").value.trim();
+        if (!newUsername) return alert("Inserisci il nuovo username");
+        if (!confirm(`Rinominare ${u.username} in ${newUsername}?`)) return;
 
-    const toggle = document.createElement("button");
-    toggle.className = "btn-ghost";
-    toggle.textContent = u.disabled ? "✅ Abilita" : "⛔ Disabilita";
-    toggle.onclick = async () => {
-      await api("/admin/users/status", {
-        method: "PUT",
-        body: JSON.stringify({ username: u.username, disabled: !u.disabled })
-      });
-      loadUsers();
-    };
+        await api("/admin/users/rename", {
+          method: "POST",
+          body: JSON.stringify({
+            oldUsername: u.username,
+            newUsername
+          })
+        });
 
-    d.appendChild(edit);
-    d.appendChild(rename);
-    d.appendChild(reset);
-    d.appendChild(toggle);
-    l.appendChild(d);
-  });
+        loadUsers();
+      };
+
+      const reset = document.createElement("button");
+      reset.className = "btn-ghost";
+      reset.textContent = "🔑 Reset PW";
+      reset.onclick = async () => {
+        await api("/admin/users/reset-password", {
+          method: "POST",
+          body: JSON.stringify({ username: u.username })
+        });
+        alert("Password resettata");
+      };
+
+      const toggle = document.createElement("button");
+      toggle.className = "btn-ghost";
+      toggle.textContent = u.disabled ? "✅ Abilita" : "⛔ Disabilita";
+      toggle.onclick = async () => {
+        await api("/admin/users/toggle", {
+          method: "PUT",
+          body: JSON.stringify({ username: u.username })
+        });
+        loadUsers();
+      };
+
+      d.appendChild(edit);
+      d.appendChild(rename);
+      d.appendChild(reset);
+      d.appendChild(toggle);
+
+      l.appendChild(d);
+    });
 }
+
 
 /* ================= GALLERY ================= */
 function renderLoginGallery() {
