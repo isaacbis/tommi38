@@ -698,12 +698,6 @@ button:active{ transform: scale(.97); }
   font-weight: bold;
   margin-bottom: 6px;
 }
-.loader {
-  text-align: center;
-  padding: 40px;
-  font-size: 18px;
-  opacity: 0.7;
-}
 /* ===== SLOT TIME LABEL ===== */
 .slot {
   display: flex;

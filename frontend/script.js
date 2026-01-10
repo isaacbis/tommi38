@@ -713,10 +713,17 @@ function renderUsers(filter = "") {
       reset.className = "btn-ghost";
       reset.textContent = "🔑 Reset PW";
       reset.onclick = async () => {
-        await api("/admin/users/reset-password", {
-          method: "POST",
-          body: JSON.stringify({ username: u.username })
-        });
+        const newPw = prompt("Nuova password");
+if (!newPw) return;
+
+await api("/admin/users/password", {
+  method: "PUT",
+  body: JSON.stringify({
+    username: u.username,
+    newPassword: newPw
+  })
+});
+
         alert("Password resettata");
       };
 
@@ -725,10 +732,14 @@ function renderUsers(filter = "") {
       toggle.className = "btn-ghost";
       toggle.textContent = u.disabled ? "✅ Abilita" : "⛔ Disabilita";
       toggle.onclick = async () => {
-        await api("/admin/users/toggle", {
-          method: "PUT",
-          body: JSON.stringify({ username: u.username })
-        });
+        await api("/admin/users/status", {
+  method: "PUT",
+  body: JSON.stringify({
+    username: u.username,
+    disabled: !u.disabled
+  })
+});
+
         loadUsers();
       };
 
@@ -747,6 +758,9 @@ async function loadUsers() {
   renderUsers();
 }
 
+qs("userSearch").addEventListener("input", e => {
+  renderUsers(e.target.value);
+});
 
 /* ================= GALLERY ================= */
 function renderLoginGallery() {

@@ -433,30 +433,6 @@ router.put("/admin/users/password", requireAdmin, async (req, res) => {
     .update({ passwordHash: hash });
   res.json({ ok: true });
 });
-router.put("/admin/users/username", requireAdmin, async (req, res) => {
-  const { oldUsername, newUsername } = req.body;
-
-  if (!newUsername || newUsername.length < 3) {
-    return res.status(400).json({ error: "INVALID_USERNAME" });
-  }
-
-  const oldRef = db.collection("users").doc(oldUsername);
-  const newRef = db.collection("users").doc(newUsername);
-
-  if ((await newRef.get()).exists) {
-    return res.status(409).json({ error: "USERNAME_EXISTS" });
-  }
-
-  const snap = await oldRef.get();
-  if (!snap.exists) {
-    return res.status(404).json({ error: "NOT_FOUND" });
-  }
-
-  await newRef.set(snap.data());
-  await oldRef.delete();
-
-  res.json({ ok: true });
-});
 
 
 // ===== METEO (proxy backend per CSP) =====
