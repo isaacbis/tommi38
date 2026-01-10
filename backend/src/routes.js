@@ -452,5 +452,32 @@ router.get("/weather", async (req, res) => {
   }
 });
 
+// =================== ADMIN CLEAN PASSWORDS ===================
+router.post("/admin/cleanup-passwords", requireAdmin, async (req, res) => {
+  const snap = await db.collection("users").get();
+
+  if (snap.empty) {
+    return res.json({ ok: true, cleaned: 0 });
+  }
+
+  const batch = db.batch();
+  let cleaned = 0;
+
+  snap.forEach(doc => {
+    const data = doc.data();
+    if ("password" in data) {
+      batch.update(doc.ref, {
+        password: FieldValue.delete()
+      });
+      cleaned++;
+    }
+  });
+
+  if (cleaned > 0) {
+    await batch.commit();
+  }
+
+  res.json({ ok: true, cleaned });
+});
 
 export default router;
