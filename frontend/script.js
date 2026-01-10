@@ -649,8 +649,16 @@ async function loadUsers() {
   STATE.users.forEach(u => {
     const d = document.createElement("div");
     d.className = "item";
-    d.textContent = `${u.username} – crediti ${u.credits}`;
-
+    d.innerHTML = `
+  <strong>${u.username}</strong> – crediti ${u.credits}
+  <br>
+  <input
+  type="text"
+  placeholder="Nuovo username"
+  class="rename-input"
+  style="width:120px;margin-top:4px;"
+>
+`;
     const edit = document.createElement("button");
     edit.className = "btn-ghost";
     edit.textContent = "✏️ Crediti";
@@ -661,6 +669,26 @@ async function loadUsers() {
         method: "PUT",
         body: JSON.stringify({ username: u.username, delta: v - u.credits })
       });
+      loadUsers();
+    };
+    const rename = document.createElement("button");
+    rename.className = "btn-ghost";
+    rename.textContent = "✏️ Rinomina";
+    rename.onclick = async () => {
+      const input = d.querySelector(".rename-input");
+      const newUsername = input.value.trim();
+      if (!newUsername) return alert("Inserisci il nuovo username");
+
+      if (!confirm(`Rinominare ${u.username} in ${newUsername}?`)) return;
+
+      await api("/admin/users/rename", {
+        method: "POST",
+        body: JSON.stringify({
+          oldUsername: u.username,
+          newUsername
+        })
+      });
+
       loadUsers();
     };
 
@@ -688,6 +716,7 @@ async function loadUsers() {
     };
 
     d.appendChild(edit);
+    d.appendChild(rename);
     d.appendChild(reset);
     d.appendChild(toggle);
     l.appendChild(d);
