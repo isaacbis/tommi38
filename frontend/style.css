@@ -737,3 +737,7 @@ button:active{ transform: scale(.97); }
     0 20px 45px rgba(255,179,71,.18),
     inset 0 0 0 1px rgba(255,255,255,.06);
 }
+.users-scroll {
+  max-height: 320px;
+  overflow-y: auto;
+}
