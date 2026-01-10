@@ -640,13 +640,8 @@ async function saveConfig() {
 }
 
 /* ================= USERS ================= */
-async function loadUsers() {
-  const r = await api("/admin/users");
-  STATE.users = r.items;
-  const l = qs("usersList");
-  l.innerHTML = "";
 
-  function renderUsers(filter = "") {
+function renderUsers(filter = "") {
   const l = qs("usersList");
   l.innerHTML = "";
 
@@ -669,7 +664,7 @@ async function loadUsers() {
         >
       `;
 
-      /* BOTTONI (uguali a prima) */
+      // ✏️ CREDITI
       const edit = document.createElement("button");
       edit.className = "btn-ghost";
       edit.textContent = "✏️ Crediti";
@@ -678,17 +673,28 @@ async function loadUsers() {
         if (v === null) return;
         await api("/admin/users/credits", {
           method: "PUT",
-          body: JSON.stringify({ username: u.username, delta: v - u.credits })
+          body: JSON.stringify({
+            username: u.username,
+            delta: v - u.credits
+          })
         });
         loadUsers();
       };
 
+      // ✏️ RINOMINA
       const rename = document.createElement("button");
       rename.className = "btn-ghost";
       rename.textContent = "✏️ Rinomina";
       rename.onclick = async () => {
-        const newUsername = d.querySelector(".rename-input").value.trim();
-        if (!newUsername) return alert("Inserisci il nuovo username");
+        const newUsername = d
+          .querySelector(".rename-input")
+          .value.trim();
+
+        if (!newUsername) {
+          alert("Inserisci il nuovo username");
+          return;
+        }
+
         if (!confirm(`Rinominare ${u.username} in ${newUsername}?`)) return;
 
         await api("/admin/users/rename", {
@@ -702,6 +708,7 @@ async function loadUsers() {
         loadUsers();
       };
 
+      // 🔑 RESET PASSWORD
       const reset = document.createElement("button");
       reset.className = "btn-ghost";
       reset.textContent = "🔑 Reset PW";
@@ -713,6 +720,7 @@ async function loadUsers() {
         alert("Password resettata");
       };
 
+      // ⛔ DISABILITA / ABILITA
       const toggle = document.createElement("button");
       toggle.className = "btn-ghost";
       toggle.textContent = u.disabled ? "✅ Abilita" : "⛔ Disabilita";
@@ -731,6 +739,12 @@ async function loadUsers() {
 
       l.appendChild(d);
     });
+}
+
+async function loadUsers() {
+  const r = await api("/admin/users");
+  STATE.users = r.items;
+  renderUsers();
 }
 
 
