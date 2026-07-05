@@ -791,9 +791,12 @@ async function loadUsers() {
   renderUsers();
 }
 
-qs("userSearch").addEventListener("input", e => {
-  renderUsers(e.target.value);
-});
+const userSearch = qs("userSearch");
+if (userSearch) {
+  userSearch.addEventListener("input", e => {
+    renderUsers(e.target.value);
+  });
+}
 
 /* ================= GALLERY ================= */
 function renderLoginGallery() {

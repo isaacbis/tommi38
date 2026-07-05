@@ -902,3 +902,11 @@ body::before {
     0 0 12px rgba(255,179,71,.35),
     0 0 22px rgba(77,208,225,.25);
 }
+
+body::before,
+body::after,
+.card::before,
+.card::after,
+.timeline::after {
+  pointer-events: none;
+}
