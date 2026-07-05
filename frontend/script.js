@@ -333,13 +333,19 @@ renderTimeline(fieldId);
 
 function renderTimeSelect() {
   const sel = qs("timeSelect");
+
+  // Salva l'orario scelto prima del refresh automatico.
+  // Così non torna al primo orario disponibile.
+  const previousValue = sel.value;
+
   sel.innerHTML = "";
 
   const slot = STATE.config.slotMinutes || 45;
   const start = minutes(STATE.config.dayStart || "09:00");
   const end = minutes(STATE.config.dayEnd || "20:00");
   const field = qs("fieldSelect").value;
-  const isToday = qs("datePick").value === localISODate();
+  const date = qs("datePick").value;
+  const isToday = date === localISODate();
 
   const taken = new Set(
     STATE.dayReservationsAll
@@ -352,15 +358,13 @@ function renderTimeSelect() {
     const o = document.createElement("option");
     o.value = t;
 
-    if (isPastDate(qs("datePick").value)) {
-  o.textContent = `${t} ⛔ Giorno passato`;
-  o.disabled = true;
-}
-else if (isToday && m <= nowMinutes()) {
-  o.textContent = `${t} ⏰ Orario passato`;
-  o.disabled = true;
-}
- else if (taken.has(t)) {
+    if (isPastDate(date)) {
+      o.textContent = `${t} ⛔ Giorno passato`;
+      o.disabled = true;
+    } else if (isToday && m <= nowMinutes()) {
+      o.textContent = `${t} ⏰ Orario passato`;
+      o.disabled = true;
+    } else if (taken.has(t)) {
       o.textContent = `${t} ❌ Occupato`;
       o.disabled = true;
     } else {
@@ -368,6 +372,19 @@ else if (isToday && m <= nowMinutes()) {
     }
 
     sel.appendChild(o);
+  }
+
+  // Rimette l'orario scelto prima del refresh, se esiste ancora.
+  const previousOption = [...sel.options].find(o => o.value === previousValue);
+  if (previousOption) {
+    sel.value = previousValue;
+    return;
+  }
+
+  // Solo se l'orario precedente non esiste più, sceglie il primo disponibile.
+  const firstAvailable = [...sel.options].find(o => !o.disabled);
+  if (firstAvailable) {
+    sel.value = firstAvailable.value;
   }
 }
 
@@ -435,34 +452,43 @@ marker.style.top =
 /* ===== PRENOTA (UI OTTIMISTICA) ===== */
 async function book() {
   const fieldId = qs("fieldSelect").value;
+  const fieldName = qs("fieldSelect").selectedOptions[0]?.textContent || fieldId;
   const date = qs("datePick").value;
   const time = qs("timeSelect").value;
+  const selectedTimeOption = qs("timeSelect").selectedOptions[0];
 
-  // ❌ BLOCCO GIORNI PASSATI
+  if (!fieldId || !date || !time) {
+    qs("bookMsg").textContent = "❌ Seleziona campo, data e orario";
+    return;
+  }
+
   if (isPastDate(date)) {
-  qs("bookMsg").textContent = "❌ Non puoi prenotare un giorno passato";
-  return;
-}
+    qs("bookMsg").textContent = "❌ Non puoi prenotare un giorno passato";
+    return;
+  }
 
-if (isPastTimeToday(date, time)) {
-  qs("bookMsg").textContent = "❌ Orario già passato";
-  return;
-}
+  if (isPastTimeToday(date, time)) {
+    qs("bookMsg").textContent = "❌ Orario già passato";
+    return;
+  }
 
+  if (selectedTimeOption?.disabled) {
+    qs("bookMsg").textContent = "❌ Questo orario non è disponibile";
+    return;
+  }
+
+  const ok = confirm(
+    `Confermi la prenotazione?
+
+Campo: ${fieldName}
+Data: ${date}
+Orario: ${time}`
+  );
+
+  if (!ok) return;
 
   qs("bookBtn").disabled = true;
   qs("bookBtn").textContent = "Salvataggio…";
-
-  // UI immediata
-  STATE.reservations.push({
-    id: "tmp_" + Date.now(),
-    fieldId,
-    date,
-    time,
-    user: STATE.me.username
-  });
-  renderReservations();
-  renderTimeSelect();
 
   try {
     await api("/reservations", {
@@ -474,17 +500,24 @@ if (isPastTimeToday(date, time)) {
     await refreshCredits();
     await loadReservations();
 
+    // Dopo la prenotazione resta sull'orario scelto.
+    qs("timeSelect").value = time;
+
   } catch (e) {
-  qs("bookMsg").textContent =
-    e?.error === "ACTIVE_BOOKING_LIMIT"
-      ? "Hai raggiunto il limite di prenotazioni attive"
-      : e?.error === "MAX_PER_DAY_LIMIT"
-      ? "Hai raggiunto il limite di prenotazioni per questo giorno"
-      : "Errore prenotazione";
+    qs("bookMsg").textContent =
+      e?.error === "ACTIVE_BOOKING_LIMIT"
+        ? "Hai raggiunto il limite di prenotazioni attive"
+        : e?.error === "MAX_PER_DAY_LIMIT"
+        ? "Hai raggiunto il limite di prenotazioni per questo giorno"
+        : e?.error === "SLOT_TAKEN"
+        ? "Questo orario è già stato prenotato"
+        : "Errore prenotazione";
 
-  await loadReservations();
-}
+    await loadReservations();
 
+    // Anche in caso di errore non cambia orario da solo.
+    qs("timeSelect").value = time;
+  }
 
   qs("bookBtn").disabled = false;
   qs("bookBtn").textContent = "Prenota";
