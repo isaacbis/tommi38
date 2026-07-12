@@ -17,11 +17,16 @@
 <body>
 
 <header class="topbar">
-  <div class="brand-wrap">
-    <div class="brand">Tommi38</div>
-    <div class="brand-subtitle">Campi</div>
+  <div class="topbar-inner">
+    <div class="brand-wrap">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <div>
+        <div class="brand">Tommi38</div>
+        <div class="brand-subtitle">Prenotazione campi</div>
+      </div>
+    </div>
+    <button id="logoutBtn" class="btn-ghost btn-small hidden" type="button">Esci</button>
   </div>
-  <button id="logoutBtn" class="btn-ghost btn-small hidden" type="button">Esci</button>
 </header>
 
 <main class="wrap">
@@ -29,6 +34,7 @@
   <!-- LOGIN -->
   <section id="loginBox" class="card login-card">
     <div id="loginGallery" class="login-gallery"></div>
+    <div class="login-mark" aria-hidden="true"><span></span></div>
     <h1 class="login-title">Tommi38</h1>
     <p class="login-subtitle">Prenotazione campi</p>
 
@@ -68,7 +74,7 @@
           <p class="eyebrow">Prenotazione</p>
           <h2>Scegli il campo</h2>
         </div>
-        <span class="section-number">01</span>
+        <span class="live-pill"><span aria-hidden="true"></span>Disponibilità live</span>
       </div>
 
       <div class="grid3">
@@ -87,6 +93,8 @@
           <select id="timeSelect"></select>
         </div>
       </div>
+
+      <div id="bookingPreview" class="booking-preview" aria-live="polite"></div>
 
       <button id="bookBtn" class="btn btn-book" type="button">Conferma prenotazione</button>
       <div id="bookMsg" class="form-message" aria-live="polite"></div>

@@ -129,6 +129,44 @@ function formatSelectedDate(dateStr) {
   });
 }
 
+function formatBookingDate(dateStr) {
+  if (!dateStr) return "Data da scegliere";
+
+  const today = localISODate();
+  const tomorrowDate = new Date();
+  tomorrowDate.setDate(tomorrowDate.getDate() + 1);
+  const tomorrow = localISODate(tomorrowDate);
+
+  if (dateStr === today) return "Oggi";
+  if (dateStr === tomorrow) return "Domani";
+
+  const [year, month, day] = dateStr.split("-").map(Number);
+  return new Date(year, month - 1, day).toLocaleDateString("it-IT", {
+    weekday: "short",
+    day: "numeric",
+    month: "short"
+  });
+}
+
+function updateBookingPreview() {
+  const box = qs("bookingPreview");
+  const fieldSelect = qs("fieldSelect");
+  const date = qs("datePick")?.value;
+  const time = qs("timeSelect")?.value;
+  if (!box || !fieldSelect) return;
+
+  const fieldName = fieldSelect.selectedOptions[0]?.textContent || "Campo da scegliere";
+  const readableDate = formatBookingDate(date);
+
+  box.innerHTML = `
+    <div>
+      <div class="booking-preview-label">La tua scelta</div>
+      <div class="booking-preview-value">${escapeHTML(fieldName)} · ${escapeHTML(readableDate)}</div>
+    </div>
+    <div class="booking-preview-time">${escapeHTML(time || "--:--")}</div>
+  `;
+}
+
 /* ================= API ================= */
 async function api(path, options = {}) {
   const r = await fetch(API + path, {
@@ -243,7 +281,7 @@ async function loadAll(setDateToday = false) {
   show(qs("logoutBtn"));
 
   qs("welcome").textContent = `Ciao ${STATE.me.username}`;
-  qs("creditsBox").textContent = `Crediti: ${STATE.me.credits}`;
+  qs("creditsBox").textContent = `${STATE.me.credits} ${Number(STATE.me.credits) === 1 ? "credito disponibile" : "crediti disponibili"}`;
   qs("roleBadge").textContent = STATE.me.role === "admin" ? "Admin" : "Utente";
   qs("notesView").textContent = STATE.notes || "Nessuna comunicazione.";
 
@@ -360,6 +398,11 @@ function renderFieldInfo() {
     </div>
     <div class="timeline-label">Tocca un orario libero per selezionarlo</div>
     <div id="timeline" class="timeline" aria-label="Disponibilità orari"></div>
+    <div class="timeline-legend" aria-hidden="true">
+      <span class="legend-item"><span class="legend-dot free"></span>Libero</span>
+      <span class="legend-item"><span class="legend-dot busy"></span>Occupato</span>
+      <span class="legend-item"><span class="legend-dot selected"></span>Selezionato</span>
+    </div>
   `;
 
   renderTimeline(fieldId);
@@ -420,6 +463,8 @@ function renderTimeSelect() {
   if (availableOptions.length === 0 && !isPastDate(date)) {
     setBookMessage("Nessun orario disponibile per questo campo");
   }
+
+  updateBookingPreview();
 }
 
 function renderTimeline(fieldId) {
@@ -467,6 +512,7 @@ function renderTimeline(fieldId) {
       button.addEventListener("click", () => {
         qs("timeSelect").value = time;
         setBookMessage();
+        updateBookingPreview();
         renderTimeline(fieldId);
       });
     }
@@ -593,14 +639,30 @@ function renderReservations() {
     .sort((a, b) => minutes(a.time) - minutes(b.time))
     .forEach(reservation => {
       const item = document.createElement("div");
-      item.className = "item";
+      item.className = "item reservation-item";
 
       const fieldName = STATE.fields.find(field => field.id === reservation.fieldId)?.name || reservation.fieldId;
-      const text = document.createElement("div");
-      text.innerHTML = STATE.me.role === "admin"
-        ? `<strong>${reservation.time}</strong> · ${fieldName}<br><span class="muted">${reservation.user}</span>`
-        : `<strong>${reservation.time}</strong> · ${fieldName}`;
-      item.appendChild(text);
+
+      const time = document.createElement("div");
+      time.className = "reservation-time";
+      time.textContent = reservation.time;
+
+      const main = document.createElement("div");
+      main.className = "reservation-main";
+
+      const field = document.createElement("div");
+      field.className = "reservation-field";
+      field.textContent = fieldName;
+      main.appendChild(field);
+
+      if (STATE.me.role === "admin") {
+        const meta = document.createElement("div");
+        meta.className = "reservation-meta";
+        meta.textContent = `Prenotata da ${reservation.user}`;
+        main.appendChild(meta);
+      }
+
+      item.append(time, main);
 
       if (STATE.me.role === "admin" || reservation.user === STATE.me.username) {
         const button = document.createElement("button");
@@ -618,7 +680,7 @@ function renderReservations() {
 async function refreshCredits() {
   const me = await api("/me");
   STATE.me.credits = me.credits;
-  qs("creditsBox").textContent = `Crediti: ${me.credits}`;
+  qs("creditsBox").textContent = `${me.credits} ${Number(me.credits) === 1 ? "credito disponibile" : "crediti disponibili"}`;
 }
 
 /* ================= FIELDS ================= */
@@ -924,6 +986,7 @@ const appLoader = qs("appLoader");
   };
   qs("timeSelect").onchange = () => {
     setBookMessage();
+    updateBookingPreview();
     renderFieldInfo();
   };
   qs("fieldSelect").onchange = () => {
