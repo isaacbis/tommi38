@@ -34,10 +34,30 @@ function timeToMinutes(t) {
   const [h, m] = t.split(":").map(Number);
   return h * 60 + m;
 }
+function romeDateParts(date = new Date()) {
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    timeZone: "Europe/Rome",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hourCycle: "h23"
+  }).formatToParts(date);
+
+  return Object.fromEntries(
+    parts.filter(part => part.type !== "literal").map(part => [part.type, part.value])
+  );
+}
+
 function localISODate() {
-  const d = new Date();
-  const tz = d.getTimezoneOffset() * 60000;
-  return new Date(d.getTime() - tz).toISOString().slice(0, 10);
+  const parts = romeDateParts();
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
+function localMinutes() {
+  const parts = romeDateParts();
+  return Number(parts.hour) * 60 + Number(parts.minute);
 }
 
 async function cleanupExpiredReservations() {
@@ -50,7 +70,7 @@ async function cleanupExpiredReservations() {
   const slotMinutes = Number(cfg.slotMinutes || 45);
 
   const today = localISODate();
-  const nowMinutes = new Date().getHours() * 60 + new Date().getMinutes();
+  const nowMinutes = localMinutes();
 
   const snap = await db
     .collection("reservations")
@@ -165,10 +185,10 @@ router.get("/reservations", requireAuth, async (req, res) => {
 });
 
 router.post("/reservations", requireAuth, async (req, res) => {
-  await cleanupExpiredReservations(); // ⬅️ QUI
+  await cleanupExpiredReservations();
 
   const schema = z.object({
-    fieldId: z.string(),
+    fieldId: z.string().min(1).max(80),
     date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     time: z.string().regex(/^\d{2}:\d{2}$/)
   });
@@ -179,111 +199,159 @@ router.post("/reservations", requireAuth, async (req, res) => {
   const username = req.session.user.username;
   const isAdmin = req.session.user.role === "admin";
 
-  const cfgSnap = await db.collection("admin").doc("config").get();
+  const [cfgSnap, fieldsSnap] = await Promise.all([
+    db.collection("admin").doc("config").get(),
+    db.collection("admin").doc("fields").get()
+  ]);
+
   const cfg = cfgSnap.exists ? cfgSnap.data() : {};
   const slotMinutes = Number(cfg.slotMinutes || 45);
-const maxPerDay = Number(cfg.maxBookingsPerUserPerDay || 1);
-const maxActive = Number(cfg.maxActiveBookingsPerUser || 1);
+  const dayStart = cfg.dayStart || "09:00";
+  const dayEnd = cfg.dayEnd || "20:00";
+  const maxPerDay = Number(cfg.maxBookingsPerUserPerDay || 1);
+  const maxActive = Number(cfg.maxActiveBookingsPerUser || 1);
 
+  const fields = fieldsSnap.exists ? (fieldsSnap.data().fields || []) : [];
+  if (!fields.some(field => field.id === fieldId)) {
+    return res.status(400).json({ error: "INVALID_FIELD" });
+  }
+
+  const requestedMinutes = timeToMinutes(time);
+  const startMinutes = timeToMinutes(dayStart);
+  const endMinutes = timeToMinutes(dayEnd);
+  const isAligned = (requestedMinutes - startMinutes) % slotMinutes === 0;
+
+  if (
+    requestedMinutes < startMinutes ||
+    requestedMinutes + slotMinutes > endMinutes ||
+    !isAligned
+  ) {
+    return res.status(400).json({ error: "INVALID_SLOT" });
+  }
 
   const today = localISODate();
-const nowMinutes = new Date().getHours() * 60 + new Date().getMinutes();
+  const currentMinutes = localMinutes();
 
-// ❌ BLOCCO GIORNI PASSATI
-if (date < today) {
-  return res.status(400).json({ error: "PAST_DATE_NOT_ALLOWED" });
-}
+  if (date < today) {
+    return res.status(400).json({ error: "PAST_DATE_NOT_ALLOWED" });
+  }
 
-// ❌ BLOCCO ORARI PASSATI (OGGI)
-if (date === today) {
-  const end = timeToMinutes(time) + slotMinutes;
-  if (end <= nowMinutes) {
+  if (date === today && requestedMinutes <= currentMinutes) {
     return res.status(400).json({ error: "PAST_TIME_NOT_ALLOWED" });
   }
-}
-
-
-  /* 🔒 LIMITI PRENOTAZIONI (per giorno + attive totali) */
-if (!isAdmin) {
-  const userSnap = await db.collection("reservations")
-    .where("user", "==", username)
-    .get();
-
-  let activeCount = 0;
-  let perDayCount = 0;
-
-  userSnap.forEach(doc => {
-    const r = doc.data();
-
-    // conteggio prenotazioni per la data selezionata
-    if (r.date === date) {
-      perDayCount++;
-    }
-
-    // conteggio prenotazioni "attive" (future + oggi non ancora finita)
-    if (r.date > today) {
-      activeCount++;
-    } else if (r.date === today) {
-      const end = timeToMinutes(r.time) + slotMinutes;
-      if (end > nowMinutes) activeCount++;
-    }
-  });
-
-  // limite per giorno (es. max 2 prenotazioni nella stessa data)
-  if (perDayCount >= maxPerDay) {
-    return res.status(403).json({ error: "MAX_PER_DAY_LIMIT" });
-  }
-
-  // limite prenotazioni attive totali (es. max 1 attiva)
-  if (activeCount >= maxActive) {
-    return res.status(403).json({ error: "ACTIVE_BOOKING_LIMIT" });
-  }
-}
-
-
-  const id = `${fieldId}_${date}_${time}`;
-  const ref = db.collection("reservations").doc(id);
-  if ((await ref.get()).exists) {
-    return res.status(409).json({ error: "SLOT_TAKEN" });
-  }
-
-  await ref.set({
-    fieldId,
-    date,
-    time,
-    user: username,
-    createdAt: FieldValue.serverTimestamp()
-  });
 
   if (!isAdmin) {
-    await db.collection("users").doc(username)
-      .update({ credits: FieldValue.increment(-1) });
+    const userReservations = await db.collection("reservations")
+      .where("user", "==", username)
+      .get();
+
+    let activeCount = 0;
+    let perDayCount = 0;
+
+    userReservations.forEach(doc => {
+      const reservation = doc.data();
+
+      if (reservation.date === date) perDayCount++;
+
+      if (reservation.date > today) {
+        activeCount++;
+      } else if (reservation.date === today) {
+        const reservationEnd = timeToMinutes(reservation.time) + slotMinutes;
+        if (reservationEnd > currentMinutes) activeCount++;
+      }
+    });
+
+    if (perDayCount >= maxPerDay) {
+      return res.status(403).json({ error: "MAX_PER_DAY_LIMIT" });
+    }
+
+    if (activeCount >= maxActive) {
+      return res.status(403).json({ error: "ACTIVE_BOOKING_LIMIT" });
+    }
+  }
+
+  const reservationId = `${fieldId}_${date}_${time}`;
+  const reservationRef = db.collection("reservations").doc(reservationId);
+  const userRef = db.collection("users").doc(username);
+
+  try {
+    await db.runTransaction(async transaction => {
+      const reservationSnap = await transaction.get(reservationRef);
+      if (reservationSnap.exists) {
+        const error = new Error("SLOT_TAKEN");
+        error.code = "SLOT_TAKEN";
+        throw error;
+      }
+
+      if (!isAdmin) {
+        const userSnap = await transaction.get(userRef);
+        if (!userSnap.exists || Number(userSnap.data().credits || 0) <= 0) {
+          const error = new Error("NO_CREDITS");
+          error.code = "NO_CREDITS";
+          throw error;
+        }
+
+        transaction.update(userRef, {
+          credits: FieldValue.increment(-1)
+        });
+      }
+
+      transaction.set(reservationRef, {
+        fieldId,
+        date,
+        time,
+        user: username,
+        createdAt: FieldValue.serverTimestamp()
+      });
+    });
+  } catch (error) {
+    if (error?.code === "SLOT_TAKEN") {
+      return res.status(409).json({ error: "SLOT_TAKEN" });
+    }
+    if (error?.code === "NO_CREDITS") {
+      return res.status(403).json({ error: "NO_CREDITS" });
+    }
+    console.error("Errore creazione prenotazione", error);
+    return res.status(500).json({ error: "BOOKING_ERROR" });
   }
 
   res.json({ ok: true });
 });
 
 router.delete("/reservations/:id", requireAuth, async (req, res) => {
-  const snap = await db.collection("reservations").doc(req.params.id).get();
-  if (!snap.exists) return res.json({ ok: true });
-
-  const r = snap.data();
+  const reservationRef = db.collection("reservations").doc(req.params.id);
   const username = req.session.user.username;
   const isAdmin = req.session.user.role === "admin";
-
-  if (!isAdmin && r.user !== username) {
-    return res.status(403).json({ error: "NOT_ALLOWED" });
-  }
-
   const today = localISODate();
 
-  /* recupero credito SOLO se futuro */
-  if (!isAdmin && r.date > today) {
-    await db.collection("users").doc(username)
-      .update({ credits: FieldValue.increment(1) });
+  try {
+    await db.runTransaction(async transaction => {
+      const reservationSnap = await transaction.get(reservationRef);
+      if (!reservationSnap.exists) return;
+
+      const reservation = reservationSnap.data();
+      if (!isAdmin && reservation.user !== username) {
+        const error = new Error("NOT_ALLOWED");
+        error.code = "NOT_ALLOWED";
+        throw error;
+      }
+
+      if (!isAdmin && reservation.date > today) {
+        transaction.update(db.collection("users").doc(username), {
+          credits: FieldValue.increment(1)
+        });
+      }
+
+      transaction.delete(reservationRef);
+    });
+  } catch (error) {
+    if (error?.code === "NOT_ALLOWED") {
+      return res.status(403).json({ error: "NOT_ALLOWED" });
+    }
+    console.error("Errore cancellazione prenotazione", error);
+    return res.status(500).json({ error: "DELETE_ERROR" });
   }
 
-  await snap.ref.delete();
   res.json({ ok: true });
 });
 
@@ -318,122 +386,97 @@ router.put("/admin/gallery", requireAdmin, async (req, res) => {
 /* =================== ADMIN USERS =================== */
 router.get("/admin/users", requireAdmin, async (req, res) => {
   const snap = await db.collection("users").get();
-
-  const items = snap.docs
-    .map(d => ({
+  const items = [];
+  snap.forEach(d => {
+    const u = d.data();
+    items.push({
       username: d.id,
-      role: d.data().role || "user",
-      credits: d.data().credits ?? 0,
-      disabled: !!d.data().disabled
-    }))
-    
-    .sort((a, b) => {
-  const aIsNum = /^\d+$/.test(a.username);
-  const bIsNum = /^\d+$/.test(b.username);
-
-  // alfabetici prima dei numerici
-  if (aIsNum && !bIsNum) return 1;
-  if (!aIsNum && bIsNum) return -1;
-
-  // entrambi alfabetici
-  if (!aIsNum && !bIsNum) {
-    return a.username.localeCompare(b.username, "it");
-  }
-
-  // entrambi numerici
-  return Number(a.username) - Number(b.username);
-});
-
-
+      role: u.role || "user",
+      credits: u.credits ?? 0,
+      disabled: !!u.disabled
+    });
+  });
   res.json({ items });
 });
 
-/* =================== RENAME USER =================== */
-router.post("/admin/users/rename", requireAdmin, async (req, res) => {
-  const { oldUsername, newUsername } = req.body;
-
-  if (!oldUsername || !newUsername) {
-    return res.status(400).json({ error: "Missing parameters" });
-  }
-
-  if (oldUsername === "admin" || newUsername === "admin") {
-    return res.status(400).json({ error: "Cannot rename admin" });
-  }
-
-  if (!/^[a-zA-Z0-9_]{3,20}$/.test(newUsername)) {
-  return res.status(400).json({
-    error: "Username 3–20 caratteri, solo lettere, numeri o _"
-  });
-}
-
-const reserved = ["admin", "root", "system"];
-if (reserved.includes(newUsername.toLowerCase())) {
-  return res.status(400).json({ error: "Username non consentito" });
-}
-
-
-
-  const oldRef = db.collection("users").doc(oldUsername);
-  const newRef = db.collection("users").doc(newUsername);
-
-  const oldSnap = await oldRef.get();
-  if (!oldSnap.exists) {
-    return res.status(404).json({ error: "Old user not found" });
-  }
-
-  const newSnap = await newRef.get();
-  if (newSnap.exists) {
-    return res.status(409).json({ error: "New username already exists" });
-  }
-
-  const userData = oldSnap.data();
-
-  const batch = db.batch();
-
-  // crea nuovo utente con stessi dati
-  batch.set(newRef, { ...userData });
-
-  // aggiorna prenotazioni
-  const resSnap = await db
-    .collection("reservations")
-    .where("user", "==", oldUsername)
-    .get();
-
-  resSnap.forEach(doc => {
-    batch.update(doc.ref, { user: newUsername });
-  });
-
-  // elimina vecchio utente
-  batch.delete(oldRef);
-
-  await batch.commit();
-
-  res.json({ ok: true });
-});
-
-
 router.put("/admin/users/credits", requireAdmin, async (req, res) => {
-  const { username, delta } = req.body;
-  await db.collection("users").doc(username)
-    .update({ credits: FieldValue.increment(delta) });
+  const schema = z.object({
+    username: z.string().min(1),
+    delta: z.number().finite()
+  });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "BAD_BODY" });
+
+  const ref = db.collection("users").doc(parsed.data.username);
+  if (!(await ref.get()).exists) return res.status(404).json({ error: "USER_NOT_FOUND" });
+
+  await ref.update({ credits: FieldValue.increment(parsed.data.delta) });
   res.json({ ok: true });
 });
 
 router.put("/admin/users/status", requireAdmin, async (req, res) => {
-  const { username, disabled } = req.body;
-  await db.collection("users").doc(username)
-    .update({ disabled });
+  const schema = z.object({
+    username: z.string().min(1),
+    disabled: z.boolean()
+  });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "BAD_BODY" });
+
+  await db.collection("users").doc(parsed.data.username)
+    .update({ disabled: parsed.data.disabled });
   res.json({ ok: true });
 });
 
 router.put("/admin/users/password", requireAdmin, async (req, res) => {
-  const { username, newPassword } = req.body;
-  const hash = await bcrypt.hash(newPassword, 10);
-  await db.collection("users").doc(username)
+  const schema = z.object({
+    username: z.string().min(1),
+    newPassword: z.string().min(4).max(100)
+  });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "BAD_BODY" });
+
+  const hash = await bcrypt.hash(parsed.data.newPassword, 10);
+  await db.collection("users").doc(parsed.data.username)
     .update({ passwordHash: hash });
   res.json({ ok: true });
 });
 
+router.post("/admin/users/rename", requireAdmin, async (req, res) => {
+  const schema = z.object({
+    oldUsername: z.string().min(1).max(80),
+    newUsername: z.string().regex(/^[a-zA-Z0-9._-]{3,40}$/)
+  });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "BAD_BODY" });
+
+  const { oldUsername, newUsername } = parsed.data;
+  if (oldUsername === newUsername) return res.json({ ok: true });
+  if (oldUsername === req.session.user.username) {
+    return res.status(400).json({ error: "CANNOT_RENAME_CURRENT_USER" });
+  }
+
+  const oldRef = db.collection("users").doc(oldUsername);
+  const newRef = db.collection("users").doc(newUsername);
+  const [oldSnap, newSnap, reservationsSnap] = await Promise.all([
+    oldRef.get(),
+    newRef.get(),
+    db.collection("reservations").where("user", "==", oldUsername).get()
+  ]);
+
+  if (!oldSnap.exists) return res.status(404).json({ error: "USER_NOT_FOUND" });
+  if (newSnap.exists) return res.status(409).json({ error: "USERNAME_TAKEN" });
+  if (reservationsSnap.size > 498) {
+    return res.status(409).json({ error: "TOO_MANY_RESERVATIONS" });
+  }
+
+  const batch = db.batch();
+  batch.set(newRef, oldSnap.data());
+  batch.delete(oldRef);
+  reservationsSnap.forEach(doc => batch.update(doc.ref, { user: newUsername }));
+  await batch.commit();
+
+  res.json({ ok: true });
+});
 
 // ===== METEO (proxy backend per CSP) =====
 router.get("/weather", async (req, res) => {
@@ -442,7 +485,7 @@ router.get("/weather", async (req, res) => {
     const lon = 13.218;
 
     const r = await fetch(
-      `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=weathercode&timezone=Europe/Rome`
+      `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=weathercode,temperature_2m_max,temperature_2m_min&timezone=Europe/Rome`
     );
 
     const data = await r.json();

@@ -2,154 +2,236 @@
 <html lang="it">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b1220">
   <title>Tommi38 – Prenotazione Campi</title>
+
   <link rel="stylesheet" href="/style.css">
   <link rel="manifest" href="/manifest.json">
-<link rel="apple-touch-icon" href="/icon-192.png">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Tommi38">
+  <link rel="apple-touch-icon" href="/icon-192.png">
+
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Tommi38">
 </head>
 <body>
 
 <header class="topbar">
-  <div class="brand">Tommi38</div>
-  <button id="logoutBtn" class="btn-ghost hidden">Logout</button>
+  <div class="brand-wrap">
+    <div class="brand">Tommi38</div>
+    <div class="brand-subtitle">Campi</div>
+  </div>
+  <button id="logoutBtn" class="btn-ghost btn-small hidden" type="button">Esci</button>
 </header>
 
 <main class="wrap">
 
-<!-- LOGIN -->
-<section id="loginBox" class="card login-card">
-<div id="loginGallery" class="login-gallery"></div>
-  <h1 class="login-title">Tommi38</h1>
-  <p class="login-subtitle">Prenotazione Campi</p>
+  <!-- LOGIN -->
+  <section id="loginBox" class="card login-card">
+    <div id="loginGallery" class="login-gallery"></div>
+    <h1 class="login-title">Tommi38</h1>
+    <p class="login-subtitle">Prenotazione campi</p>
 
-  <input id="username" placeholder="Username">
-  <input id="password" type="password" placeholder="Password">
-  <button id="loginBtn" class="btn">Accedi</button>
-  <div id="loginErr" class="error hidden"></div>
+    <div class="form-stack">
+      <label class="field-label" for="username">Username</label>
+      <input id="username" autocomplete="username" placeholder="Inserisci username">
 
-</section>
+      <label class="field-label" for="password">Password</label>
+      <input id="password" type="password" autocomplete="current-password" placeholder="Inserisci password">
 
-<!-- LOADER GLOBALE -->
-<div id="appLoader" class="app-loader">
-  <div class="loader-ring"></div>
-  <div class="loader-text">
-     <span>Tommi38</span>
-    <div class="dots">Caricamento</div>
-  </div>
-</div>
-
-<section id="app" class="hidden">
-
-
-  <section class="card">
-    <h2 id="welcome"></h2>
-    <div id="creditsBox" class="muted"></div>
-    <span id="roleBadge" class="badge"></span>
-  </section>
-
-  <section class="card">
-    <h4>📌 Comunicazioni</h4>
-    <div id="notesView" class="muted"></div>
-  </section>
-<section id="fieldInfo" class="card card-tech">
-
-  <!-- popolato via JS -->
-</section>
-
-  <section class="card">
-    <h3>Prenota</h3>
-    <div class="grid3">
-      <input id="datePick" type="date">
-      <select id="fieldSelect"></select>
-      <select id="timeSelect"></select>
+      <button id="loginBtn" class="btn" type="button">Accedi</button>
+      <div id="loginErr" class="error hidden" role="alert"></div>
     </div>
-    <button id="bookBtn" class="btn">Prenota</button>
-    <div id="bookMsg" class="muted"></div>
-
-    <hr class="sep">
-    <h3>Le tue prenotazioni</h3>
-    <div id="reservationsList" class="list"></div>
   </section>
 
-<section id="weatherBox" class="card hidden">
-  <h4>🌤️ Meteo Senigallia</h4>
+  <!-- LOADER GLOBALE -->
+  <div id="appLoader" class="app-loader" aria-live="polite">
+    <div class="loader-ring" aria-hidden="true"></div>
+    <div class="loader-text">Caricamento<span class="dots"></span></div>
+  </div>
 
-  <div class="weather-title">Meteo settimana</div>
-  <div id="weatherRow" class="weather-row"></div>
-</section>
+  <section id="app" class="hidden">
 
+    <!-- PROFILO -->
+    <section class="card user-strip">
+      <div>
+        <h2 id="welcome"></h2>
+        <div id="creditsBox" class="credits-text"></div>
+      </div>
+      <span id="roleBadge" class="badge"></span>
+    </section>
 
-  <!-- ADMIN MENU -->
-  <section id="adminMenu" class="card hidden">
-    <h3>👑 Area Admin</h3>
-    <button id="btnAdminConfig" class="btn">Config</button>
-    <button id="btnAdminNotes" class="btn">Note</button>
-    <button id="btnAdminFields" class="btn">Campi</button>
-    <button id="btnAdminUsers" class="btn">Utenti</button>
-    <button id="btnAdminGallery" class="btn">Galleria Login</button>
+    <!-- PRENOTAZIONE PRINCIPALE -->
+    <section class="card booking-card">
+      <div class="section-heading">
+        <div>
+          <p class="eyebrow">Prenotazione</p>
+          <h2>Scegli il campo</h2>
+        </div>
+        <span class="section-number">01</span>
+      </div>
+
+      <div class="grid3">
+        <div class="control-group">
+          <label for="datePick">Data</label>
+          <input id="datePick" type="date">
+        </div>
+
+        <div class="control-group">
+          <label for="fieldSelect">Campo</label>
+          <select id="fieldSelect"></select>
+        </div>
+
+        <div class="control-group">
+          <label for="timeSelect">Orario</label>
+          <select id="timeSelect"></select>
+        </div>
+      </div>
+
+      <button id="bookBtn" class="btn btn-book" type="button">Conferma prenotazione</button>
+      <div id="bookMsg" class="form-message" aria-live="polite"></div>
+
+      <div id="fieldInfo" class="field-panel">
+        <!-- popolato via JavaScript -->
+      </div>
+    </section>
+
+    <!-- PRENOTAZIONI UTENTE -->
+    <section class="card">
+      <div class="section-heading compact-heading">
+        <div>
+          <p class="eyebrow">Riepilogo</p>
+          <h3>Le tue prenotazioni</h3>
+        </div>
+        <span class="section-number">02</span>
+      </div>
+      <div id="reservationsList" class="list"></div>
+    </section>
+
+    <!-- INFORMAZIONI -->
+    <div class="info-grid">
+      <section class="card info-card">
+        <h3>Comunicazioni</h3>
+        <div id="notesView" class="muted"></div>
+      </section>
+
+      <section id="weatherBox" class="card info-card hidden">
+        <h3>Meteo Senigallia</h3>
+        <div id="weatherRow" class="weather-row"></div>
+      </section>
+    </div>
+
+    <!-- ADMIN MENU -->
+    <section id="adminMenu" class="card admin-card hidden">
+      <div class="section-heading compact-heading">
+        <div>
+          <p class="eyebrow">Gestione</p>
+          <h3>Area amministratore</h3>
+        </div>
+      </div>
+      <div class="admin-grid">
+        <button id="btnAdminConfig" class="admin-action" type="button">Configurazione</button>
+        <button id="btnAdminNotes" class="admin-action" type="button">Comunicazioni</button>
+        <button id="btnAdminFields" class="admin-action" type="button">Campi</button>
+        <button id="btnAdminUsers" class="admin-action" type="button">Utenti</button>
+        <button id="btnAdminGallery" class="admin-action" type="button">Galleria login</button>
+      </div>
+    </section>
+
+    <!-- ADMIN CONFIG -->
+    <section id="adminConfig" class="card admin-section hidden">
+      <h3>Configurazione</h3>
+
+      <label class="field-label" for="cfgSlotMinutes">Durata slot in minuti</label>
+      <input id="cfgSlotMinutes" type="number" min="5" step="5" placeholder="Durata slot">
+
+      <div class="admin-two-cols">
+        <div>
+          <label class="field-label" for="cfgDayStart">Apertura</label>
+          <input id="cfgDayStart" type="time">
+        </div>
+        <div>
+          <label class="field-label" for="cfgDayEnd">Chiusura</label>
+          <input id="cfgDayEnd" type="time">
+        </div>
+      </div>
+
+      <label class="field-label" for="cfgMaxPerDay">Prenotazioni massime al giorno</label>
+      <input id="cfgMaxPerDay" type="number" min="1" placeholder="Massimo giornaliero">
+
+      <label class="field-label" for="cfgMaxActive">Prenotazioni attive massime</label>
+      <input id="cfgMaxActive" type="number" min="1" placeholder="Massimo attive">
+
+      <div class="action-row">
+        <button id="saveConfigBtn" class="btn" type="button">Salva</button>
+        <button class="btn-ghost backAdmin" type="button">Indietro</button>
+      </div>
+    </section>
+
+    <!-- ADMIN NOTES -->
+    <section id="adminNotes" class="card admin-section hidden">
+      <h3>Comunicazioni</h3>
+      <label class="field-label" for="notesText">Testo mostrato agli utenti</label>
+      <textarea id="notesText" placeholder="Scrivi una comunicazione pubblica"></textarea>
+      <div class="action-row">
+        <button id="saveNotesBtn" class="btn" type="button">Salva</button>
+        <button class="btn-ghost backAdmin" type="button">Indietro</button>
+      </div>
+    </section>
+
+    <!-- ADMIN FIELDS -->
+    <section id="adminFields" class="card admin-section hidden">
+      <h3>Campi</h3>
+      <div class="admin-two-cols">
+        <div>
+          <label class="field-label" for="newFieldId">ID campo</label>
+          <input id="newFieldId" placeholder="Es. volley1">
+        </div>
+        <div>
+          <label class="field-label" for="newFieldName">Nome campo</label>
+          <input id="newFieldName" placeholder="Es. Volley 1">
+        </div>
+      </div>
+      <button id="addFieldBtn" class="btn-secondary" type="button">Aggiungi campo</button>
+      <div id="fieldsList" class="list admin-list"></div>
+      <div class="action-row">
+        <button id="saveFieldsBtn" class="btn" type="button">Salva campi</button>
+        <button class="btn-ghost backAdmin" type="button">Indietro</button>
+      </div>
+    </section>
+
+    <!-- ADMIN USERS -->
+    <section id="adminUsers" class="card admin-section hidden">
+      <h3>Utenti</h3>
+      <label class="field-label" for="userSearch">Cerca utente</label>
+      <input id="userSearch" type="search" placeholder="Scrivi lo username">
+      <div id="usersList" class="list users-scroll"></div>
+      <button class="btn-ghost backAdmin" type="button">Indietro</button>
+    </section>
+
+    <!-- ADMIN GALLERY -->
+    <section id="adminGallery" class="card admin-section hidden">
+      <h3>Galleria login</h3>
+
+      <label class="field-label" for="galleryUrl">URL immagine</label>
+      <input id="galleryUrl" inputmode="url" placeholder="https://...">
+
+      <label class="field-label" for="galleryCaption">Didascalia</label>
+      <input id="galleryCaption" placeholder="Didascalia facoltativa">
+
+      <label class="field-label" for="galleryLink">Link di destinazione</label>
+      <input id="galleryLink" inputmode="url" placeholder="https://...">
+
+      <button id="addGalleryBtn" class="btn-secondary" type="button">Aggiungi immagine</button>
+      <div id="galleryList" class="list admin-list"></div>
+
+      <div class="action-row">
+        <button id="saveGalleryBtn" class="btn" type="button">Salva galleria</button>
+        <button class="btn-ghost backAdmin" type="button">Indietro</button>
+      </div>
+    </section>
+
   </section>
-
-  <!-- ADMIN CONFIG -->
-  <section id="adminConfig" class="card hidden">
-    <h4>Configurazione</h4>
-    <input id="cfgSlotMinutes" type="number" placeholder="Durata slot (min)">
-    <input id="cfgDayStart" type="time">
-    <input id="cfgDayEnd" type="time">
-    <input id="cfgMaxPerDay" type="number" placeholder="Max prenotazioni/giorno">
-    <input id="cfgMaxActive" type="number" placeholder="Max prenotazioni attive">
-    <button id="saveConfigBtn" class="btn">Salva</button>
-    <button class="btn-ghost backAdmin">⬅ Indietro</button>
-  </section>
-
-  <!-- ADMIN NOTES -->
-  <section id="adminNotes" class="card hidden">
-    <textarea id="notesText" placeholder="Note pubbliche"></textarea>
-    <button id="saveNotesBtn" class="btn">Salva</button>
-    <button class="btn-ghost backAdmin">⬅ Indietro</button>
-  </section>
-
-  <!-- ADMIN FIELDS -->
-  <section id="adminFields" class="card hidden">
-    <input id="newFieldId" placeholder="ID campo">
-    <input id="newFieldName" placeholder="Nome campo">
-    <button id="addFieldBtn" class="btn">Aggiungi campo</button>
-    <div id="fieldsList" class="list"></div>
-    <button id="saveFieldsBtn" class="btn">Salva campi</button>
-    <button class="btn-ghost backAdmin">⬅ Indietro</button>
-  </section>
-
-  <!-- ADMIN USERS -->
-<section id="adminUsers" class="card hidden">
-
-  <input
-    type="text"
-    id="userSearch"
-    placeholder="Cerca utente..."
-    style="margin-bottom:10px;width:100%;padding:6px;"
-  >
-
-  <div id="usersList" class="list users-scroll"></div>
-
-  <button class="btn-ghost backAdmin">⬅ Indietro</button>
-</section>
-
-
-  <!-- ADMIN GALLERY -->
-  <section id="adminGallery" class="card hidden">
-    <input id="galleryUrl" placeholder="URL immagine">
-    <input id="galleryCaption" placeholder="Didascalia">
-<input id="galleryLink" placeholder="Link al sito (https://...)">
-    <button id="addGalleryBtn" class="btn">Aggiungi</button>
-    <div id="galleryList" class="list"></div>
-    <button id="saveGalleryBtn" class="btn">Salva galleria</button>
-    <button class="btn-ghost backAdmin">⬅ Indietro</button>
-  </section>
-
-</section>
 </main>
 
 <script src="/script.js" defer></script>

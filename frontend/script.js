@@ -3,6 +3,13 @@ const API = "/api";
 const qs = id => document.getElementById(id);
 const show = el => el.classList.remove("hidden");
 const hide = el => el.classList.add("hidden");
+const escapeHTML = value => String(value ?? "").replace(/[&<>'"]/g, char => ({
+  "&": "&amp;",
+  "<": "&lt;",
+  ">": "&gt;",
+  "'": "&#39;",
+  '"': "&quot;"
+}[char]));
 
 /* ================= STATE ================= */
 let STATE = {
@@ -20,12 +27,22 @@ let STATE = {
 
 let AUTO_REFRESH_TIMER = null;
 
+function setBookMessage(message = "", type = "") {
+  const element = qs("bookMsg");
+  if (!element) return;
+  element.textContent = message;
+  element.className = `form-message ${type}`.trim();
+}
+
 function startAutoRefresh() {
   stopAutoRefresh();
   AUTO_REFRESH_TIMER = setInterval(async () => {
     try {
       // aggiorna prenotazioni (e quindi timeline, stato, ecc.)
+      const timeline = qs("timeline");
+      const savedScroll = timeline?.scrollLeft || 0;
       await loadReservations();
+      if (qs("timeline")) qs("timeline").scrollLeft = savedScroll;
 
       // aggiorna crediti (solo se user)
       if (STATE.me && STATE.me.role === "user") {
@@ -35,7 +52,7 @@ function startAutoRefresh() {
       // se la sessione è scaduta o il server dorme, non blocchiamo la UI
       console.warn("Auto-refresh fallito", e);
     }
-  }, 5_000);
+  }, 10_000);
 }
 
 function stopAutoRefresh() {
@@ -83,37 +100,34 @@ function weatherEmoji(code) {
 }
 
 // ===== STATO CAMPO =====
-function getFieldStatus(fieldId) {
-  const now = nowMinutes();
-  const slot = STATE.config.slotMinutes || 45;
-
-  const current = STATE.dayReservationsAll.find(r => {
-    if (r.fieldId !== fieldId) return false;
-    const start = minutes(r.time);
-    return now >= start && now < start + slot;
-  });
-
-  if (current) return { status: "playing", user: current.user };
-
-  const todayHas = STATE.dayReservationsAll.some(r => r.fieldId === fieldId);
-  if (todayHas) return { status: "busy" };
-
-  return { status: "free" };
-}
-
-// ===== COUNTDOWN PROSSIMA PARTITA =====
-function getNextMatchCountdown(fieldId) {
-  const now = nowMinutes();
-
-  const next = STATE.dayReservationsAll
+function getFieldDayData(fieldId) {
+  const slotMinutes = Number(STATE.config.slotMinutes || 45);
+  const start = minutes(STATE.config.dayStart || "09:00");
+  const end = minutes(STATE.config.dayEnd || "20:00");
+  const reservations = STATE.dayReservationsAll
     .filter(r => r.fieldId === fieldId)
-    .map(r => minutes(r.time))
-    .filter(t => t > now)
-    .sort((a, b) => a - b)[0];
+    .sort((a, b) => minutes(a.time) - minutes(b.time));
 
-  return next ? next - now : null;
+  const totalSlots = Math.max(0, Math.floor((end - start) / slotMinutes));
+  return {
+    slotMinutes,
+    start,
+    end,
+    reservations,
+    totalSlots,
+    availableSlots: Math.max(0, totalSlots - reservations.length)
+  };
 }
 
+function formatSelectedDate(dateStr) {
+  if (!dateStr) return "";
+  const [year, month, day] = dateStr.split("-").map(Number);
+  return new Date(year, month - 1, day).toLocaleDateString("it-IT", {
+    weekday: "long",
+    day: "numeric",
+    month: "long"
+  });
+}
 
 /* ================= API ================= */
 async function api(path, options = {}) {
@@ -141,31 +155,23 @@ async function loadWeather() {
   const row = qs("weatherRow");
   if (!box || !row) return;
 
-  const CACHE_KEY = "weather_cache";
-  const CACHE_TTL = 30 * 60 * 1000; // 30 minuti
+  const CACHE_KEY = "weather_cache_v2";
+  const CACHE_TTL = 30 * 60 * 1000;
 
   try {
     const cached = JSON.parse(localStorage.getItem(CACHE_KEY) || "null");
     const now = Date.now();
 
-    // ✅ usa cache se valida
     if (cached && now - cached.time < CACHE_TTL) {
       renderWeather(cached.data);
-      box.classList.remove("hidden");
+      show(box);
       return;
     }
 
-    // 🔄 fetch reale
     const data = await api("/weather");
-
-    localStorage.setItem(
-      CACHE_KEY,
-      JSON.stringify({ time: now, data })
-    );
-
+    localStorage.setItem(CACHE_KEY, JSON.stringify({ time: now, data }));
     renderWeather(data);
-    box.classList.remove("hidden");
-
+    show(box);
   } catch (e) {
     console.error("Errore meteo", e);
   }
@@ -173,24 +179,31 @@ async function loadWeather() {
 
 function renderWeather(data) {
   const row = qs("weatherRow");
-  row.innerHTML = "";
+  const daily = data?.daily;
+  if (!row || !daily?.time?.length) return;
 
-  for (let i = 0; i < 7; i++) {
-    const d = new Date(data.daily.time[i]);
-    const day = d.toLocaleDateString("it-IT", { weekday: "short" });
+  row.innerHTML = "";
+  const days = Math.min(7, daily.time.length);
+
+  for (let i = 0; i < days; i++) {
+    const [year, month, dayNumber] = daily.time[i].split("-").map(Number);
+    const date = new Date(year, month - 1, dayNumber);
+    const day = date.toLocaleDateString("it-IT", { weekday: "short" });
+    const max = daily.temperature_2m_max?.[i];
+    const min = daily.temperature_2m_min?.[i];
 
     const el = document.createElement("div");
     el.className = "weather-day";
     el.innerHTML = `
-      ${day}
-      <span class="weather-emoji">
-        ${weatherEmoji(data.daily.weathercode[i])}
-      </span>
+      <span>${day}</span>
+      <span class="weather-emoji">${weatherEmoji(daily.weathercode[i])}</span>
+      ${Number.isFinite(max) && Number.isFinite(min)
+        ? `<span class="weather-temp">${Math.round(max)}° / ${Math.round(min)}°</span>`
+        : ""}
     `;
     row.appendChild(el);
   }
 }
-
 
 /* ================= AUTH ================= */
 async function login() {
@@ -231,16 +244,16 @@ async function loadAll(setDateToday = false) {
 
   qs("welcome").textContent = `Ciao ${STATE.me.username}`;
   qs("creditsBox").textContent = `Crediti: ${STATE.me.credits}`;
-  qs("roleBadge").textContent = STATE.me.role;
+  qs("roleBadge").textContent = STATE.me.role === "admin" ? "Admin" : "Utente";
   qs("notesView").textContent = STATE.notes || "Nessuna comunicazione.";
 
+  qs("datePick").min = localISODate();
   if (setDateToday || !qs("datePick").value) {
     qs("datePick").value = localISODate();
   }
 
 renderFields();
 
-// 👇 AGGIUNGI QUESTO
 if (STATE.fields.length > 0) {
   qs("fieldSelect").value = STATE.fields[0].id;
 }
@@ -272,7 +285,7 @@ async function loadReservations() {
   // ❌ BLOCCO GIORNI PASSATI
   if (isPastDate(date)) {
     qs("bookBtn").disabled = true;
-    qs("bookMsg").textContent = "❌ Non puoi prenotare una giornata passata";
+    setBookMessage("Non puoi prenotare una giornata passata", "error");
 
     STATE.dayReservationsAll = [];
     STATE.reservations = [];
@@ -284,8 +297,6 @@ async function loadReservations() {
   }
 
   qs("bookBtn").disabled = false;
-  qs("bookMsg").textContent = "";
-
   const res = await api(`/reservations?date=${date}`);
 
   STATE.dayReservationsAll = res.items || [];
@@ -301,46 +312,66 @@ async function loadReservations() {
 
 function renderFieldInfo() {
   const fieldId = qs("fieldSelect")?.value;
-  if (!fieldId) return;
   const box = qs("fieldInfo");
+  if (!fieldId || !box) return;
 
-  if (!box) return;
+  const fieldName = qs("fieldSelect").selectedOptions[0]?.textContent || fieldId;
+  const date = qs("datePick").value;
+  const today = localISODate();
+  const now = nowMinutes();
+  const data = getFieldDayData(fieldId);
 
-  const status = getFieldStatus(fieldId);
-  const countdown = getNextMatchCountdown(fieldId);
+  let statusText;
+  let statusClass;
+  let detailText;
 
-  let statusText = "🟢 Campo libero";
-  if (status.status === "playing") statusText = "🟡 Partita in corso";
-  if (status.status === "busy") statusText = "🔴 Campo occupato oggi";
+  if (date === today) {
+    const current = data.reservations.find(r => {
+      const start = minutes(r.time);
+      return now >= start && now < start + data.slotMinutes;
+    });
 
-  let countdownText = "Nessuna partita prevista";
-  if (countdown !== null) {
-    countdownText = `⏳ Prossima partita tra ${countdown} min`;
+    const next = data.reservations.find(r => minutes(r.time) > now);
+
+    if (current) {
+      statusText = "Partita in corso";
+      statusClass = "is-playing";
+      detailText = `Il campo torna libero alle ${timeStr(minutes(current.time) + data.slotMinutes)}`;
+    } else {
+      statusText = "Campo libero adesso";
+      statusClass = "is-free";
+      detailText = next
+        ? `Prossima prenotazione alle ${next.time}`
+        : "Nessun'altra prenotazione prevista oggi";
+    }
+  } else {
+    statusText = escapeHTML(fieldName);
+    statusClass = "is-day";
+    detailText = formatSelectedDate(date);
   }
 
   box.innerHTML = `
-  <div class="field-status glow">${statusText}</div>
-  <div class="field-countdown">${countdownText}</div>
+    <div class="field-summary">
+      <div>
+        <div class="field-status ${statusClass}">${statusText}</div>
+        <div class="field-countdown">${detailText}</div>
+      </div>
+      <span class="availability-pill">${data.availableSlots} liberi</span>
+    </div>
+    <div class="timeline-label">Tocca un orario libero per selezionarlo</div>
+    <div id="timeline" class="timeline" aria-label="Disponibilità orari"></div>
+  `;
 
-  <!-- TIMELINE GIORNATA -->
-  <div id="timeline" class="timeline"></div>
-`;
-
-renderTimeline(fieldId);
+  renderTimeline(fieldId);
 }
-
-
 
 function renderTimeSelect() {
   const sel = qs("timeSelect");
-
-  // Salva l'orario scelto prima del refresh automatico.
-  // Così non torna al primo orario disponibile.
+  const bookBtn = qs("bookBtn");
   const previousValue = sel.value;
-
   sel.innerHTML = "";
 
-  const slot = STATE.config.slotMinutes || 45;
+  const slot = Number(STATE.config.slotMinutes || 45);
   const start = minutes(STATE.config.dayStart || "09:00");
   const end = minutes(STATE.config.dayEnd || "20:00");
   const field = qs("fieldSelect").value;
@@ -355,98 +386,99 @@ function renderTimeSelect() {
 
   for (let m = start; m + slot <= end; m += slot) {
     const t = timeStr(m);
-    const o = document.createElement("option");
-    o.value = t;
+    const option = document.createElement("option");
+    option.value = t;
 
     if (isPastDate(date)) {
-      o.textContent = `${t} ⛔ Giorno passato`;
-      o.disabled = true;
+      option.textContent = `${t} — giorno passato`;
+      option.disabled = true;
     } else if (isToday && m <= nowMinutes()) {
-      o.textContent = `${t} ⏰ Orario passato`;
-      o.disabled = true;
+      option.textContent = `${t} — passato`;
+      option.disabled = true;
     } else if (taken.has(t)) {
-      o.textContent = `${t} ❌ Occupato`;
-      o.disabled = true;
+      option.textContent = `${t} — occupato`;
+      option.disabled = true;
     } else {
-      o.textContent = `${t} ✅ Libero`;
+      option.textContent = `${t} — libero`;
     }
 
-    sel.appendChild(o);
+    sel.appendChild(option);
   }
 
-  // Rimette l'orario scelto prima del refresh, se esiste ancora.
-  const previousOption = [...sel.options].find(o => o.value === previousValue);
+  const availableOptions = [...sel.options].filter(option => !option.disabled);
+  const previousOption = availableOptions.find(option => option.value === previousValue);
+
   if (previousOption) {
-    sel.value = previousValue;
-    return;
+    sel.value = previousOption.value;
+  } else if (availableOptions[0]) {
+    sel.value = availableOptions[0].value;
   }
 
-  // Solo se l'orario precedente non esiste più, sceglie il primo disponibile.
-  const firstAvailable = [...sel.options].find(o => !o.disabled);
-  if (firstAvailable) {
-    sel.value = firstAvailable.value;
+  sel.disabled = availableOptions.length === 0;
+  bookBtn.disabled = isPastDate(date) || availableOptions.length === 0;
+
+  if (availableOptions.length === 0 && !isPastDate(date)) {
+    setBookMessage("Nessun orario disponibile per questo campo");
   }
 }
 
 function renderTimeline(fieldId) {
-  const slotMinutes = STATE.config.slotMinutes || 45;
-  const start = minutes(STATE.config.dayStart);
-  const end = minutes(STATE.config.dayEnd);
-  const now = nowMinutes();
-
   const box = qs("timeline");
   if (!box) return;
+
+  const slotMinutes = Number(STATE.config.slotMinutes || 45);
+  const start = minutes(STATE.config.dayStart || "09:00");
+  const end = minutes(STATE.config.dayEnd || "20:00");
+  const date = qs("datePick").value;
+  const today = localISODate();
+  const now = nowMinutes();
+  const selectedTime = qs("timeSelect").value;
+  const isPastDay = isPastDate(date);
+
   box.innerHTML = "";
 
-  const slots = [];
-
   for (let m = start; m + slotMinutes <= end; m += slotMinutes) {
-    const t = timeStr(m);
-    const el = document.createElement("div");
-
+    const time = timeStr(m);
     const isBusy = STATE.dayReservationsAll.some(
-      r => r.fieldId === fieldId && r.time === t
+      reservation => reservation.fieldId === fieldId && reservation.time === time
+    );
+    const isPast = isPastDay || (date === today && m <= now);
+    const isCurrent = date === today && now >= m && now < m + slotMinutes;
+    const isSelected = !isBusy && !isPast && time === selectedTime;
+
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = [
+      "slot",
+      isBusy ? "busy" : isPast ? "past" : "free",
+      isCurrent ? "current" : "",
+      isSelected ? "selected" : ""
+    ].filter(Boolean).join(" ");
+
+    button.textContent = time;
+    button.dataset.stateLabel = isBusy ? "Occupato" : isPast ? "Passato" : isSelected ? "Scelto" : "Libero";
+    button.disabled = isBusy || isPast;
+    button.setAttribute(
+      "aria-label",
+      `${time}, ${isBusy ? "occupato" : isPast ? "non disponibile" : "libero"}`
     );
 
-    el.className = "slot " + (isBusy ? "busy" : "free");
-    el.dataset.start = m;
+    if (!button.disabled) {
+      button.addEventListener("click", () => {
+        qs("timeSelect").value = time;
+        setBookMessage();
+        renderTimeline(fieldId);
+      });
+    }
 
-    el.innerHTML = `<div class="slot-time">${t}</div>`;
-    box.appendChild(el);
-    slots.push(el);
+    box.appendChild(button);
   }
 
-  // === MARKER ORA ===
-  const marker = document.createElement("div");
-  marker.className = "now-marker";
-  box.appendChild(marker);
-
-  // fuori orario → nasconde
-  if (now < start || now > end) {
-    marker.style.display = "none";
-    return;
+  const selected = box.querySelector(".slot.selected");
+  if (selected && !box.dataset.initialized) {
+    selected.scrollIntoView({ behavior: "auto", block: "nearest", inline: "center" });
+    box.dataset.initialized = "true";
   }
-
-  // trova lo slot corretto
-  const currentIndex = Math.floor((now - start) / slotMinutes);
-  const currentSlot = slots[currentIndex];
-  if (!currentSlot) {
-    marker.style.display = "none";
-    return;
-  }
-
-  // posiziona la linea sopra lo slot reale
-  const slotRect = currentSlot.getBoundingClientRect();
-  const boxRect = box.getBoundingClientRect();
-
-  marker.style.display = "block";
-
-marker.style.left =
-  `${slotRect.left - boxRect.left + slotRect.width / 2}px`;
-
-marker.style.top =
-  `${slotRect.top - boxRect.top + (slotRect.height - marker.offsetHeight) / 2}px`;
-
 }
 
 /* ===== PRENOTA (UI OTTIMISTICA) ===== */
@@ -458,22 +490,22 @@ async function book() {
   const selectedTimeOption = qs("timeSelect").selectedOptions[0];
 
   if (!fieldId || !date || !time) {
-    qs("bookMsg").textContent = "❌ Seleziona campo, data e orario";
+    setBookMessage("Seleziona campo, data e orario", "error");
     return;
   }
 
   if (isPastDate(date)) {
-    qs("bookMsg").textContent = "❌ Non puoi prenotare un giorno passato";
+    setBookMessage("Non puoi prenotare un giorno passato", "error");
     return;
   }
 
   if (isPastTimeToday(date, time)) {
-    qs("bookMsg").textContent = "❌ Orario già passato";
+    setBookMessage("Orario già passato", "error");
     return;
   }
 
   if (selectedTimeOption?.disabled) {
-    qs("bookMsg").textContent = "❌ Questo orario non è disponibile";
+    setBookMessage("Questo orario non è disponibile", "error");
     return;
   }
 
@@ -496,31 +528,35 @@ Orario: ${time}`
       body: JSON.stringify({ fieldId, date, time })
     });
 
-    qs("bookMsg").textContent = "Prenotazione effettuata ✅";
     await refreshCredits();
     await loadReservations();
-
-    // Dopo la prenotazione resta sull'orario scelto.
-    qs("timeSelect").value = time;
+    setBookMessage(`Prenotazione effettuata: ${fieldName}, ore ${time}`, "success");
 
   } catch (e) {
-    qs("bookMsg").textContent =
+    const message =
       e?.error === "ACTIVE_BOOKING_LIMIT"
         ? "Hai raggiunto il limite di prenotazioni attive"
         : e?.error === "MAX_PER_DAY_LIMIT"
         ? "Hai raggiunto il limite di prenotazioni per questo giorno"
         : e?.error === "SLOT_TAKEN"
         ? "Questo orario è già stato prenotato"
-        : "Errore prenotazione";
+        : e?.error === "NO_CREDITS"
+        ? "Non hai crediti disponibili"
+        : e?.error === "PAST_TIME_NOT_ALLOWED"
+        ? "Questo orario è già iniziato"
+        : "Errore durante la prenotazione";
 
     await loadReservations();
 
-    // Anche in caso di errore non cambia orario da solo.
-    qs("timeSelect").value = time;
+    const selectedOption = [...qs("timeSelect").options]
+      .find(option => option.value === time && !option.disabled);
+    if (selectedOption) qs("timeSelect").value = time;
+    renderFieldInfo();
+    setBookMessage(message, "error");
   }
 
-  qs("bookBtn").disabled = false;
-  qs("bookBtn").textContent = "Prenota";
+  qs("bookBtn").disabled = qs("timeSelect").disabled || isPastDate(qs("datePick").value);
+  qs("bookBtn").textContent = "Conferma prenotazione";
 }
 
 async function deleteReservation(id) {
@@ -545,29 +581,37 @@ function renderReservations() {
   list.innerHTML = "";
 
   if (STATE.reservations.length === 0) {
-    list.textContent = "Nessuna prenotazione.";
+    const empty = document.createElement("div");
+    empty.className = "empty-state";
+    empty.textContent = "Nessuna prenotazione per la data selezionata";
+    list.appendChild(empty);
     return;
   }
 
-  STATE.reservations.forEach(r => {
-    const d = document.createElement("div");
-    d.className = "item";
+  STATE.reservations
+    .slice()
+    .sort((a, b) => minutes(a.time) - minutes(b.time))
+    .forEach(reservation => {
+      const item = document.createElement("div");
+      item.className = "item";
 
-    d.textContent =
-      STATE.me.role === "admin"
-        ? `${r.time} – ${r.fieldId} – 👤 ${r.user}`
-        : `${r.time} – ${r.fieldId}`;
+      const fieldName = STATE.fields.find(field => field.id === reservation.fieldId)?.name || reservation.fieldId;
+      const text = document.createElement("div");
+      text.innerHTML = STATE.me.role === "admin"
+        ? `<strong>${reservation.time}</strong> · ${fieldName}<br><span class="muted">${reservation.user}</span>`
+        : `<strong>${reservation.time}</strong> · ${fieldName}`;
+      item.appendChild(text);
 
-    if (STATE.me.role === "admin" || r.user === STATE.me.username) {
-      const b = document.createElement("button");
-      b.className = "btn-ghost";
-      b.textContent = "❌ Cancella";
-      b.onclick = () => deleteReservation(r.id);
-      d.appendChild(b);
-    }
+      if (STATE.me.role === "admin" || reservation.user === STATE.me.username) {
+        const button = document.createElement("button");
+        button.className = "btn-ghost";
+        button.textContent = "Cancella";
+        button.onclick = () => deleteReservation(reservation.id);
+        item.appendChild(button);
+      }
 
-    list.appendChild(d);
-  });
+      list.appendChild(item);
+    });
 }
 
 /* ================= CREDITI ================= */
@@ -675,114 +719,99 @@ async function saveConfig() {
 /* ================= USERS ================= */
 
 function renderUsers(filter = "") {
-  const l = qs("usersList");
-  l.innerHTML = "";
+  const list = qs("usersList");
+  list.innerHTML = "";
 
-  STATE.users
-    .filter(u =>
-      u.username.toLowerCase().includes(filter.toLowerCase())
-    )
-    .forEach(u => {
-      const d = document.createElement("div");
-      d.className = "item";
+  const users = STATE.users.filter(user =>
+    user.username.toLowerCase().includes(filter.toLowerCase())
+  );
 
-      d.innerHTML = `
-        <strong>${u.username}</strong> – crediti ${u.credits}
-        <br>
-        <input
-          type="text"
-          placeholder="Nuovo username"
-          class="rename-input"
-          style="width:120px;margin-top:4px;"
-        >
-      `;
+  if (users.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "empty-state";
+    empty.textContent = "Nessun utente trovato";
+    list.appendChild(empty);
+    return;
+  }
 
-      // ✏️ CREDITI
-      const edit = document.createElement("button");
-      edit.className = "btn-ghost";
-      edit.textContent = "✏️ Crediti";
-      edit.onclick = async () => {
-        const v = prompt("Nuovi crediti", u.credits);
-        if (v === null) return;
-        await api("/admin/users/credits", {
-          method: "PUT",
-          body: JSON.stringify({
-            username: u.username,
-            delta: v - u.credits
-          })
-        });
-        loadUsers();
-      };
+  users.forEach(user => {
+    const item = document.createElement("div");
+    item.className = "item";
 
-      // ✏️ RINOMINA
-      const rename = document.createElement("button");
-      rename.className = "btn-ghost";
-      rename.textContent = "✏️ Rinomina";
-      rename.onclick = async () => {
-        const newUsername = d
-          .querySelector(".rename-input")
-          .value.trim();
+    const info = document.createElement("div");
+    info.style.width = "100%";
+    info.innerHTML = `
+      <strong>${escapeHTML(user.username)}</strong>
+      <div class="muted">${user.credits} crediti · ${user.disabled ? "disabilitato" : "attivo"}</div>
+      <input type="text" placeholder="Nuovo username" class="rename-input">
+    `;
+    item.appendChild(info);
 
-        if (!newUsername) {
-          alert("Inserisci il nuovo username");
-          return;
-        }
+    const edit = document.createElement("button");
+    edit.className = "btn-ghost";
+    edit.textContent = "Crediti";
+    edit.onclick = async () => {
+      const value = prompt("Nuovi crediti", user.credits);
+      if (value === null || !Number.isFinite(Number(value))) return;
+      await api("/admin/users/credits", {
+        method: "PUT",
+        body: JSON.stringify({
+          username: user.username,
+          delta: Number(value) - Number(user.credits)
+        })
+      });
+      await loadUsers();
+    };
 
-        if (!confirm(`Rinominare ${u.username} in ${newUsername}?`)) return;
+    const rename = document.createElement("button");
+    rename.className = "btn-ghost";
+    rename.textContent = "Rinomina";
+    rename.onclick = async () => {
+      const newUsername = item.querySelector(".rename-input").value.trim();
+      if (!newUsername) {
+        alert("Inserisci il nuovo username");
+        return;
+      }
+      if (!confirm(`Rinominare ${user.username} in ${newUsername}?`)) return;
 
+      try {
         await api("/admin/users/rename", {
           method: "POST",
-          body: JSON.stringify({
-            oldUsername: u.username,
-            newUsername
-          })
+          body: JSON.stringify({ oldUsername: user.username, newUsername })
         });
+        await loadUsers();
+      } catch (error) {
+        alert(error?.error === "USERNAME_TAKEN" ? "Username già utilizzato" : "Rinomina non riuscita");
+      }
+    };
 
-        loadUsers();
-      };
+    const reset = document.createElement("button");
+    reset.className = "btn-ghost";
+    reset.textContent = "Password";
+    reset.onclick = async () => {
+      const newPassword = prompt("Nuova password");
+      if (!newPassword) return;
+      await api("/admin/users/password", {
+        method: "PUT",
+        body: JSON.stringify({ username: user.username, newPassword })
+      });
+      alert("Password aggiornata");
+    };
 
-      // 🔑 RESET PASSWORD
-      const reset = document.createElement("button");
-      reset.className = "btn-ghost";
-      reset.textContent = "🔑 Reset PW";
-      reset.onclick = async () => {
-        const newPw = prompt("Nuova password");
-if (!newPw) return;
+    const toggle = document.createElement("button");
+    toggle.className = "btn-ghost";
+    toggle.textContent = user.disabled ? "Abilita" : "Disabilita";
+    toggle.onclick = async () => {
+      await api("/admin/users/status", {
+        method: "PUT",
+        body: JSON.stringify({ username: user.username, disabled: !user.disabled })
+      });
+      await loadUsers();
+    };
 
-await api("/admin/users/password", {
-  method: "PUT",
-  body: JSON.stringify({
-    username: u.username,
-    newPassword: newPw
-  })
-});
-
-        alert("Password resettata");
-      };
-
-      // ⛔ DISABILITA / ABILITA
-      const toggle = document.createElement("button");
-      toggle.className = "btn-ghost";
-      toggle.textContent = u.disabled ? "✅ Abilita" : "⛔ Disabilita";
-      toggle.onclick = async () => {
-        await api("/admin/users/status", {
-  method: "PUT",
-  body: JSON.stringify({
-    username: u.username,
-    disabled: !u.disabled
-  })
-});
-
-        loadUsers();
-      };
-
-      d.appendChild(edit);
-      d.appendChild(rename);
-      d.appendChild(reset);
-      d.appendChild(toggle);
-
-      l.appendChild(d);
-    });
+    item.append(edit, rename, reset, toggle);
+    list.appendChild(item);
+  });
 }
 
 async function loadUsers() {
@@ -883,8 +912,22 @@ const appLoader = qs("appLoader");
   qs("logoutBtn").onclick = logout;
   qs("bookBtn").onclick = book;
 
-  qs("datePick").onchange = loadReservations;
+  [qs("username"), qs("password")].forEach(input => {
+    input.addEventListener("keydown", event => {
+      if (event.key === "Enter") login();
+    });
+  });
+
+  qs("datePick").onchange = () => {
+    setBookMessage();
+    loadReservations();
+  };
+  qs("timeSelect").onchange = () => {
+    setBookMessage();
+    renderFieldInfo();
+  };
   qs("fieldSelect").onchange = () => {
+    setBookMessage();
     renderTimeSelect();
     renderFieldInfo();
   };
@@ -904,6 +947,12 @@ const appLoader = qs("appLoader");
   qs("saveFieldsBtn").onclick = saveFields;
   qs("addGalleryBtn").onclick = addGalleryItem;
   qs("saveGalleryBtn").onclick = saveGallery;
+
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("/service-worker.js").catch(error => {
+      console.warn("Service worker non registrato", error);
+    });
+  }
 
   // login gallery pubblica
   loadPublicLoginGallery();
