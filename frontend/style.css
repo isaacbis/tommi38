@@ -1418,3 +1418,66 @@ button,
     width: 100%;
   }
 }
+
+/* ======================================================
+   FIX CAMPO DATA MOBILE – ANDROID / CHROME
+   Impedisce al controllo nativo di superare la card.
+   ====================================================== */
+#datePick,
+.control-group,
+.grid3 {
+  min-inline-size: 0;
+  max-inline-size: 100%;
+}
+
+#datePick {
+  display: block;
+  inline-size: 100%;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+#datePick::-webkit-date-and-time-value {
+  min-width: 0;
+  width: 100%;
+  text-align: left;
+}
+
+#datePick::-webkit-datetime-edit,
+#datePick::-webkit-datetime-edit-fields-wrapper {
+  min-width: 0;
+  max-width: 100%;
+  padding: 0;
+}
+
+#datePick::-webkit-calendar-picker-indicator {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 4px;
+}
+
+@media (max-width: 720px) {
+  .booking-card,
+  .booking-card .grid3,
+  .booking-card .control-group {
+    min-width: 0;
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .booking-card .grid3 {
+    overflow: hidden;
+  }
+
+  #datePick {
+    inline-size: 100% !important;
+    width: 100% !important;
+    min-inline-size: 0 !important;
+    max-inline-size: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+}
