@@ -1305,3 +1305,116 @@ textarea {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* ================= MOBILE WIDTH & SCROLL STABILITY ================= */
+html,
+body {
+  width: 100%;
+  max-width: 100%;
+}
+
+.topbar,
+.topbar-inner,
+.wrap,
+#app,
+#app > .card,
+#app > .info-grid,
+.info-grid > .card {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.wrap,
+#app,
+#app > .card,
+#app > .info-grid,
+.info-grid > .card {
+  width: 100%;
+}
+
+.grid3 > *,
+.info-grid > *,
+.admin-grid > *,
+.admin-two-cols > *,
+.section-heading > *,
+.field-summary > *,
+.booking-preview > *,
+.user-strip > * {
+  min-width: 0;
+}
+
+input,
+select,
+textarea,
+button,
+.field-panel,
+.timeline,
+.weather-row,
+.list,
+.item {
+  max-width: 100%;
+}
+
+/* Le zone aggiornate in tempo reale non devono modificare l'ancoraggio verticale. */
+#fieldInfo,
+#reservationsList,
+#creditsBox,
+.timeline {
+  overflow-anchor: none;
+}
+
+@media (max-width: 720px) {
+  .wrap {
+    width: 100%;
+    max-width: none;
+    padding-left: max(10px, env(safe-area-inset-left));
+    padding-right: max(10px, env(safe-area-inset-right));
+  }
+
+  #app,
+  #app > section,
+  #app > .info-grid,
+  .info-grid > section,
+  .card {
+    width: 100%;
+    max-width: 100%;
+  }
+
+  .info-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .control-group,
+  .admin-two-cols > div,
+  .booking-preview > div:first-child,
+  .field-summary > div:first-child {
+    min-width: 0;
+    width: 100%;
+  }
+
+  input,
+  select,
+  textarea,
+  input[type="date"],
+  input[type="time"] {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .booking-preview-value,
+  .field-countdown,
+  .reservation-field,
+  .reservation-meta {
+    overflow-wrap: anywhere;
+    white-space: normal;
+  }
+
+  .timeline,
+  .weather-row {
+    width: 100%;
+  }
+}

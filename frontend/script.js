@@ -26,6 +26,14 @@ let STATE = {
 };
 
 let AUTO_REFRESH_TIMER = null;
+let LAST_RESERVATIONS_SIGNATURE = "";
+
+function reservationsSignature(items = []) {
+  return items
+    .map(item => `${item.id || ""}|${item.fieldId || ""}|${item.date || ""}|${item.time || ""}|${item.user || ""}`)
+    .sort()
+    .join("||");
+}
 
 function setBookMessage(message = "", type = "") {
   const element = qs("bookMsg");
@@ -37,19 +45,18 @@ function setBookMessage(message = "", type = "") {
 function startAutoRefresh() {
   stopAutoRefresh();
   AUTO_REFRESH_TIMER = setInterval(async () => {
-    try {
-      // aggiorna prenotazioni (e quindi timeline, stato, ecc.)
-      const timeline = qs("timeline");
-      const savedScroll = timeline?.scrollLeft || 0;
-      await loadReservations();
-      if (qs("timeline")) qs("timeline").scrollLeft = savedScroll;
+    // Evita aggiornamenti inutili quando l'app non è visibile.
+    if (document.hidden) return;
 
-      // aggiorna crediti (solo se user)
+    try {
+      // In background aggiorna il DOM solo quando le prenotazioni cambiano.
+      // Questo impedisce alla pagina di spostarsi ogni 10 secondi.
+      await loadReservations({ background: true });
+
       if (STATE.me && STATE.me.role === "user") {
         await refreshCredits();
       }
     } catch (e) {
-      // se la sessione è scaduta o il server dorme, non blocchiamo la UI
       console.warn("Auto-refresh fallito", e);
     }
   }, 10_000);
@@ -317,42 +324,48 @@ if (STATE.fields.length > 0) {
 
 
 /* ================= RESERVATIONS ================= */
-async function loadReservations() {
+async function loadReservations({ background = false } = {}) {
   const date = qs("datePick").value;
 
-  // ❌ BLOCCO GIORNI PASSATI
   if (isPastDate(date)) {
     qs("bookBtn").disabled = true;
     setBookMessage("Non puoi prenotare una giornata passata", "error");
 
     STATE.dayReservationsAll = [];
     STATE.reservations = [];
+    LAST_RESERVATIONS_SIGNATURE = `${date}::past`;
 
     renderTimeSelect();
     renderReservations();
-    renderFieldInfo();
+    renderFieldInfo({ preserveScroll: background });
     return;
   }
 
   qs("bookBtn").disabled = false;
   const res = await api(`/reservations?date=${date}`);
+  const nextReservations = res.items || [];
+  const nextSignature = `${date}::${reservationsSignature(nextReservations)}`;
+  const reservationsChanged = nextSignature !== LAST_RESERVATIONS_SIGNATURE;
 
-  STATE.dayReservationsAll = res.items || [];
+  STATE.dayReservationsAll = nextReservations;
   STATE.reservations =
     STATE.me.role === "admin"
       ? STATE.dayReservationsAll
       : STATE.dayReservationsAll.filter(r => r.user === STATE.me.username);
 
+  // Se il refresh automatico non trova cambiamenti, non ricrea tutta la pagina.
+  if (background && !reservationsChanged) {
+    updateFieldStatusOnly();
+    return;
+  }
+
+  LAST_RESERVATIONS_SIGNATURE = nextSignature;
   renderTimeSelect();
   renderReservations();
-  renderFieldInfo();
+  renderFieldInfo({ preserveScroll: background });
 }
 
-function renderFieldInfo() {
-  const fieldId = qs("fieldSelect")?.value;
-  const box = qs("fieldInfo");
-  if (!fieldId || !box) return;
-
+function getFieldSummaryView(fieldId) {
   const fieldName = qs("fieldSelect").selectedOptions[0]?.textContent || fieldId;
   const date = qs("datePick").value;
   const today = localISODate();
@@ -383,18 +396,50 @@ function renderFieldInfo() {
         : "Nessun'altra prenotazione prevista oggi";
     }
   } else {
-    statusText = escapeHTML(fieldName);
+    statusText = fieldName;
     statusClass = "is-day";
     detailText = formatSelectedDate(date);
   }
 
+  return { ...data, statusText, statusClass, detailText };
+}
+
+function updateFieldStatusOnly() {
+  const fieldId = qs("fieldSelect")?.value;
+  const box = qs("fieldInfo");
+  if (!fieldId || !box) return;
+
+  const view = getFieldSummaryView(fieldId);
+  const status = box.querySelector(".field-status");
+  const detail = box.querySelector(".field-countdown");
+  const availability = box.querySelector(".availability-pill");
+
+  if (status) {
+    status.className = `field-status ${view.statusClass}`;
+    status.textContent = view.statusText;
+  }
+  if (detail) detail.textContent = view.detailText;
+  if (availability) availability.textContent = `${view.availableSlots} liberi`;
+}
+
+function renderFieldInfo({ preserveScroll = true } = {}) {
+  const fieldId = qs("fieldSelect")?.value;
+  const box = qs("fieldInfo");
+  if (!fieldId || !box) return;
+
+  const previousTimeline = qs("timeline");
+  const savedScroll = preserveScroll && previousTimeline
+    ? previousTimeline.scrollLeft
+    : null;
+  const view = getFieldSummaryView(fieldId);
+
   box.innerHTML = `
     <div class="field-summary">
       <div>
-        <div class="field-status ${statusClass}">${statusText}</div>
-        <div class="field-countdown">${detailText}</div>
+        <div class="field-status ${view.statusClass}">${escapeHTML(view.statusText)}</div>
+        <div class="field-countdown">${escapeHTML(view.detailText)}</div>
       </div>
-      <span class="availability-pill">${data.availableSlots} liberi</span>
+      <span class="availability-pill">${view.availableSlots} liberi</span>
     </div>
     <div class="timeline-label">Tocca un orario libero per selezionarlo</div>
     <div id="timeline" class="timeline" aria-label="Disponibilità orari"></div>
@@ -405,7 +450,10 @@ function renderFieldInfo() {
     </div>
   `;
 
-  renderTimeline(fieldId);
+  renderTimeline(fieldId, {
+    scrollLeft: savedScroll,
+    centerSelected: savedScroll === null
+  });
 }
 
 function renderTimeSelect() {
@@ -467,7 +515,7 @@ function renderTimeSelect() {
   updateBookingPreview();
 }
 
-function renderTimeline(fieldId) {
+function renderTimeline(fieldId, { scrollLeft = null, centerSelected = false } = {}) {
   const box = qs("timeline");
   if (!box) return;
 
@@ -510,10 +558,11 @@ function renderTimeline(fieldId) {
 
     if (!button.disabled) {
       button.addEventListener("click", () => {
+        const currentScroll = box.scrollLeft;
         qs("timeSelect").value = time;
         setBookMessage();
         updateBookingPreview();
-        renderTimeline(fieldId);
+        renderTimeline(fieldId, { scrollLeft: currentScroll });
       });
     }
 
@@ -521,10 +570,21 @@ function renderTimeline(fieldId) {
   }
 
   const selected = box.querySelector(".slot.selected");
-  if (selected && !box.dataset.initialized) {
-    selected.scrollIntoView({ behavior: "auto", block: "nearest", inline: "center" });
-    box.dataset.initialized = "true";
-  }
+
+  // Muove soltanto la barra interna degli orari, mai la pagina intera.
+  requestAnimationFrame(() => {
+    if (!box.isConnected) return;
+
+    if (Number.isFinite(scrollLeft)) {
+      box.scrollLeft = scrollLeft;
+      return;
+    }
+
+    if (centerSelected && selected) {
+      const target = selected.offsetLeft - (box.clientWidth - selected.offsetWidth) / 2;
+      box.scrollLeft = Math.max(0, target);
+    }
+  });
 }
 
 /* ===== PRENOTA (UI OTTIMISTICA) ===== */
@@ -987,12 +1047,12 @@ const appLoader = qs("appLoader");
   qs("timeSelect").onchange = () => {
     setBookMessage();
     updateBookingPreview();
-    renderFieldInfo();
+    renderFieldInfo({ preserveScroll: false });
   };
   qs("fieldSelect").onchange = () => {
     setBookMessage();
     renderTimeSelect();
-    renderFieldInfo();
+    renderFieldInfo({ preserveScroll: false });
   };
 
   qs("btnAdminConfig").onclick = () => openAdmin("adminConfig");
