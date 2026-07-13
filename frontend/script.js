@@ -21,12 +21,14 @@ let STATE = {
   users: [],
   reservations: [],
   dayReservationsAll: [],
+  playerSearches: [],
   gallery: [],
   galleryDraft: []
 };
 
 let AUTO_REFRESH_TIMER = null;
 let LAST_RESERVATIONS_SIGNATURE = "";
+let LAST_PLAYER_SEARCHES_SIGNATURE = "";
 
 function reservationsSignature(items = []) {
   return items
@@ -52,6 +54,7 @@ function startAutoRefresh() {
       // In background aggiorna il DOM solo quando le prenotazioni cambiano.
       // Questo impedisce alla pagina di spostarsi ogni 10 secondi.
       await loadReservations({ background: true });
+      await loadPlayerSearches({ background: true });
 
       if (STATE.me && STATE.me.role === "user") {
         await refreshCredits();
@@ -318,6 +321,7 @@ if (STATE.fields.length > 0) {
   }
 
   await loadReservations();
+  await loadPlayerSearches();
 
 }
 
@@ -677,8 +681,10 @@ async function deleteReservation(id) {
     await api(`/reservations/${id}`, { method: "DELETE" });
     await refreshCredits();
     await loadReservations();
+    await loadPlayerSearches();
   } catch {
     await loadReservations();
+    await loadPlayerSearches();
   }
 }
 
@@ -702,6 +708,7 @@ function renderReservations() {
       item.className = "item reservation-item";
 
       const fieldName = STATE.fields.find(field => field.id === reservation.fieldId)?.name || reservation.fieldId;
+      const search = STATE.playerSearches.find(playerSearch => playerSearch.reservationId === reservation.id);
 
       const time = document.createElement("div");
       time.className = "reservation-time";
@@ -722,18 +729,451 @@ function renderReservations() {
         main.appendChild(meta);
       }
 
+      if (search) {
+        const pending = (search.requests || []).filter(request => request.status === "pending").length;
+        const summary = document.createElement("div");
+        summary.className = "player-search-summary";
+        summary.textContent = search.status === "open"
+          ? `${search.spotsAvailable} posti liberi · ${pending} richieste in attesa`
+          : search.status === "full"
+          ? "Gruppo completo"
+          : "Ricerca giocatori chiusa";
+        main.appendChild(summary);
+      }
+
       item.append(time, main);
 
       if (STATE.me.role === "admin" || reservation.user === STATE.me.username) {
-        const button = document.createElement("button");
-        button.className = "btn-ghost";
-        button.textContent = "Cancella";
-        button.onclick = () => deleteReservation(reservation.id);
-        item.appendChild(button);
+        const actions = document.createElement("div");
+        actions.className = "reservation-actions";
+
+        const searchButton = document.createElement("button");
+        searchButton.className = search ? "btn-secondary" : "btn-ghost";
+        searchButton.type = "button";
+
+        if (search) {
+          const pending = (search.requests || []).filter(request => request.status === "pending").length;
+          searchButton.textContent = pending > 0 ? `Gestisci (${pending})` : "Gestisci giocatori";
+          searchButton.onclick = () => openManagePlayerSearch(search.id);
+        } else {
+          searchButton.textContent = "Cerco giocatori";
+          searchButton.onclick = () => openCreatePlayerSearch(reservation.id);
+        }
+
+        const deleteButton = document.createElement("button");
+        deleteButton.className = "btn-ghost";
+        deleteButton.type = "button";
+        deleteButton.textContent = "Cancella";
+        deleteButton.onclick = () => deleteReservation(reservation.id);
+
+        if (search || !isPastTimeToday(reservation.date, reservation.time)) {
+          actions.appendChild(searchButton);
+        }
+        actions.appendChild(deleteButton);
+        item.appendChild(actions);
       }
 
       list.appendChild(item);
     });
+}
+
+/* ================= CERCA GIOCATORI ================= */
+function playerSearchesSignature(items = []) {
+  return JSON.stringify(items.map(item => ({
+    id: item.id,
+    status: item.status,
+    spotsAvailable: item.spotsAvailable,
+    spotsFilled: item.spotsFilled,
+    myRequest: item.myRequest ? {
+      id: item.myRequest.id,
+      status: item.myRequest.status,
+      count: item.myRequest.count
+    } : null,
+    requests: (item.requests || []).map(request => ({
+      id: request.id,
+      status: request.status,
+      count: request.count,
+      phone: request.phone,
+      participantNames: request.participantNames
+    }))
+  })));
+}
+
+async function loadPlayerSearches({ background = false } = {}) {
+  const response = await api("/player-searches");
+  const nextItems = response.items || [];
+  const nextSignature = playerSearchesSignature(nextItems);
+
+  if (background && nextSignature === LAST_PLAYER_SEARCHES_SIGNATURE) return;
+
+  LAST_PLAYER_SEARCHES_SIGNATURE = nextSignature;
+  STATE.playerSearches = nextItems;
+  renderPlayerSearches();
+  renderReservations();
+}
+
+function fieldNameById(fieldId) {
+  return STATE.fields.find(field => field.id === fieldId)?.name || fieldId;
+}
+
+function formatLongDate(dateStr) {
+  if (!dateStr) return "";
+  const [year, month, day] = dateStr.split("-").map(Number);
+  return new Date(year, month - 1, day).toLocaleDateString("it-IT", {
+    weekday: "long",
+    day: "numeric",
+    month: "long"
+  });
+}
+
+function requestStatusLabel(status) {
+  if (status === "accepted") return "Accettata";
+  if (status === "rejected") return "Rifiutata";
+  if (status === "cancelled") return "Annullata";
+  return "In attesa";
+}
+
+function renderPlayerSearches() {
+  const openList = qs("openGamesList");
+  const myWrap = qs("myJoinRequestsWrap");
+  const myList = qs("myJoinRequestsList");
+  if (!openList || !myWrap || !myList) return;
+
+  openList.innerHTML = "";
+  myList.innerHTML = "";
+
+  const openGames = STATE.playerSearches.filter(search =>
+    !search.isOwner && search.status === "open" && search.spotsAvailable > 0 && !search.myRequest
+  );
+
+  if (openGames.length === 0) {
+    const empty = document.createElement("div");
+    empty.className = "empty-state";
+    empty.textContent = "Nessuna partita aperta in questo momento";
+    openList.appendChild(empty);
+  } else {
+    openGames.forEach(search => {
+      const card = document.createElement("div");
+      card.className = "item game-card";
+      card.innerHTML = `
+        <div class="game-card-top">
+          <div class="game-card-main">
+            <div class="game-field">${escapeHTML(fieldNameById(search.fieldId))}</div>
+            <div class="game-date">${escapeHTML(formatLongDate(search.date))}</div>
+          </div>
+          <div class="game-time">${escapeHTML(search.time)}</div>
+        </div>
+        ${search.note ? `<div class="game-note">${escapeHTML(search.note)}</div>` : ""}
+        <div class="game-card-footer">
+          <span class="spots-pill">${search.spotsAvailable} ${search.spotsAvailable === 1 ? "posto disponibile" : "posti disponibili"}</span>
+          <button class="btn-ghost btn-small join-game-btn" type="button">Richiedi di partecipare</button>
+        </div>
+      `;
+      card.querySelector(".join-game-btn").onclick = () => openJoinPlayerSearch(search.id);
+      openList.appendChild(card);
+    });
+  }
+
+  const myRequests = STATE.playerSearches.filter(search => search.myRequest);
+  if (myRequests.length === 0) {
+    hide(myWrap);
+    return;
+  }
+
+  show(myWrap);
+  myRequests.forEach(search => {
+    const request = search.myRequest;
+    const card = document.createElement("div");
+    card.className = "item join-request-card";
+    card.innerHTML = `
+      <div class="request-card-top">
+        <div class="request-card-main">
+          <div class="game-field">${escapeHTML(fieldNameById(search.fieldId))}</div>
+          <div class="game-date">${escapeHTML(formatLongDate(search.date))} · ore ${escapeHTML(search.time)}</div>
+          <div class="player-names">${request.participantNames.map(escapeHTML).join("<br>")}</div>
+        </div>
+        <span class="request-status ${escapeHTML(request.status)}">${escapeHTML(requestStatusLabel(request.status))}</span>
+      </div>
+      <div class="request-card-footer">
+        <span class="muted">${request.count} ${request.count === 1 ? "partecipante" : "partecipanti"}</span>
+        ${request.status === "pending"
+          ? '<button class="btn-ghost btn-small cancel-join-btn" type="button">Annulla richiesta</button>'
+          : request.status === "rejected" && search.status === "open" && search.spotsAvailable > 0
+          ? '<button class="btn-ghost btn-small retry-join-btn" type="button">Invia di nuovo</button>'
+          : ""}
+      </div>
+    `;
+
+    const cancelButton = card.querySelector(".cancel-join-btn");
+    if (cancelButton) {
+      cancelButton.onclick = () => cancelJoinRequest(search.id, request.id);
+    }
+    const retryButton = card.querySelector(".retry-join-btn");
+    if (retryButton) {
+      retryButton.onclick = () => openJoinPlayerSearch(search.id);
+    }
+    myList.appendChild(card);
+  });
+}
+
+function openAppModal(title, html) {
+  qs("appModalTitle").textContent = title;
+  qs("appModalBody").innerHTML = html;
+  show(qs("appModal"));
+  document.body.classList.add("modal-open");
+}
+
+function closeAppModal() {
+  hide(qs("appModal"));
+  qs("appModalBody").innerHTML = "";
+  document.body.classList.remove("modal-open");
+}
+
+function searchSummaryHTML(search) {
+  return `
+    <div class="modal-summary">
+      <strong>${escapeHTML(fieldNameById(search.fieldId))} · ore ${escapeHTML(search.time)}</strong>
+      <span>${escapeHTML(formatLongDate(search.date))}</span>
+    </div>
+  `;
+}
+
+function openCreatePlayerSearch(reservationId) {
+  const reservation = STATE.reservations.find(item => item.id === reservationId);
+  if (!reservation) return;
+
+  const tempSearch = {
+    fieldId: reservation.fieldId,
+    date: reservation.date,
+    time: reservation.time
+  };
+
+  const options = Array.from({ length: 12 }, (_, index) => {
+    const value = index + 1;
+    return `<option value="${value}">${value}</option>`;
+  }).join("");
+
+  openAppModal("Cerca giocatori", `
+    ${searchSummaryHTML(tempSearch)}
+    <label class="field-label" for="searchSpots">Quanti giocatori mancano?</label>
+    <select id="searchSpots">${options}</select>
+
+    <label class="field-label" for="searchNote">Messaggio facoltativo</label>
+    <textarea id="searchNote" maxlength="200" placeholder="Es. Partita tranquilla, livello amatoriale"></textarea>
+
+    <button id="createSearchBtn" class="btn btn-book" type="button">Pubblica la ricerca</button>
+    <div id="playerSearchModalMsg" class="form-message" aria-live="polite"></div>
+  `);
+
+  qs("createSearchBtn").onclick = async () => {
+    const button = qs("createSearchBtn");
+    button.disabled = true;
+    try {
+      await api("/player-searches", {
+        method: "POST",
+        body: JSON.stringify({
+          reservationId,
+          spotsNeeded: Number(qs("searchSpots").value),
+          note: qs("searchNote").value.trim()
+        })
+      });
+      await loadPlayerSearches();
+      closeAppModal();
+    } catch (error) {
+      const message = error?.error === "SEARCH_ALREADY_EXISTS"
+        ? "La ricerca giocatori è già attiva"
+        : "Non è stato possibile pubblicare la ricerca";
+      qs("playerSearchModalMsg").textContent = message;
+      qs("playerSearchModalMsg").className = "form-message error";
+      button.disabled = false;
+    }
+  };
+}
+
+function renderParticipantNameFields(count) {
+  const box = qs("participantNameFields");
+  if (!box) return;
+  box.innerHTML = "";
+
+  for (let index = 0; index < count; index++) {
+    const label = document.createElement("label");
+    label.className = "field-label";
+    label.htmlFor = `participantName${index}`;
+    label.textContent = count === 1 ? "Nome e cognome" : `Nome e cognome partecipante ${index + 1}`;
+
+    const input = document.createElement("input");
+    input.id = `participantName${index}`;
+    input.className = "participant-name-input";
+    input.autocomplete = "name";
+    input.maxLength = 80;
+    input.placeholder = "Nome e cognome";
+
+    box.append(label, input);
+  }
+}
+
+function openJoinPlayerSearch(searchId) {
+  const search = STATE.playerSearches.find(item => item.id === searchId);
+  if (!search || search.spotsAvailable <= 0) return;
+
+  const options = Array.from({ length: search.spotsAvailable }, (_, index) => {
+    const value = index + 1;
+    return `<option value="${value}">${value}</option>`;
+  }).join("");
+
+  openAppModal("Richiedi di partecipare", `
+    ${searchSummaryHTML(search)}
+    <label class="field-label" for="joinCount">Quante persone partecipano?</label>
+    <select id="joinCount">${options}</select>
+
+    <div id="participantNameFields" class="participant-fields"></div>
+
+    <label class="field-label" for="joinPhone">Numero di telefono di riferimento</label>
+    <input id="joinPhone" type="tel" autocomplete="tel" maxlength="30" placeholder="Es. 333 1234567">
+    <p class="modal-help">Il nome e il numero saranno visibili solamente a chi ha prenotato il campo, così potrà accettare la richiesta e contattarti.</p>
+
+    <button id="sendJoinRequestBtn" class="btn btn-book" type="button">Invia richiesta</button>
+    <div id="playerSearchModalMsg" class="form-message" aria-live="polite"></div>
+  `);
+
+  renderParticipantNameFields(1);
+  qs("joinCount").onchange = () => renderParticipantNameFields(Number(qs("joinCount").value));
+
+  qs("sendJoinRequestBtn").onclick = async () => {
+    const participantNames = [...document.querySelectorAll(".participant-name-input")]
+      .map(input => input.value.trim());
+    const phone = qs("joinPhone").value.trim();
+    const messageBox = qs("playerSearchModalMsg");
+
+    if (participantNames.some(name => name.length < 2) || phone.length < 6) {
+      messageBox.textContent = "Inserisci tutti i nomi e un numero di telefono valido";
+      messageBox.className = "form-message error";
+      return;
+    }
+
+    const button = qs("sendJoinRequestBtn");
+    button.disabled = true;
+
+    try {
+      await api(`/player-searches/${encodeURIComponent(searchId)}/requests`, {
+        method: "POST",
+        body: JSON.stringify({ participantNames, phone })
+      });
+      await loadPlayerSearches();
+      closeAppModal();
+    } catch (error) {
+      const messages = {
+        ALREADY_REQUESTED: "Hai già inviato una richiesta per questa partita",
+        NOT_ENOUGH_SPOTS: "Non ci sono più abbastanza posti disponibili",
+        CANNOT_JOIN_OWN_SEARCH: "Non puoi partecipare alla tua stessa ricerca"
+      };
+      messageBox.textContent = messages[error?.error] || "Invio della richiesta non riuscito";
+      messageBox.className = "form-message error";
+      button.disabled = false;
+    }
+  };
+}
+
+function whatsappNumber(phone) {
+  let digits = String(phone || "").replace(/\D/g, "");
+  if (digits.startsWith("00")) digits = digits.slice(2);
+  if (digits.length === 10 && digits.startsWith("3")) digits = `39${digits}`;
+  return digits;
+}
+
+function openManagePlayerSearch(searchId) {
+  const search = STATE.playerSearches.find(item => item.id === searchId);
+  if (!search) return;
+
+  const requests = search.requests || [];
+  const requestCards = requests.length === 0
+    ? '<div class="empty-state">Non hai ancora ricevuto richieste</div>'
+    : requests.map(request => {
+        const phoneHref = escapeHTML(String(request.phone || "").replace(/[^0-9+]/g, ""));
+        const waNumber = whatsappNumber(request.phone);
+        return `
+          <div class="item player-request-card">
+            <div class="request-card-top">
+              <div class="request-card-main">
+                <div class="game-field">${request.count} ${request.count === 1 ? "partecipante" : "partecipanti"}</div>
+                <div class="player-names">${request.participantNames.map(escapeHTML).join("<br>")}</div>
+              </div>
+              <span class="request-status ${escapeHTML(request.status)}">${escapeHTML(requestStatusLabel(request.status))}</span>
+            </div>
+            <div class="contact-row">
+              <a class="contact-link" href="tel:${phoneHref}">${escapeHTML(request.phone)}</a>
+              ${waNumber ? `<a class="contact-link" href="https://wa.me/${waNumber}" target="_blank" rel="noopener noreferrer">WhatsApp</a>` : ""}
+            </div>
+            ${request.status === "pending" ? `
+              <div class="request-actions">
+                <button class="btn-ghost btn-accept request-decision" data-request-id="${escapeHTML(request.id)}" data-status="accepted" type="button">Accetta</button>
+                <button class="btn-ghost btn-reject request-decision" data-request-id="${escapeHTML(request.id)}" data-status="rejected" type="button">Rifiuta</button>
+              </div>
+            ` : ""}
+          </div>
+        `;
+      }).join("");
+
+  openAppModal("Gestisci giocatori", `
+    ${searchSummaryHTML(search)}
+    <div class="game-card-footer" style="margin: 0 0 14px;">
+      <span class="spots-pill">${search.spotsAvailable} ${search.spotsAvailable === 1 ? "posto libero" : "posti liberi"}</span>
+      <span class="request-status ${search.status === "open" ? "accepted" : "closed"}">${search.status === "open" ? "Ricerca attiva" : search.status === "full" ? "Gruppo completo" : "Ricerca chiusa"}</span>
+    </div>
+    <div id="manageRequestsList">${requestCards}</div>
+    ${search.status === "open" ? '<button id="closePlayerSearchBtn" class="btn-ghost btn-book" type="button">Chiudi la ricerca</button>' : ""}
+    <div id="playerSearchModalMsg" class="form-message" aria-live="polite"></div>
+  `);
+
+  document.querySelectorAll(".request-decision").forEach(button => {
+    button.onclick = () => decideJoinRequest(search.id, button.dataset.requestId, button.dataset.status);
+  });
+
+  const closeButton = qs("closePlayerSearchBtn");
+  if (closeButton) closeButton.onclick = () => closePlayerSearch(search.id);
+}
+
+async function decideJoinRequest(searchId, requestId, status) {
+  const messageBox = qs("playerSearchModalMsg");
+  try {
+    await api(`/player-searches/${encodeURIComponent(searchId)}/requests/${encodeURIComponent(requestId)}`, {
+      method: "PATCH",
+      body: JSON.stringify({ status })
+    });
+    await loadPlayerSearches();
+    openManagePlayerSearch(searchId);
+  } catch (error) {
+    messageBox.textContent = error?.error === "NOT_ENOUGH_SPOTS"
+      ? "Non ci sono abbastanza posti per accettare questa richiesta"
+      : "Operazione non riuscita";
+    messageBox.className = "form-message error";
+  }
+}
+
+async function closePlayerSearch(searchId) {
+  if (!confirm("Chiudere la ricerca giocatori? Le richieste ancora in attesa verranno rifiutate.")) return;
+
+  try {
+    await api(`/player-searches/${encodeURIComponent(searchId)}`, { method: "DELETE" });
+    await loadPlayerSearches();
+    closeAppModal();
+  } catch {
+    const messageBox = qs("playerSearchModalMsg");
+    messageBox.textContent = "Non è stato possibile chiudere la ricerca";
+    messageBox.className = "form-message error";
+  }
+}
+
+async function cancelJoinRequest(searchId, requestId) {
+  if (!confirm("Annullare la richiesta di partecipazione?")) return;
+  try {
+    await api(`/player-searches/${encodeURIComponent(searchId)}/requests/${encodeURIComponent(requestId)}`, {
+      method: "DELETE"
+    });
+    await loadPlayerSearches();
+  } catch {
+    alert("Non è stato possibile annullare la richiesta");
+  }
 }
 
 /* ================= CREDITI ================= */
@@ -1033,6 +1473,13 @@ const appLoader = qs("appLoader");
   qs("loginBtn").onclick = login;
   qs("logoutBtn").onclick = logout;
   qs("bookBtn").onclick = book;
+  qs("appModalClose").onclick = closeAppModal;
+  qs("appModal").addEventListener("click", event => {
+    if (event.target.dataset.closeModal === "true") closeAppModal();
+  });
+  document.addEventListener("keydown", event => {
+    if (event.key === "Escape" && !qs("appModal").classList.contains("hidden")) closeAppModal();
+  });
 
   [qs("username"), qs("password")].forEach(input => {
     input.addEventListener("keydown", event => {

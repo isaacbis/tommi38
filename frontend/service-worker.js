@@ -1,4 +1,4 @@
-const CACHE_NAME = "tommi38-pwa-v6";
+const CACHE_NAME = "tommi38-pwa-v7-player-search";
 
 const ASSETS = [
   "/",

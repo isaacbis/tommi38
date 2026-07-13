@@ -60,6 +60,34 @@ function localMinutes() {
   return Number(parts.hour) * 60 + Number(parts.minute);
 }
 
+async function commitDeleteRefs(refs = []) {
+  for (let index = 0; index < refs.length; index += 450) {
+    const batch = db.batch();
+    refs.slice(index, index + 450).forEach(ref => batch.delete(ref));
+    await batch.commit();
+  }
+}
+
+async function deletePlayerSearchTree(searchId) {
+  const searchRef = db.collection("playerSearches").doc(searchId);
+  const requestsSnap = await searchRef.collection("requests").get();
+  const refs = requestsSnap.docs.map(doc => doc.ref);
+  refs.push(searchRef);
+  await commitDeleteRefs(refs);
+}
+
+function reservationIsExpired(reservation, slotMinutes, today, nowMinutes) {
+  if (reservation.date < today) return true;
+  if (reservation.date > today) return false;
+  return timeToMinutes(reservation.time) + slotMinutes <= nowMinutes;
+}
+
+function playerSearchIsExpired(search, today, nowMinutes) {
+  if (search.date < today) return true;
+  if (search.date > today) return false;
+  return timeToMinutes(search.time) <= nowMinutes;
+}
+
 async function cleanupExpiredReservations() {
   const now = Date.now();
   if (now - lastCleanup < CLEANUP_COOLDOWN_MS) return;
@@ -77,25 +105,29 @@ async function cleanupExpiredReservations() {
     .where("date", "<=", today)
     .get();
 
-  if (snap.empty) return;
+  const expiredDocs = snap.docs.filter(doc =>
+    reservationIsExpired(doc.data(), slotMinutes, today, nowMinutes)
+  );
 
-  const batch = db.batch();
+  if (expiredDocs.length === 0) return;
 
-  snap.forEach(doc => {
-    const r = doc.data();
-    let expired = false;
+  await commitDeleteRefs(expiredDocs.map(doc => doc.ref));
+  await Promise.all(expiredDocs.map(doc => deletePlayerSearchTree(doc.id)));
+}
 
-    if (r.date < today) expired = true;
+function playerRequestId(username) {
+  return Buffer.from(username, "utf8").toString("base64url");
+}
 
-    if (r.date === today) {
-      const end = timeToMinutes(r.time) + slotMinutes;
-      if (end <= nowMinutes) expired = true;
-    }
-
-    if (expired) batch.delete(doc.ref);
-  });
-
-  await batch.commit();
+function publicRequestData(doc) {
+  const data = doc.data();
+  return {
+    id: doc.id,
+    participantNames: Array.isArray(data.participantNames) ? data.participantNames : [],
+    phone: data.phone || "",
+    count: Number(data.count || 0),
+    status: data.status || "pending"
+  };
 }
 
 
@@ -323,6 +355,11 @@ router.delete("/reservations/:id", requireAuth, async (req, res) => {
   const username = req.session.user.username;
   const isAdmin = req.session.user.role === "admin";
   const today = localISODate();
+  const currentMinutes = localMinutes();
+
+  const cfgSnap = await db.collection("admin").doc("config").get();
+  const cfg = cfgSnap.exists ? cfgSnap.data() : {};
+  const slotMinutes = Number(cfg.slotMinutes || 45);
 
   try {
     await db.runTransaction(async transaction => {
@@ -336,8 +373,13 @@ router.delete("/reservations/:id", requireAuth, async (req, res) => {
         throw error;
       }
 
-      if (!isAdmin && reservation.date > today) {
-        transaction.update(db.collection("users").doc(username), {
+      const ownerRef = db.collection("users").doc(reservation.user);
+      const ownerSnap = await transaction.get(ownerRef);
+      const isStillActive = !reservationIsExpired(reservation, slotMinutes, today, currentMinutes);
+      const ownerIsAdmin = ownerSnap.exists && (ownerSnap.data().role || "user") === "admin";
+
+      if (ownerSnap.exists && !ownerIsAdmin && isStillActive) {
+        transaction.update(ownerRef, {
           credits: FieldValue.increment(1)
         });
       }
@@ -352,6 +394,377 @@ router.delete("/reservations/:id", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "DELETE_ERROR" });
   }
 
+  await deletePlayerSearchTree(req.params.id);
+  res.json({ ok: true });
+});
+
+/* =================== CERCA GIOCATORI =================== */
+router.get("/player-searches", requireAuth, async (req, res) => {
+  await cleanupExpiredReservations();
+
+  const username = req.session.user.username;
+  const isAdmin = req.session.user.role === "admin";
+  const today = localISODate();
+  const currentMinutes = localMinutes();
+
+  const cfgSnap = await db.collection("admin").doc("config").get();
+  const cfg = cfgSnap.exists ? cfgSnap.data() : {};
+  const slotMinutes = Number(cfg.slotMinutes || 45);
+
+  const snap = await db.collection("playerSearches")
+    .where("date", ">=", today)
+    .get();
+
+  const items = [];
+
+  for (const doc of snap.docs) {
+    const search = doc.data();
+    if (playerSearchIsExpired(search, today, currentMinutes)) continue;
+
+    const requestsSnap = await doc.ref.collection("requests").get();
+    const allRequests = requestsSnap.docs.map(publicRequestData);
+    const myRequest = requestsSnap.docs.find(requestDoc =>
+      requestDoc.data().requesterUser === username
+    );
+
+    const isOwner = search.ownerUser === username;
+    const canManage = isOwner || isAdmin;
+    const spotsNeeded = Number(search.spotsNeeded || 0);
+    const spotsFilled = Number(search.spotsFilled || 0);
+    const spotsAvailable = Math.max(0, spotsNeeded - spotsFilled);
+    const status = search.status || "open";
+
+    const shouldInclude =
+      status === "open" ||
+      status === "full" ||
+      canManage ||
+      Boolean(myRequest);
+
+    if (!shouldInclude) continue;
+
+    items.push({
+      id: doc.id,
+      reservationId: search.reservationId || doc.id,
+      fieldId: search.fieldId,
+      date: search.date,
+      time: search.time,
+      note: search.note || "",
+      status,
+      spotsNeeded,
+      spotsFilled,
+      spotsAvailable,
+      isOwner,
+      canManage,
+      requests: canManage ? allRequests : [],
+      myRequest: myRequest ? publicRequestData(myRequest) : null
+    });
+  }
+
+  items.sort((a, b) => `${a.date} ${a.time}`.localeCompare(`${b.date} ${b.time}`));
+  res.json({ items });
+});
+
+router.post("/player-searches", requireAuth, async (req, res) => {
+  const schema = z.object({
+    reservationId: z.string().min(1).max(180),
+    spotsNeeded: z.number().int().min(1).max(12),
+    note: z.string().max(200).optional().default("")
+  });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "BAD_BODY" });
+
+  const { reservationId, spotsNeeded, note } = parsed.data;
+  const username = req.session.user.username;
+  const isAdmin = req.session.user.role === "admin";
+  const reservationRef = db.collection("reservations").doc(reservationId);
+  const reservationSnap = await reservationRef.get();
+
+  if (!reservationSnap.exists) return res.status(404).json({ error: "RESERVATION_NOT_FOUND" });
+
+  const reservation = reservationSnap.data();
+  if (!isAdmin && reservation.user !== username) {
+    return res.status(403).json({ error: "NOT_ALLOWED" });
+  }
+
+  const cfgSnap = await db.collection("admin").doc("config").get();
+  const cfg = cfgSnap.exists ? cfgSnap.data() : {};
+  const slotMinutes = Number(cfg.slotMinutes || 45);
+  if (playerSearchIsExpired(reservation, localISODate(), localMinutes())) {
+    return res.status(400).json({ error: "RESERVATION_EXPIRED" });
+  }
+
+  const searchRef = db.collection("playerSearches").doc(reservationId);
+  const existing = await searchRef.get();
+  if (existing.exists && ["open", "full"].includes(existing.data().status || "open")) {
+    return res.status(409).json({ error: "SEARCH_ALREADY_EXISTS" });
+  }
+
+  if (existing.exists) await deletePlayerSearchTree(reservationId);
+
+  await searchRef.set({
+    reservationId,
+    fieldId: reservation.fieldId,
+    date: reservation.date,
+    time: reservation.time,
+    ownerUser: reservation.user,
+    spotsNeeded,
+    spotsFilled: 0,
+    status: "open",
+    note: note.trim(),
+    createdAt: FieldValue.serverTimestamp(),
+    updatedAt: FieldValue.serverTimestamp()
+  });
+
+  res.json({ ok: true, id: reservationId });
+});
+
+router.post("/player-searches/:id/requests", requireAuth, async (req, res) => {
+  const schema = z.object({
+    participantNames: z.array(z.string().trim().min(2).max(80)).min(1).max(12),
+    phone: z.string().trim().min(6).max(30).regex(/^[0-9+().\s-]+$/)
+  });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "BAD_BODY" });
+
+  const username = req.session.user.username;
+  const searchRef = db.collection("playerSearches").doc(req.params.id);
+  const requestRef = searchRef.collection("requests").doc(playerRequestId(username));
+  const participantNames = parsed.data.participantNames.map(name => name.replace(/\s+/g, " "));
+  const count = participantNames.length;
+
+  try {
+    await db.runTransaction(async transaction => {
+      const [searchSnap, requestSnap] = await Promise.all([
+        transaction.get(searchRef),
+        transaction.get(requestRef)
+      ]);
+
+      if (!searchSnap.exists) {
+        const error = new Error("SEARCH_NOT_FOUND");
+        error.code = "SEARCH_NOT_FOUND";
+        throw error;
+      }
+
+      const search = searchSnap.data();
+      if (playerSearchIsExpired(search, localISODate(), localMinutes())) {
+        const error = new Error("SEARCH_CLOSED");
+        error.code = "SEARCH_CLOSED";
+        throw error;
+      }
+      if (search.ownerUser === username) {
+        const error = new Error("CANNOT_JOIN_OWN_SEARCH");
+        error.code = "CANNOT_JOIN_OWN_SEARCH";
+        throw error;
+      }
+
+      if ((search.status || "open") !== "open") {
+        const error = new Error("SEARCH_CLOSED");
+        error.code = "SEARCH_CLOSED";
+        throw error;
+      }
+
+      const available = Math.max(0, Number(search.spotsNeeded || 0) - Number(search.spotsFilled || 0));
+      if (count > available) {
+        const error = new Error("NOT_ENOUGH_SPOTS");
+        error.code = "NOT_ENOUGH_SPOTS";
+        throw error;
+      }
+
+      if (requestSnap.exists && ["pending", "accepted"].includes(requestSnap.data().status)) {
+        const error = new Error("ALREADY_REQUESTED");
+        error.code = "ALREADY_REQUESTED";
+        throw error;
+      }
+
+      transaction.set(requestRef, {
+        requesterUser: username,
+        participantNames,
+        phone: parsed.data.phone,
+        count,
+        status: "pending",
+        createdAt: FieldValue.serverTimestamp(),
+        updatedAt: FieldValue.serverTimestamp()
+      });
+    });
+  } catch (error) {
+    const known = [
+      "SEARCH_NOT_FOUND",
+      "CANNOT_JOIN_OWN_SEARCH",
+      "SEARCH_CLOSED",
+      "NOT_ENOUGH_SPOTS",
+      "ALREADY_REQUESTED"
+    ];
+    if (known.includes(error?.code)) {
+      return res.status(error.code === "SEARCH_NOT_FOUND" ? 404 : 409).json({ error: error.code });
+    }
+    console.error("Errore richiesta partecipazione", error);
+    return res.status(500).json({ error: "JOIN_REQUEST_ERROR" });
+  }
+
+  res.json({ ok: true });
+});
+
+router.patch("/player-searches/:id/requests/:requestId", requireAuth, async (req, res) => {
+  const schema = z.object({ status: z.enum(["accepted", "rejected"]) });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "BAD_BODY" });
+
+  const username = req.session.user.username;
+  const isAdmin = req.session.user.role === "admin";
+  const searchRef = db.collection("playerSearches").doc(req.params.id);
+  const requestRef = searchRef.collection("requests").doc(req.params.requestId);
+
+  try {
+    await db.runTransaction(async transaction => {
+      const [searchSnap, requestSnap] = await Promise.all([
+        transaction.get(searchRef),
+        transaction.get(requestRef)
+      ]);
+
+      if (!searchSnap.exists || !requestSnap.exists) {
+        const error = new Error("NOT_FOUND");
+        error.code = "NOT_FOUND";
+        throw error;
+      }
+
+      const search = searchSnap.data();
+      const request = requestSnap.data();
+
+      if (playerSearchIsExpired(search, localISODate(), localMinutes())) {
+        const error = new Error("SEARCH_CLOSED");
+        error.code = "SEARCH_CLOSED";
+        throw error;
+      }
+
+      if (!isAdmin && search.ownerUser !== username) {
+        const error = new Error("NOT_ALLOWED");
+        error.code = "NOT_ALLOWED";
+        throw error;
+      }
+
+      if (request.status !== "pending") {
+        const error = new Error("REQUEST_ALREADY_HANDLED");
+        error.code = "REQUEST_ALREADY_HANDLED";
+        throw error;
+      }
+
+      if (parsed.data.status === "rejected") {
+        transaction.update(requestRef, {
+          status: "rejected",
+          updatedAt: FieldValue.serverTimestamp()
+        });
+        return;
+      }
+
+      if ((search.status || "open") !== "open") {
+        const error = new Error("SEARCH_CLOSED");
+        error.code = "SEARCH_CLOSED";
+        throw error;
+      }
+
+      const spotsNeeded = Number(search.spotsNeeded || 0);
+      const spotsFilled = Number(search.spotsFilled || 0);
+      const count = Number(request.count || 0);
+      const available = Math.max(0, spotsNeeded - spotsFilled);
+
+      if (count > available) {
+        const error = new Error("NOT_ENOUGH_SPOTS");
+        error.code = "NOT_ENOUGH_SPOTS";
+        throw error;
+      }
+
+      const nextFilled = spotsFilled + count;
+      transaction.update(requestRef, {
+        status: "accepted",
+        updatedAt: FieldValue.serverTimestamp()
+      });
+      transaction.update(searchRef, {
+        spotsFilled: nextFilled,
+        status: nextFilled >= spotsNeeded ? "full" : "open",
+        updatedAt: FieldValue.serverTimestamp()
+      });
+    });
+  } catch (error) {
+    const known = [
+      "NOT_FOUND",
+      "NOT_ALLOWED",
+      "REQUEST_ALREADY_HANDLED",
+      "SEARCH_CLOSED",
+      "NOT_ENOUGH_SPOTS"
+    ];
+    if (known.includes(error?.code)) {
+      return res.status(error.code === "NOT_FOUND" ? 404 : 409).json({ error: error.code });
+    }
+    console.error("Errore gestione richiesta", error);
+    return res.status(500).json({ error: "REQUEST_UPDATE_ERROR" });
+  }
+
+  const updatedSearchSnap = await searchRef.get();
+  if (updatedSearchSnap.exists && updatedSearchSnap.data().status === "full") {
+    const pendingSnap = await searchRef.collection("requests")
+      .where("status", "==", "pending")
+      .get();
+
+    if (!pendingSnap.empty) {
+      const batch = db.batch();
+      pendingSnap.docs.forEach(doc => batch.update(doc.ref, {
+        status: "rejected",
+        updatedAt: FieldValue.serverTimestamp()
+      }));
+      await batch.commit();
+    }
+  }
+
+  res.json({ ok: true });
+});
+
+router.delete("/player-searches/:id/requests/:requestId", requireAuth, async (req, res) => {
+  const searchRef = db.collection("playerSearches").doc(req.params.id);
+  const requestRef = searchRef.collection("requests").doc(req.params.requestId);
+  const requestSnap = await requestRef.get();
+
+  if (!requestSnap.exists) return res.status(404).json({ error: "REQUEST_NOT_FOUND" });
+  const request = requestSnap.data();
+
+  if (request.requesterUser !== req.session.user.username) {
+    return res.status(403).json({ error: "NOT_ALLOWED" });
+  }
+  if (request.status !== "pending") {
+    return res.status(409).json({ error: "REQUEST_ALREADY_HANDLED" });
+  }
+
+  await requestRef.delete();
+  res.json({ ok: true });
+});
+
+router.delete("/player-searches/:id", requireAuth, async (req, res) => {
+  const searchRef = db.collection("playerSearches").doc(req.params.id);
+  const searchSnap = await searchRef.get();
+  if (!searchSnap.exists) return res.status(404).json({ error: "SEARCH_NOT_FOUND" });
+
+  const search = searchSnap.data();
+  const isAdmin = req.session.user.role === "admin";
+  if (!isAdmin && search.ownerUser !== req.session.user.username) {
+    return res.status(403).json({ error: "NOT_ALLOWED" });
+  }
+
+  const requestsSnap = await searchRef.collection("requests").get();
+  const batch = db.batch();
+  batch.update(searchRef, {
+    status: "closed",
+    updatedAt: FieldValue.serverTimestamp()
+  });
+
+  requestsSnap.docs.forEach(doc => {
+    if (doc.data().status === "pending") {
+      batch.update(doc.ref, {
+        status: "rejected",
+        updatedAt: FieldValue.serverTimestamp()
+      });
+    }
+  });
+
+  await batch.commit();
   res.json({ ok: true });
 });
 

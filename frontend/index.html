@@ -118,6 +118,29 @@
       <div id="reservationsList" class="list"></div>
     </section>
 
+    <!-- CERCA GIOCATORI -->
+    <section id="playerSearchSection" class="card community-card">
+      <div class="section-heading compact-heading">
+        <div>
+          <p class="eyebrow">Community</p>
+          <h3>Gioca con altri</h3>
+        </div>
+        <span class="community-icon" aria-hidden="true">+</span>
+      </div>
+
+      <p class="community-intro">Unisciti a una partita già organizzata oppure cerca giocatori per la tua prenotazione.</p>
+
+      <div class="community-block">
+        <div class="community-title">Partite aperte</div>
+        <div id="openGamesList" class="list"></div>
+      </div>
+
+      <div id="myJoinRequestsWrap" class="community-block hidden">
+        <div class="community-title">Le tue richieste</div>
+        <div id="myJoinRequestsList" class="list"></div>
+      </div>
+    </section>
+
     <!-- INFORMAZIONI -->
     <div class="info-grid">
       <section class="card info-card">
@@ -243,6 +266,18 @@
 
   </section>
 </main>
+
+<!-- MODALE APP -->
+<div id="appModal" class="app-modal hidden" role="dialog" aria-modal="true" aria-labelledby="appModalTitle">
+  <div class="app-modal-backdrop" data-close-modal="true"></div>
+  <div class="app-modal-panel">
+    <div class="app-modal-header">
+      <h3 id="appModalTitle">Dettagli</h3>
+      <button id="appModalClose" class="modal-close" type="button" aria-label="Chiudi">×</button>
+    </div>
+    <div id="appModalBody" class="app-modal-body"></div>
+  </div>
+</div>
 
 <script src="/script.js" defer></script>
 </body>
