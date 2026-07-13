@@ -1420,64 +1420,72 @@ button,
 }
 
 /* ======================================================
-   FIX CAMPO DATA MOBILE – ANDROID / CHROME
-   Impedisce al controllo nativo di superare la card.
+   FIX STRUTTURALE DATA MOBILE
+   Il bordo visibile appartiene al contenitore, non al
+   controllo data nativo del browser.
    ====================================================== */
-#datePick,
-.control-group,
-.grid3 {
-  min-inline-size: 0;
-  max-inline-size: 100%;
-}
-
-#datePick {
+.date-control-group,
+.date-input-shell {
   display: block;
-  inline-size: 100%;
   width: 100%;
   min-width: 0;
   max-width: 100%;
   box-sizing: border-box;
+}
+
+.date-input-shell {
+  min-height: 49px;
+  margin: 0 0 13px;
   overflow: hidden;
+  contain: inline-size;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface-input);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.025);
+  transition: border-color 150ms var(--ease), background 150ms var(--ease), box-shadow 150ms var(--ease);
 }
 
-#datePick::-webkit-date-and-time-value {
-  min-width: 0;
-  width: 100%;
-  text-align: left;
+.date-input-shell:focus-within {
+  border-color: rgba(255, 179, 71, 0.66);
+  background: rgba(5, 12, 22, 0.74);
+  box-shadow: var(--focus);
 }
 
-#datePick::-webkit-datetime-edit,
-#datePick::-webkit-datetime-edit-fields-wrapper {
-  min-width: 0;
-  max-width: 100%;
-  padding: 0;
+.date-input-shell #datePick {
+  display: block;
+  width: 100% !important;
+  min-width: 0 !important;
+  max-width: 100% !important;
+  min-height: 47px;
+  margin: 0 !important;
+  padding: 12px 13px;
+  overflow: hidden;
+  border: 0 !important;
+  border-radius: 0;
+  outline: 0;
+  background: transparent !important;
+  box-shadow: none !important;
+  box-sizing: border-box;
 }
 
-#datePick::-webkit-calendar-picker-indicator {
-  flex: 0 0 auto;
-  margin: 0;
-  padding: 4px;
+.date-input-shell #datePick:focus,
+.date-input-shell #datePick:focus-visible {
+  outline: 0;
+  box-shadow: none !important;
 }
 
 @media (max-width: 720px) {
-  .booking-card,
-  .booking-card .grid3,
-  .booking-card .control-group {
-    min-width: 0;
-    width: 100%;
-    max-width: 100%;
-  }
-
-  .booking-card .grid3 {
+  .booking-card .date-control-group,
+  .booking-card .date-input-shell {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
     overflow: hidden;
   }
 
-  #datePick {
+  .date-input-shell #datePick {
     inline-size: 100% !important;
-    width: 100% !important;
-    min-inline-size: 0 !important;
     max-inline-size: 100% !important;
-    min-width: 0 !important;
-    max-width: 100% !important;
   }
 }
+
