@@ -1301,3 +1301,22 @@ body.dialog-open { overflow: hidden; }
 .contact-link { display: inline-flex; min-height: 44px; align-items: center; color: #ffb957; }
 #manageRequestsList { display: grid; gap: 10px; }
 body.modal-open { overflow: hidden; }
+
+/* Community dashboard */
+.bottom-nav { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.summary-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; margin:20px 0; }
+.summary-grid strong { display:block; font-size:1.7rem; }
+.summary-grid span { display:block; font-size:.75rem; color:var(--muted, #aabac9); }
+.home-actions { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:18px 0; }
+.wait-row { padding:18px; margin:12px 0; overflow-wrap:anywhere; }
+.wait-row .secondary-btn { margin-top:8px; }
+.ledger-row { display:flex; justify-content:space-between; gap:12px; padding:12px 0; border-bottom:1px solid #ffffff20; }
+.ledger-row small { display:block; opacity:.7; font-size:.75rem; }
+.venue-choice { width:100%; padding:22px; text-align:left; }
+#closureForm input, #closureForm select { width:100%; box-sizing:border-box; }
+#viewHome h1 { font-size:1.7rem; }
+
+#homeSummary { display:block; }
+.login-topline { display:flex; }
+.selected-establishment { display:flex; }
+#switchBathBtn { display:inline-flex; }

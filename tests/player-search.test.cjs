@@ -15,7 +15,7 @@ function setup(){
  const update=(ref,changes)=>data.set(ref.path,{...data.get(ref.path),...changes});
  const db={collection,batch:()=>({update,delete:ref=>data.delete(ref.path),commit:async()=>{}}),runTransaction:async fn=>fn({get:ref=>ref.get(),update,delete:ref=>data.delete(ref.path)})};
  const routes={};const router={};for(const method of ['get','post','put','patch','delete'])router[method]=(path,...handlers)=>routes[method+' '+path]=handlers;
- const ctx=vm.createContext({console,Buffer,Date,Intl,db,FieldValue:{serverTimestamp:()=>0},express:{Router:()=>router},rateLimit:()=>()=>{},z:{enum:()=>({}),object:()=>({safeParse:body=>({success:true,data:body})})}});
+ const ctx=vm.createContext({console,Buffer,Date,Intl,db,tenantId:()=>"tommi38",FieldValue:{serverTimestamp:()=>0},express:{Router:()=>router},rateLimit:()=>()=>{},z:{enum:()=>({}),object:()=>({safeParse:body=>({success:true,data:body})})}});
  vm.runInContext(source,ctx);
  async function call(method,path,user,body={},params={}){const req={session:user?{user:{username:user,role:user==='admin'?'admin':'user'}}:{},body,params};const res={code:200,status(n){this.code=n;return this},json(value){this.body=value;return this}};const handlers=routes[method+' '+path];let allowed=false;handlers[0](req,res,()=>allowed=true);if(allowed)await handlers[1](req,res);return res;}
  return {call,data};

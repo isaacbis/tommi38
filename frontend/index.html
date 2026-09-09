@@ -24,6 +24,7 @@
   </div>
 
   <main class="app-shell">
+    <section id="establishmentPicker" class="login-screen hidden"><p class="eyebrow">Campi e partite</p><h1>Scegli il tuo stabilimento</h1><p class="muted">Accedi con le credenziali del tuo stabilimento.</p><div id="establishmentList" class="form-stack"></div></section>
     <!-- LOGIN -->
     <section id="loginBox" class="login-screen hidden">
       <div class="login-topline">
@@ -32,7 +33,7 @@
 
       <div class="login-hero">
         <img src="/icon-512.png" alt="Tommi38" class="login-logo">
-        <h1>Benvenuto da<br><span>Tommi<span class="accent">38</span></span></h1>
+        <h1>Benvenuto da<br><span data-establishment-name>Tommi38</span></h1>
         <p>Accedi per prenotare il tuo campo.</p>
       </div>
 
@@ -62,7 +63,7 @@
           <div class="mini-label">Stabilimento selezionato</div>
           <div class="establishment-row">
             <img src="/icon-192.png" alt="" class="mini-logo">
-            <strong>Tommi38</strong>
+            <strong data-establishment-name>Tommi38</strong>
           </div>
         </div>
         <button id="loginChangeBtn" class="change-btn" type="button">Cambia ›</button>
@@ -78,7 +79,7 @@
       <header class="native-header">
         <div class="header-brand">
           <img src="/icon-192.png" alt="Tommi38" class="header-logo">
-          <strong>Tommi38</strong>
+          <strong data-establishment-name>Tommi38</strong>
         </div>
         <div class="header-actions">
           <button id="switchBathBtn" class="change-btn" type="button">Cambia ›</button>
@@ -86,6 +87,15 @@
         </div>
       </header>
 
+      <section id="viewHome" class="app-view hidden">
+        <div class="page-title-row"><p class="eyebrow">Home</p><button id="refreshHomeBtn" class="icon-btn" aria-label="Aggiorna home" type="button">↻</button></div>
+        <section id="homeSummary" class="glass-card user-card" aria-live="polite"></section>
+        <div class="home-actions"><button class="primary-btn" data-home-view="book" type="button">Prenota un campo</button><button class="secondary-btn" data-home-view="players" type="button">Cerca giocatori</button></div>
+        <section class="glass-card wait-row"><h2>La prossima partita</h2><p id="homeNext"></p><button class="secondary-btn" data-home-view="matches" type="button">Le mie partite</button></section>
+        <section class="glass-card wait-row"><h2>Dal gestore</h2><p id="homeNotice"></p></section>
+        <section class="glass-card wait-row"><h2>Lista d’attesa</h2><p class="muted">Gli aggiornamenti compaiono qui mentre l’app è aperta. Nessuna prenotazione automatica.</p><div id="waitlistItems" aria-live="polite"></div></section>
+        <section class="glass-card wait-row"><h2>I tuoi crediti</h2><p class="muted">Per ottenere crediti rivolgiti al gestore. Una prenotazione costa 1 credito; la cancellazione utente entro il giorno precedente restituisce il credito.</p><details><summary>Storico degli ultimi 100 movimenti</summary><div id="creditHistory"></div></details></section>
+      </section>
       <!-- PRENOTA -->
       <section id="viewBook" class="app-view active-view">
         <section class="glass-card user-card">
@@ -201,7 +211,7 @@
         </div>
 
         <section id="adminMenu" class="glass-card admin-card hidden">
-          <div class="admin-grid">
+          <div class="admin-grid"><button id="btnAdminOperations" class="admin-action" type="button">Statistiche e chiusure <span>›</span></button>
             <button id="btnAdminConfig" class="admin-action" type="button">Configurazione <span>›</span></button>
             <button id="btnAdminNotes" class="admin-action" type="button">Comunicazioni <span>›</span></button>
             <button id="btnAdminFields" class="admin-action" type="button">Campi <span>›</span></button>
@@ -289,7 +299,7 @@
         </section>
       </section>
 
-      <nav id="bottomNav" class="bottom-nav" aria-label="Navigazione principale">
+      <nav id="bottomNav" class="bottom-nav" aria-label="Navigazione principale"><button class="bottom-nav-item" data-view="home" type="button"><span class="nav-icon" aria-hidden="true">⌂</span><span>Home</span></button>
         <button class="bottom-nav-item active" data-view="book" type="button">
           <span class="nav-icon"><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M16 3v4M8 3v4M3 11h18"/></svg></span>
           <span>Prenota</span>
@@ -322,5 +332,6 @@
   </dialog>
   <noscript><p class="empty-state">Attiva JavaScript nel browser per utilizzare Tommi38.</p></noscript>
   <script src="/script.js" defer></script>
+  <script src="/community.js" defer></script>
 </body>
 </html>

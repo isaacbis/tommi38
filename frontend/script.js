@@ -139,7 +139,7 @@ async function api(path, options = {}) {
     const response = await fetch(API + path, {
       credentials: "include", cache: "no-store", ...options,
       signal: controller.signal,
-      headers: { "Content-Type": "application/json", ...options.headers }
+      headers: { "Content-Type": "application/json", "X-Establishment": typeof selectedEstablishment === "undefined" ? "tommi38" : selectedEstablishment, ...options.headers }
     });
     if (!response.headers.get("content-type")?.includes("application/json")) {
       throw { error: "INVALID_RESPONSE", status: response.status };
@@ -179,6 +179,9 @@ function loadPublicConfig() {
 
 /* ===================== NATIVE BRIDGE ===================== */
 function nativeMessage(payload) {
+  if (typeof selectedEstablishment !== "undefined" && selectedEstablishment !== "tommi38" && payload.id) {
+    payload = {...payload, id: selectedEstablishment + ":" + payload.id};
+  }
   try {
     const handler = window.webkit?.messageHandlers?.tommi38Notifications;
     if (handler) handler.postMessage(payload);
@@ -321,9 +324,6 @@ function togglePassword() {
   qs("passwordToggle").setAttribute("aria-label", isPassword ? "Nascondi password" : "Mostra password");
 }
 
-function unavailableEstablishmentMessage() {
-  alert("Al momento in questa versione è disponibile solo Tommi38.");
-}
 
 /* ===================== LOAD APP ===================== */
 async function loadAll(setToday = false) {
@@ -385,7 +385,7 @@ async function loadAll(setToday = false) {
     loadMyReservations()
   ]);
 
-  switchView("book", false);
+  switchView("home", false);
   startAutoRefresh();
 }
 
@@ -454,6 +454,7 @@ async function loadReservations() {
     const response = await api(`/reservations?date=${encodeURIComponent(date)}`);
     if (request !== reservationRequest || date !== qs("datePick").value || !STATE.me) return;
     STATE.dayReservationsAll = response.items || [];
+    STATE.closures = response.closures || [];
     STATE.reservations = STATE.dayReservationsAll.filter(item => item.user === STATE.me.username);
     loadedDate = date;
     renderTimeGrid();
@@ -502,7 +503,8 @@ function renderTimeGrid() {
     const time = timeStr(m);
     const past = date < today || (date === today && m <= now);
     const busy = taken.has(time);
-    const selectable = !past && !busy;
+    const closure = (STATE.closures || []).find(c=>c.fieldId===fieldId && c.date===date && time<c.end && m+slot>minutes(c.start));
+    const selectable = !past && !busy && !closure;
     if (past) continue;
 
     if (selectable) available.push(time);
@@ -516,10 +518,12 @@ function renderTimeGrid() {
     const button = document.createElement("button");
     button.type = "button";
     button.className = `time-slot ${busy ? "busy" : past ? "past" : "free"}`;
-    button.disabled = !selectable;
+    button.disabled = past || Boolean(closure);
     button.dataset.time = time;
-    button.innerHTML = `<strong>${escapeHTML(time)}</strong><small>${busy ? "Occupato" : past ? "Passato" : "Libero"}</small>`;
+    button.innerHTML = `<strong>${escapeHTML(time)}</strong><small>${closure ? "Chiuso" : busy ? "Lista attesa" : past ? "Passato" : "Libero"}</small>`;
 
+    if (closure) button.title = closure.reason;
+    if (busy && !closure) button.addEventListener("click",()=>joinWaitlist(STATE.dayReservationsAll.find(r=>r.fieldId===fieldId && r.time===time)));
     if (selectable) {
       button.addEventListener("click", () => {
         STATE.selectedTime = time;
@@ -1175,6 +1179,7 @@ function renderWeather(data) {
 
 /* ===================== NAVIGATION ===================== */
 function switchView(name, refresh = true) {
+  hide(qs("viewHome"));
   hide(qs("viewBook"));
   hide(qs("viewMatches"));
   hide(qs("viewPlayers"));
@@ -1182,7 +1187,7 @@ function switchView(name, refresh = true) {
   hide(qs("adminShell"));
   show(qs("bottomNav"));
 
-  const target = name === "players" ? qs("viewPlayers") : name === "matches" ? qs("viewMatches") : name === "alerts" ? qs("viewAlerts") : qs("viewBook");
+  const target = name === "home" ? qs("viewHome") : name === "players" ? qs("viewPlayers") : name === "matches" ? qs("viewMatches") : name === "alerts" ? qs("viewAlerts") : qs("viewBook");
   show(target);
   target.classList.add("active-view");
 
@@ -1192,6 +1197,7 @@ function switchView(name, refresh = true) {
     else button.removeAttribute("aria-current");
   });
 
+  if (name === "home") loadHome();
   if (name === "book" && STATE.me && refresh) loadReservations();
   if (name === "matches") { loadMyReservations(); loadPlayerSearches(); }
   if (name === "players") loadPlayerSearches();
@@ -1201,6 +1207,7 @@ function switchView(name, refresh = true) {
 
 function openAdminShell() {
   if (STATE.me?.role !== "admin") return;
+  hide(qs("viewHome"));
   hide(qs("viewBook"));
   hide(qs("viewMatches"));
   hide(qs("viewPlayers"));
@@ -1465,6 +1472,7 @@ async function refreshVisibleData() {
     qs("datePick").min = localISODate();
     if (isPastDate(qs("datePick").value)) setDate(localISODate());
     const jobs = [refreshCredits()];
+    if (!qs("viewHome").classList.contains("hidden")) jobs.push(loadHome());
     if (!qs("viewBook").classList.contains("hidden")) jobs.push(loadReservations());
     if (!qs("viewMatches").classList.contains("hidden")) jobs.push(loadMyReservations(), loadPlayerSearches());
     if (!qs("viewPlayers").classList.contains("hidden")) jobs.push(loadPlayerSearches());
@@ -1487,9 +1495,9 @@ document.addEventListener("DOMContentLoaded", () => {
   qs("loginForm").onsubmit = event => { event.preventDefault(); login(); };
   qs("logoutBtn").onclick = logout;
   qs("passwordToggle").onclick = togglePassword;
-  qs("loginBackBtn").onclick = unavailableEstablishmentMessage;
-  qs("loginChangeBtn").onclick = unavailableEstablishmentMessage;
-  qs("switchBathBtn").onclick = unavailableEstablishmentMessage;
+  qs("loginBackBtn").onclick = () => chooseEstablishment().catch(e=>alert(errorMessage(e)));
+  qs("loginChangeBtn").onclick = () => chooseEstablishment().catch(e=>alert(errorMessage(e)));
+  qs("switchBathBtn").onclick = () => chooseEstablishment().catch(e=>alert(errorMessage(e)));
 
   qs("quickToday").onclick = () => setDate(localISODate());
   qs("quickTomorrow").onclick = () => setDate(tomorrowISODate());
@@ -1537,9 +1545,7 @@ document.addEventListener("DOMContentLoaded", () => {
     navigator.serviceWorker.register("/service-worker.js").catch(error => console.warn("Service worker", error));
   }
 
-  loadPublicLoginGallery();
-
-  loadAll(true)
+  initializeCommunity()
     .catch(error => {
       show(qs("loginBox"));
       hide(qs("app"));
