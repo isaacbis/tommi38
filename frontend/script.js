@@ -35,6 +35,73 @@ let bookingBusy = false;
 let refreshBusy = false;
 const deleting = new Set();
 
+/* Keep lists within a phone-sized page without removing items or their actions. */
+const listPages = new Map();
+function paginateList(id, options = {}) {
+  const list = qs(id);
+  if (!list) return;
+  const compact = window.innerWidth <= 760;
+  const tall = window.innerHeight >= 760;
+  const defaultSize = id === 'timeGrid' ? (compact ? (tall ? 9 : 6) : 15)
+    : id === 'fieldButtons' ? (compact ? 2 : 5)
+    : id === 'establishmentList' ? (compact ? 4 : 8)
+    : id === 'creditHistory' ? (compact ? 3 : 8)
+    : compact ? (tall ? 2 : 1) : 5;
+  const size = Math.max(1, Number(options.pageSize) || defaultSize);
+  const items = Array.from(list.children);
+  let state = listPages.get(id);
+  if (!items.length && state) { state.nav.classList.add('hidden'); return; }
+  const scope = [typeof selectedEstablishment === 'undefined' ? '' : selectedEstablishment,STATE.me?.username,
+    id === 'timeGrid' ? qs('datePick')?.value + ':' + qs('fieldSelect')?.value : '',
+    id === 'agendaList' ? qs('agendaDate')?.value + ':' + qs('agendaField')?.value : ''].join(':');
+  const signature = scope + '|' + items.map(item => item.dataset.time || item.dataset.id || item.textContent).join('\u001f');
+  if (!state) {
+    const nav = document.createElement('nav');
+    nav.className = 'list-pager';
+    nav.setAttribute('aria-label', 'Pagine ' + ({timeGrid:'orari',fieldButtons:'campi',usersList:'utenti',agendaList:'prenotazioni',platformEstablishmentList:'stabilimenti'}[id] || 'elenco'));
+    const previous = document.createElement('button');
+    previous.type = 'button'; previous.className = 'secondary-btn pager-previous'; previous.textContent = '‹'; previous.setAttribute('aria-label','Pagina precedente');
+    const status = document.createElement('span'); status.className = 'pager-status'; status.setAttribute('role','status');
+    const next = document.createElement('button');
+    next.type = 'button'; next.className = 'secondary-btn pager-next'; next.textContent = '›'; next.setAttribute('aria-label','Pagina successiva');
+    nav.append(previous,status,next);
+    state = {page:0,signature,nav,previous,status,next,options};
+    listPages.set(id,state);
+    previous.onclick = () => { state.page--; paginateList(id,state.options); };
+    next.onclick = () => { state.page++; paginateList(id,state.options); };
+  }
+  if (state.signature !== signature) state.page = 0;
+  else if (state.size && state.size !== size) state.page = Math.floor(state.page*state.size/size);
+  state.signature = signature;
+  state.size = size;
+  state.options = options;
+  const pages = Math.ceil(items.length / size);
+  state.page = Math.max(0,Math.min(state.page,pages-1));
+  list.classList.add('paged-list');
+  items.forEach((item,index) => item.classList.toggle('page-hidden',index < state.page*size || index >= (state.page+1)*size));
+  if (list.nextElementSibling !== state.nav) list.after(state.nav);
+  state.nav.classList.toggle('hidden',pages <= 1);
+  state.previous.disabled = state.page === 0;
+  state.next.disabled = state.page >= pages-1;
+  state.status.textContent = `${state.page+1} / ${Math.max(1,pages)}`;
+}
+
+function initializeListPagination() {
+  const ids = ['establishmentList','platformEstablishmentList','agendaList','usersList','fieldsList','galleryList','matchesList','openGamesList','ownedGamesList','myJoinRequestsList','timeGrid','fieldButtons','waitlistItems','creditHistory'];
+  ids.forEach(id => {
+    const list = qs(id);
+    if (!list) return;
+    const observer = new MutationObserver(() => paginateList(id,listPages.get(id)?.options));
+    observer.observe(list,{childList:true});
+    paginateList(id);
+  });
+  let resizing;
+  window.addEventListener('resize',() => {
+    clearTimeout(resizing);
+    resizing = setTimeout(() => [...new Set([...ids,...listPages.keys()])].forEach(id => paginateList(id,listPages.get(id)?.options)),100);
+  });
+}
+
 function confirmAction(title, details, action = "Conferma") {
   const dialog = qs("confirmDialog");
   if (dialog.open) return Promise.resolve(false);
@@ -631,7 +698,7 @@ async function book() {
     setBookMessage(message, "error");
   } finally {
     bookingBusy = false;
-    qs("bookBtn").textContent = "Conferma prenotazione";
+    qs("bookBtn").textContent = "Prenota";
     updateBookingPreview();
   }
 }
@@ -796,6 +863,17 @@ function requestStatusLabel(status) {
   return "In attesa";
 }
 
+let activePlayersPanel = 'open';
+function renderPlayersPanel() {
+  const panels = {open:'openGamesWrap',owned:'ownedGamesWrap',requests:'myJoinRequestsWrap'};
+  Object.entries(panels).forEach(([name,id]) => qs(id)?.classList.toggle('hidden',name!==activePlayersPanel));
+  document.querySelectorAll('[data-player-panel]').forEach(button => {
+    const selected = button.dataset.playerPanel === activePlayersPanel;
+    button.classList.toggle('active',selected);
+    button.setAttribute('aria-pressed',String(selected));
+  });
+}
+
 function renderPlayerSearches() {
   const openList = qs("openGamesList");
   const myWrap = qs("myJoinRequestsWrap");
@@ -847,14 +925,14 @@ function renderPlayerSearches() {
     card.querySelector("button").onclick = () => openManagePlayerSearch(search.id);
     owned.appendChild(card);
   });
-  qs("ownedGamesWrap").classList.toggle("hidden", !owned.children.length);
+  if (!owned.children.length) owned.innerHTML = '<p class="empty-state">Non hai ricerche da gestire.</p>';
   const myRequests = STATE.playerSearches.filter(search => search.myRequest);
   if (myRequests.length === 0) {
-    hide(myWrap);
+    myList.innerHTML = '<p class="empty-state">Non hai richieste di partecipazione.</p>';
+    renderPlayersPanel();
     return;
   }
 
-  show(myWrap);
   myRequests.forEach(search => {
     const request = search.myRequest;
     const card = document.createElement("div");
@@ -888,6 +966,7 @@ function renderPlayerSearches() {
     }
     myList.appendChild(card);
   });
+  renderPlayersPanel();
 }
 
 function openAppModal(title, html) {
@@ -895,6 +974,9 @@ function openAppModal(title, html) {
   qs("appModalBody").innerHTML = html;
   if (!qs("appModal").open) qs("appModal").showModal();
   document.body.classList.add("modal-open");
+  qs('appModal').scrollTop = 0;
+  qs('appModalBody').scrollTop = 0;
+  qs('appModalClose').focus({preventScroll:true});
 }
 
 function closeAppModal() {
@@ -1227,6 +1309,7 @@ function switchView(name, refresh = true) {
 
   const target = name === "home" ? qs("viewHome") : name === "players" ? qs("viewPlayers") : name === "matches" ? qs("viewMatches") : name === "alerts" ? qs("viewAlerts") : qs("viewBook");
   show(target);
+  target.scrollTop = 0;
   target.classList.add("active-view");
 
   document.querySelectorAll(".bottom-nav-item").forEach(button => {
@@ -1272,6 +1355,8 @@ function openAdmin(id) {
   ["adminMenu", "adminConfig", "adminNotes", "adminFields", "adminUsers", "adminGallery", "adminAgenda", "adminEstablishments"]
     .forEach(sectionId => hide(qs(sectionId)));
   show(qs(id));
+  qs('adminShell').scrollTop = 0;
+  qs(id).scrollTop = 0;
   document.querySelectorAll('#managerNav [data-admin-section]').forEach(button=>{
     const active=button.dataset.adminSection===id;
     button.classList.toggle('active',active);
@@ -1405,6 +1490,7 @@ function renderUsers(filter = "") {
           body: JSON.stringify({ oldUsername: user.username, newUsername })
         });
         await loadUsers();
+        closeAppModal();
       } catch (error) {
         alert(error?.error === "USERNAME_TAKEN" ? "Username già utilizzato." : "Rinomina non riuscita.");
       }
@@ -1416,13 +1502,18 @@ function renderUsers(filter = "") {
         body: JSON.stringify({ username: user.username, disabled: !user.disabled })
       });
       await loadUsers();
+      closeAppModal();
     });
 
     if (user.platformAdmin) {
       const protectedLabel=document.createElement('p');protectedLabel.className='helper-text';protectedLabel.textContent='Amministratore globale · account protetto';actions.append(protectedLabel);
     } else {
-      actions.append(credits,password,rename,toggle);
-      if(STATE.me?.platformAdmin)actions.append(adminButton('Cambia ruolo',()=>openUserRole(user)));
+      const manage = adminButton('Gestisci',() => {
+        openAppModal('Gestisci ' + user.username,'<div id="userMenuActions" class="form-stack"></div>');
+        qs('userMenuActions').append(password,rename,toggle);
+        if(STATE.me?.platformAdmin)qs('userMenuActions').append(adminButton('Cambia ruolo',()=>openUserRole(user)));
+      });
+      actions.append(credits,manage);
     }
     item.append(main, actions);
     list.appendChild(item);
@@ -1545,6 +1636,10 @@ function stopAutoRefresh() {
 
 /* ===================== INIT ===================== */
 document.addEventListener("DOMContentLoaded", () => {
+  initializeListPagination();
+  document.querySelectorAll('[data-player-panel]').forEach(button => {
+    button.onclick = () => { activePlayersPanel = button.dataset.playerPanel; renderPlayersPanel(); };
+  });
   qs("loginForm").onsubmit = event => { event.preventDefault(); login(); };
   qs("logoutBtn").onclick = logout;
   qs("passwordToggle").onclick = togglePassword;
@@ -1557,6 +1652,13 @@ document.addEventListener("DOMContentLoaded", () => {
   qs("datePick").onchange = () => {
     const date = qs("datePick").value;
     setDate(!date || isPastDate(date) ? localISODate() : date);
+  };
+  qs('fieldSelect').onchange = () => {
+    STATE.selectedTime = '';
+    renderFieldButtonsState();
+    renderTimeGrid();
+    updateBookingPreview();
+    setBookMessage();
   };
 
   qs("bookBtn").onclick = book;

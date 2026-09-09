@@ -6,6 +6,29 @@ let selectedEstablishment = rememberedEstablishment() || 'tommi38';
 let establishmentItems = [];
 let managementContextEpoch = 0;
 let contextChanging = false;
+function paginateCommunityList(id, options) {
+  if (typeof paginateList === 'function') paginateList(id, options);
+}
+function compactCommunityDate(value) {
+  return new Date(value + 'T12:00:00').toLocaleDateString('it-IT', {day:'numeric',month:'short'});
+}
+function showHomePanel(name) {
+  const panels = {overview:'homeOverviewPanel',credits:'homeCreditsPanel',waiting:'homeWaitlistPanel',notice:'homeNoticePanel'};
+  if (!panels[name]) name = 'overview';
+  Object.entries(panels).forEach(([key,id]) => {
+    const panel=qs(id);
+    if (panel) { panel.hidden=key!==name; panel.classList.toggle('hidden',key!==name); panel.setAttribute('role','tabpanel'); panel.setAttribute('aria-labelledby','home-tab-'+key); }
+  });
+  document.querySelectorAll('[data-home-panel]').forEach(button => {
+    const selected=button.dataset.homePanel===name;
+    button.id='home-tab-'+button.dataset.homePanel;
+    button.setAttribute('role','tab');
+    button.setAttribute('aria-controls',panels[button.dataset.homePanel]);
+    button.classList.toggle('selected',selected);
+    button.setAttribute('aria-selected',String(selected));
+    button.tabIndex=selected?0:-1;
+  });
+}
 async function chooseEstablishment() {
   if (STATE.me?.platformAdmin) return returnToPlatform();
   if (STATE.me) {
@@ -36,6 +59,7 @@ async function chooseEstablishment() {
       };
       list.appendChild(button);
     });
+    paginateCommunityList('establishmentList');
   } catch (e) {
     list.textContent = errorMessage(e);
     const retry = document.createElement('button');
@@ -81,59 +105,85 @@ async function loadHome() {
     if (request !== homeRequest || !STATE.me) return;
     STATE.me.credits = credits.balance;
     qs('creditsBox').textContent = credits.balance + ' crediti';
-    box.innerHTML = `<p class="eyebrow">Il tuo stabilimento, le tue partite</p><h1>Ciao, ${escapeHTML(STATE.me.username)}</h1>
+    box.innerHTML = `<h1>Ciao, ${escapeHTML(STATE.me.username)}</h1>
       <div class="summary-grid"><div><strong>${Number(credits.balance)}</strong><span>Crediti</span></div><div><strong>${matches.items.length}</strong><span>Le tue partite</span></div><div><strong>${players.items.filter(p=>p.status==='open').length}</strong><span>Gruppi aperti</span></div></div>`;
     const next = matches.items[0];
-    qs('homeNext').textContent = next ? `${fieldName(next.fieldId)} · ${next.date} alle ${next.time}` : 'Nessuna partita prenotata. Scegli un campo e torna a giocare.';
+    qs('homeNext').textContent = next ? `${fieldName(next.fieldId)} · ${compactCommunityDate(next.date)} alle ${next.time}` : 'Nessuna partita in programma.';
     qs('homeNotice').textContent = STATE.notes || 'Nessuna comunicazione dal gestore.';
-    qs('creditHistory').innerHTML = credits.items.length ? credits.items.map(c=>`<div class="ledger-row"><span>${escapeHTML(c.reason)}<small>${c.at ? escapeHTML(new Date(c.at).toLocaleString('it-IT')) : ''}</small></span><strong>${c.delta>0?'+':''}${Number(c.delta)}</strong></div>`).join('') : '<p class="muted">I nuovi movimenti appariranno qui. Il saldo include i crediti già presenti prima dell’aggiornamento.</p>';
+    qs('creditHistory').innerHTML = credits.items.length ? credits.items.map(c=>`<div class="ledger-row"><span>${escapeHTML(c.reason)}<small>${c.at ? escapeHTML(new Date(c.at).toLocaleString('it-IT')) : ''}</small></span><strong>${c.delta>0?'+':''}${Number(c.delta)}</strong></div>`).join('') : '<p class="muted">Non ci sono ancora movimenti.</p>';
     const list=qs('waitlistItems'); list.innerHTML='';
     if (!waiting.items.length) list.innerHTML='<p class="muted">Tocca un orario occupato in Prenota per metterti in attesa.</p>';
     waiting.items.forEach(w=>{
       const row=document.createElement('div'); row.className='glass-card wait-row';
-      row.innerHTML=`<strong>${escapeHTML(fieldName(w.fieldId))} · ${escapeHTML(w.date)} ${escapeHTML(w.time)}</strong><p>${w.available?'Si è liberato! Controlla e prenota.':'In attesa che si liberi'}</p>`;
-      if(w.available){const go=document.createElement('button');go.className='primary-btn';go.textContent='Vai alla prenotazione';go.onclick=()=>{qs('datePick').value=w.date;qs('fieldSelect').value=w.fieldId;STATE.selectedTime='';updateDateUI();renderFieldButtonsState();switchView('book');};row.appendChild(go);}
+      row.innerHTML=`<strong>${escapeHTML(fieldName(w.fieldId))} · ${escapeHTML(compactCommunityDate(w.date))} ${escapeHTML(w.time)}</strong><p>${w.available?'Si è liberato! Controlla e prenota.':'In attesa che si liberi'}</p>`;
+      if(w.available){const go=document.createElement('button');go.className='primary-btn';go.textContent='Prenota';go.onclick=()=>{qs('datePick').value=w.date;qs('fieldSelect').value=w.fieldId;STATE.selectedTime='';updateDateUI();renderFieldButtonsState();switchView('book');};row.appendChild(go);}
       const remove=document.createElement('button');remove.className='secondary-btn';remove.textContent='Lascia la lista';remove.onclick=async()=>{remove.disabled=true;try{await api('/waitlist/'+encodeURIComponent(w.id),{method:'DELETE'});await loadHome();}catch(e){remove.disabled=false;alert(errorMessage(e));}};row.appendChild(remove);list.appendChild(row);
     });
+    paginateCommunityList('creditHistory');
+    paginateCommunityList('waitlistItems');
   } catch(e) { if(request===homeRequest) box.textContent=errorMessage(e); }
 }
 async function joinWaitlist(reservation) {
   if(!await confirmAction('Vuoi metterti in attesa?',`${fieldName(reservation.fieldId)} · ${reservation.date} alle ${reservation.time}. Controlla la Home mentre l’app è aperta: la lista non riserva automaticamente il posto.`,'Avvisami nell’app'))return;
-  try { await api('/waitlist',{method:'POST',body:JSON.stringify({reservationId:reservation.id})}); switchView('home'); }
+  try { await api('/waitlist',{method:'POST',body:JSON.stringify({reservationId:reservation.id})}); showHomePanel('waiting'); switchView('home'); }
   catch(e) { alert(e.error==='OWN_RESERVATION'?'Questa partita è già tua.':e.error==='SLOT_FREE'?'Il posto è già libero. Aggiorna e prenota.':errorMessage(e)); }
 }
-async function loadOperations() {
+async function loadOperations(activePanel = 'statistics') {
   const epoch=managementContextEpoch;
-  openAppModal('Statistiche e chiusure', '<p>Caricamento…</p>');
+  if (!['statistics','create','planned'].includes(activePanel)) activePanel='statistics';
+  openAppModal('Statistiche e chiusure', '<p id="operationsLoading">Caricamento…</p>');
+  const loading=qs('operationsLoading');
   try {
     const data = await api('/admin/operations');
-    if(epoch!==managementContextEpoch || !qs('appModal').open)return;
-    qs('appModalBody').innerHTML=`<div class="summary-grid"><div><strong>${data.users}</strong><span>Utenti</span></div><div><strong>${data.upcoming}</strong><span>Prenotazioni da oggi</span></div><div><strong>${data.credits}</strong><span>Crediti totali</span></div></div>
-      <p class="muted">Situazione corrente del tuo stabilimento. Consulta l’agenda per vedere le prenotazioni di una data.</p>
-      ${Object.entries(data.byField).map(([f,n])=>`<p>${escapeHTML(fieldName(f))}: ${Number(n)} prenotazioni</p>`).join('')}
-      <h3>Chiudi un campo</h3><p class="muted">Le fasce con prenotazioni esistenti non possono essere chiuse.</p>
-      <form id="closureForm" class="form-stack"><label>Campo<select class="admin-input" id="closureField">${STATE.fields.map(f=>`<option value="${escapeHTML(f.id)}">${escapeHTML(f.name)}</option>`).join('')}</select></label>
+    if(epoch!==managementContextEpoch || !qs('appModal').open || !loading.isConnected)return;
+    qs('appModalBody').innerHTML=`<div class="compact-tabs" role="tablist" aria-label="Statistiche e chiusure"><button class="secondary-btn" type="button" role="tab" data-operations-panel="statistics" aria-controls="operationsStatisticsPanel">Statistiche</button><button class="secondary-btn" type="button" role="tab" data-operations-panel="create" aria-controls="operationsCreatePanel">Nuova chiusura</button><button class="secondary-btn" type="button" role="tab" data-operations-panel="planned" aria-controls="operationsPlannedPanel">Programmate</button></div>
+      <section id="operationsStatisticsPanel" role="tabpanel"><div class="summary-grid"><div><strong>${data.users}</strong><span>Utenti</span></div><div><strong>${data.upcoming}</strong><span>Prenotazioni</span></div><div><strong>${data.credits}</strong><span>Crediti totali</span></div></div>
+      <p class="helper-text">Prenotazioni da oggi, divise per campo.</p><div id="operationsFieldList">${Object.entries(data.byField).map(([f,n])=>`<div class="ledger-row"><span>${escapeHTML(fieldName(f))}</span><strong>${Number(n)}</strong></div>`).join('') || '<p class="muted">Nessuna prenotazione in programma.</p>'}</div></section>
+      <section id="operationsCreatePanel" role="tabpanel" hidden><form id="closureForm" class="form-stack"><label>Campo<select class="admin-input" id="closureField">${STATE.fields.map(f=>`<option value="${escapeHTML(f.id)}">${escapeHTML(f.name)}</option>`).join('')}</select></label>
       <label>Data<input class="admin-input" id="closureDate" type="date" min="${localISODate()}" required></label>
       <div class="admin-two-cols"><label>Dalle<input class="admin-input" id="closureStart" type="time" required></label><label>Alle<input class="admin-input" id="closureEnd" type="time" required></label></div>
-      <label>Motivo<input class="admin-input" id="closureReason" maxlength="120" required placeholder="Manutenzione, torneo, maltempo…"></label><button class="primary-btn" type="submit">Salva chiusura</button><p id="closureError" role="status"></p></form><h3>Chiusure programmate</h3><div id="closureList"></div>`;
-    const list=qs('closureList');
-    data.closures.filter(c=>c.date>=localISODate()).forEach(c=>{
-      const row=document.createElement('div');row.className='wait-row';
-      const label=document.createElement('p');label.textContent=`${fieldName(c.fieldId)} · ${c.date} ${c.start}–${c.end} · ${c.reason}`;row.appendChild(label);
-      const button=document.createElement('button');button.className='secondary-btn';button.textContent='Riapri fascia';button.onclick=async()=>{button.disabled=true;try{await api('/admin/closures/'+encodeURIComponent(c.id),{method:'DELETE'});await loadOperations();}catch(e){button.disabled=false;alert(errorMessage(e));}};row.appendChild(button);list.appendChild(row);
-    });
-    qs('closureForm').onsubmit=async e=>{
-      e.preventDefault();const button=e.currentTarget.querySelector('button');button.disabled=true;
-      try {await api('/admin/closures',{method:'POST',body:JSON.stringify({fieldId:qs('closureField').value,date:qs('closureDate').value,start:qs('closureStart').value,end:qs('closureEnd').value,reason:qs('closureReason').value})});await loadOperations();}
-      catch(error){qs('closureError').textContent=error.error==='EXISTING_RESERVATIONS'?'Ci sono prenotazioni nella fascia. Gestiscile prima di chiudere il campo.':'Chiusura non salvata. Verifica data, orari e connessione.';button.disabled=false;}
+      <label>Motivo<input class="admin-input" id="closureReason" maxlength="120" required placeholder="Es. manutenzione o torneo"></label><p class="helper-text">La fascia deve essere libera da prenotazioni.</p><button class="primary-btn" type="submit">Salva chiusura</button><p id="closureError" role="status"></p></form></section>
+      <section id="operationsPlannedPanel" role="tabpanel" hidden><div id="closureList"></div></section>`;
+    const panelIds={statistics:'operationsStatisticsPanel',create:'operationsCreatePanel',planned:'operationsPlannedPanel'};
+    const selectPanel=name=>{
+      Object.entries(panelIds).forEach(([key,id])=>{qs(id).hidden=key!==name;qs(id).classList.toggle('hidden',key!==name);});
+      qs('appModalBody').querySelectorAll('[data-operations-panel]').forEach(button=>{
+        const selected=button.dataset.operationsPanel===name;
+        button.classList.toggle('selected',selected);button.setAttribute('aria-selected',String(selected));
+      });
     };
-  } catch(e){if(epoch===managementContextEpoch && qs('appModal').open)qs('appModalBody').textContent=errorMessage(e);}
+    qs('appModalBody').querySelectorAll('[data-operations-panel]').forEach(button=>{button.onclick=()=>selectPanel(button.dataset.operationsPanel);});
+    const list=qs('closureList');
+    const closures=data.closures.filter(c=>c.date>=localISODate());
+    if(!closures.length)list.innerHTML='<p class="empty-state">Nessuna chiusura programmata.</p>';
+    closures.forEach(c=>{
+      const row=document.createElement('div');row.className='wait-row';
+      row.innerHTML=`<strong>${escapeHTML(fieldName(c.fieldId))}</strong><p>${escapeHTML(compactCommunityDate(c.date))} · ${escapeHTML(c.start)}–${escapeHTML(c.end)}</p><p class="muted">${escapeHTML(c.reason)}</p>`;
+      const button=document.createElement('button');button.className='secondary-btn';button.textContent='Riapri fascia';button.onclick=async()=>{
+        if(epoch!==managementContextEpoch)return;
+        button.disabled=true;
+        try{await api('/admin/closures/'+encodeURIComponent(c.id),{method:'DELETE'});if(epoch===managementContextEpoch)await loadOperations('planned');}
+        catch(e){button.disabled=false;if(epoch===managementContextEpoch)alert(errorMessage(e));}
+      };
+      row.appendChild(button);list.appendChild(row);
+    });
+    paginateCommunityList('operationsFieldList');
+    paginateCommunityList('closureList');
+    selectPanel(activePanel);
+    qs('closureForm').onsubmit=async e=>{
+      e.preventDefault();if(epoch!==managementContextEpoch)return;
+      const button=e.currentTarget.querySelector('button');button.disabled=true;
+      try {await api('/admin/closures',{method:'POST',body:JSON.stringify({fieldId:qs('closureField').value,date:qs('closureDate').value,start:qs('closureStart').value,end:qs('closureEnd').value,reason:qs('closureReason').value})});if(epoch===managementContextEpoch)await loadOperations('planned');}
+      catch(error){if(epoch===managementContextEpoch && qs('closureError'))qs('closureError').textContent=error.error==='EXISTING_RESERVATIONS'?'Ci sono prenotazioni nella fascia. Gestiscile prima di chiudere il campo.':'Chiusura non salvata. Verifica data, orari e connessione.';button.disabled=false;}
+    };
+  } catch(e){if(epoch===managementContextEpoch && qs('appModal').open && loading.isConnected)qs('appModalBody').textContent=errorMessage(e);}
 }
 
 /* The platform administrator creates venues; every venue manager keeps a scoped workspace. */
 let agendaRequest = 0;
 let platformRequest = 0;
 let agendaItems = [];
+let agendaDisplayedDate = '';
 
 function configureManagementAccess() {
   const manager = STATE.me?.role === 'admin';
@@ -171,8 +221,10 @@ function resetManagementViews() {
   agendaRequest++;
   platformRequest++;
   agendaItems = [];
+  agendaDisplayedDate = '';
   STATE.users = [];
   ['agendaList', 'platformEstablishmentList', 'usersList', 'agendaStatus', 'establishmentStatus', 'createUserStatus'].forEach(id => { if (qs(id)) qs(id).textContent = ''; });
+  ['agendaList', 'platformEstablishmentList'].forEach(id=>paginateCommunityList(id));
   ['establishmentCreateForm', 'createUserForm'].forEach(id => qs(id)?.reset());
   ['managerHome', 'adminShell', 'openAdminBtn', 'homePlatformBtn', 'btnPlatformEstablishments'].forEach(id => hide(qs(id)));
   hide(qs('managerNav'));
@@ -190,6 +242,8 @@ function clearEstablishmentData() {
   STATE.me = null;
   Object.assign(STATE, {config:{},fields:[],fieldsDraft:[],users:[],reservations:[],dayReservationsAll:[],myReservations:[],playerSearches:[],closures:[],gallery:[],galleryDraft:[],notes:'',selectedTime:'',nativeSynced:false});
   ['homeSummary','homeNext','homeNotice','creditHistory','waitlistItems','matchesList','matchesStatus','openGamesList','ownedGamesList','myJoinRequestsList','playersStatus','timeGrid','bookingPreview','bookMsg','fieldsList','galleryList','notesView','managerDaySummary'].forEach(id => { if(qs(id)) qs(id).textContent=''; });
+  ['creditHistory','waitlistItems'].forEach(id=>paginateCommunityList(id));
+  showHomePanel('overview');
   ['agendaDate','userSearch','notesText','newFieldId','newFieldName','galleryUrl','galleryCaption','galleryLink'].forEach(id => { qs(id).value=''; });
   document.querySelectorAll('input[type="password"]').forEach(input=>{input.value='';});
   document.querySelectorAll('#app .app-view').forEach(hide);
@@ -230,7 +284,7 @@ async function loadManagementSummary() {
     const data=await api('/admin/reservations?date='+localISODate());
     if(epoch!==managementContextEpoch || user!==STATE.me)return;
     const active=(data.items||[]).filter(item=>item.status==='active');
-    qs('managerDaySummary').innerHTML=`<span class="mini-label">Oggi · ${escapeHTML(formatLongDate(localISODate()))}</span><strong>${active.length} ${active.length===1?'prenotazione':'prenotazioni'} in programma</strong><span>${STATE.fields.length} ${STATE.fields.length===1?'campo configurato':'campi configurati'} · ${escapeHTML(STATE.config.dayStart || '—')}–${escapeHTML(STATE.config.dayEnd || '—')}</span>`;
+    qs('managerDaySummary').innerHTML=`<span class="mini-label">Oggi · ${escapeHTML(compactCommunityDate(localISODate()))}</span><strong>${active.length} ${active.length===1?'prenotazione':'prenotazioni'}</strong><span>${STATE.fields.length} ${STATE.fields.length===1?'campo':'campi'} · ${escapeHTML(STATE.config.dayStart || '—')}–${escapeHTML(STATE.config.dayEnd || '—')}</span>`;
   }catch(error){if(epoch===managementContextEpoch)qs('managerDaySummary').textContent=managementError(error);}
 }
 
@@ -287,8 +341,11 @@ async function loadManagerAgenda() {
   const user = STATE.me;
   const status = qs('agendaStatus');
   const list = qs('agendaList');
-  agendaItems = [];
-  list.textContent = '';
+  if (agendaDisplayedDate !== date) {
+    agendaItems = [];
+    list.textContent = '';
+    paginateCommunityList('agendaList');
+  }
   status.textContent = 'Caricamento prenotazioni…';
   list.setAttribute('aria-busy', 'true');
   qs('refreshAgendaBtn').disabled = true;
@@ -302,7 +359,7 @@ async function loadManagerAgenda() {
     agendaItems = data.items || [];
     renderManagerAgenda();
   } catch (error) {
-    if (request === agendaRequest && user === STATE.me) status.textContent = managementError(error);
+    if (request === agendaRequest && user === STATE.me) status.textContent = managementError(error) + (agendaDisplayedDate === date ? ' Sono mostrate le ultime prenotazioni caricate.' : '');
   } finally {
     if (request === agendaRequest) {
       list.setAttribute('aria-busy', 'false');
@@ -313,9 +370,10 @@ async function loadManagerAgenda() {
 
 function renderManagerAgenda() {
   const date = qs('agendaDate').value;
+  agendaDisplayedDate = date;
   const items = agendaItems.filter(item => !qs('agendaField').value || item.fieldId === qs('agendaField').value)
     .sort((a,b) => String(a.time).localeCompare(String(b.time)) || fieldName(a.fieldId).localeCompare(fieldName(b.fieldId)));
-  qs('agendaStatus').textContent = `${formatLongDate(date)} · ${items.length} ${items.length === 1 ? 'prenotazione' : 'prenotazioni'}`;
+  qs('agendaStatus').textContent = `${compactCommunityDate(date)} · ${items.length} ${items.length === 1 ? 'prenotazione' : 'prenotazioni'}`;
   const list = qs('agendaList');
   list.innerHTML = '';
   if (!items.length) {
@@ -328,10 +386,10 @@ function renderManagerAgenda() {
     const row = document.createElement('article');
     row.className = 'agenda-card';
     const status = item.status === 'cancelled' ? 'Cancellata' : item.status === 'completed' ? 'Conclusa' : 'Confermata';
-    row.innerHTML = `<div class="agenda-card-top"><strong>${escapeHTML(item.time)}${item.endTime ? '–' + escapeHTML(item.endTime) : ''}</strong><span class="request-status ${item.status === 'cancelled' ? 'rejected' : 'accepted'}">${status}</span></div><h3>${escapeHTML(fieldName(item.fieldId))}</h3><p>Prenotata da <strong>${escapeHTML(item.user)}</strong></p>`;
+    row.innerHTML = `<div class="agenda-card-top"><strong>${escapeHTML(item.time)}${item.endTime ? '–' + escapeHTML(item.endTime) : ''}</strong><span class="request-status ${item.status === 'cancelled' ? 'rejected' : 'accepted'}">${status}</span></div><div class="agenda-booking-info"><h3>${escapeHTML(fieldName(item.fieldId))}</h3><p>Prenotata da <strong>${escapeHTML(item.user)}</strong></p></div>`;
     if (item.status === 'active') {
       const epoch = managementContextEpoch;
-      row.appendChild(adminButton('Annulla prenotazione', async () => {
+      row.appendChild(adminButton('Annulla', async () => {
         if (!await confirmAction('Annulla questa prenotazione?', `${item.user} · ${fieldName(item.fieldId)} · ${formatLongDate(item.date)} alle ${item.time}. Il campo tornerà disponibile. L’annullamento dalla gestione non rimborsa crediti automaticamente.`, 'Annulla prenotazione')) return;
         if (epoch !== managementContextEpoch) return;
         await api('/admin/reservations/'+encodeURIComponent(item.id), {method:'DELETE'});
@@ -340,6 +398,7 @@ function renderManagerAgenda() {
     }
     list.appendChild(row);
   });
+  paginateCommunityList('agendaList');
 }
 
 async function openPlatformEstablishments() {
@@ -356,7 +415,8 @@ async function loadPlatformEstablishments() {
   const request = ++platformRequest;
   const user = STATE.me;
   const list = qs('platformEstablishmentList');
-  list.textContent = 'Caricamento stabilimenti…';
+  if (!list.children.length) list.textContent = 'Caricamento stabilimenti…';
+  list.setAttribute('aria-busy','true');
   try {
     const data = await api('/platform/establishments');
     if (request !== platformRequest || user !== STATE.me) return;
@@ -364,26 +424,44 @@ async function loadPlatformEstablishments() {
     (data.items || []).forEach(item => {
       const card = document.createElement('article');
       card.className = 'venue-management-card';
-      const managers = (item.managers || []).map(manager => `${manager.username}${manager.disabled ? ' (disabilitato)' : ''}`).join(', ') || 'Nessun gestore';
-      card.innerHTML = `<div class="agenda-card-top"><h3>${escapeHTML(item.name)}</h3><span class="request-status ${item.enabled ? 'accepted' : 'rejected'}">${item.enabled ? 'Attivo' : 'Sospeso'}</span></div><p class="muted">Codice: ${escapeHTML(item.id)}</p><p>Gestore: <strong>${escapeHTML(managers)}</strong></p>`;
+      const managers = item.managers || [];
+      const managerLabel = managers.length ? `${managers[0].username}${managers.length>1?' + '+(managers.length-1):''}` : 'Nessun gestore';
+      card.innerHTML = `<div class="agenda-card-top"><h3>${escapeHTML(item.name)}</h3><span class="request-status ${item.enabled ? 'accepted' : 'rejected'}">${item.enabled ? 'Attivo' : 'Sospeso'}</span></div><p class="venue-manager-label">Gestore: <strong>${escapeHTML(managerLabel)}</strong></p>`;
       const actions = document.createElement('div');
       actions.className = 'action-row';
-      const manage = adminButton('Gestisci stabilimento →', () => changeManagementContext(item.id));
+      const manage = adminButton('Gestisci →', () => changeManagementContext(item.id));
       manage.className = 'primary-btn manage-venue-btn';
       actions.appendChild(manage);
-      actions.appendChild(adminButton('Modifica nome', () => openEstablishmentName(item)));
-      if (!item.legacy) actions.appendChild(adminButton(item.enabled ? 'Sospendi' : 'Riattiva', async () => {
-        if (item.enabled && !await confirmAction('Sospendi ' + item.name + '?', 'Gli utenti e il gestore non potranno accedere finché non lo riattivi. Le prenotazioni e i dati saranno conservati.', 'Sospendi stabilimento')) return;
-        await api('/platform/establishments/' + encodeURIComponent(item.id), {method:'PATCH', body:JSON.stringify({enabled:!item.enabled})});
-        qs('establishmentStatus').textContent = `${item.name}: ${item.enabled ? 'accesso sospeso' : 'accesso riattivato'}.`;
-        await loadPlatformEstablishments();
-      }));
+      actions.appendChild(adminButton('Opzioni', () => openEstablishmentOptions(item)));
       card.appendChild(actions);
       list.appendChild(card);
     });
+    paginateCommunityList('platformEstablishmentList');
   } catch (error) {
     if (request === platformRequest && user === STATE.me) list.textContent = managementError(error);
+  } finally {
+    if (request === platformRequest && user === STATE.me) list.setAttribute('aria-busy','false');
   }
+}
+
+function openEstablishmentOptions(item) {
+  if (!STATE.me?.platformAdmin) return;
+  const epoch=managementContextEpoch;
+  openAppModal(item.name, `<p class="helper-text">Codice: <strong>${escapeHTML(item.id)}</strong> · ${item.enabled?'Attivo':'Sospeso'}</p><h3>Gestori</h3><div id="venueManagersList">${(item.managers || []).map(manager=>`<p class="ledger-row"><strong>${escapeHTML(manager.username)}</strong><span>${manager.disabled?'Disabilitato':'Attivo'}</span></p>`).join('') || '<p class="muted">Nessun gestore assegnato.</p>'}</div><div id="venueOptionsActions" class="form-stack"></div>`);
+  const actions=qs('venueOptionsActions');
+  actions.appendChild(adminButton('Modifica nome', () => {
+    if(epoch===managementContextEpoch)openEstablishmentName(item);
+  }));
+  if (!item.legacy) actions.appendChild(adminButton(item.enabled ? 'Sospendi stabilimento' : 'Riattiva stabilimento', async () => {
+    if (item.enabled && !await confirmAction('Sospendi ' + item.name + '?', 'Gli utenti e il gestore non potranno accedere finché non lo riattivi. Le prenotazioni e i dati saranno conservati.', 'Sospendi stabilimento')) return;
+    if(epoch!==managementContextEpoch)return;
+    await api('/platform/establishments/' + encodeURIComponent(item.id), {method:'PATCH', body:JSON.stringify({enabled:!item.enabled})});
+    if(epoch!==managementContextEpoch)return;
+    closeAppModal();
+    qs('establishmentStatus').textContent = `${item.name}: ${item.enabled ? 'accesso sospeso' : 'accesso riattivato'}.`;
+    await loadPlatformEstablishments();
+  }));
+  paginateCommunityList('venueManagersList');
 }
 
 async function createEstablishment(event) {
@@ -549,6 +627,21 @@ function openUserRole(user) {
 }
 
 document.addEventListener('DOMContentLoaded',()=>{
+  const homeTabs=[...document.querySelectorAll('[data-home-panel]')];
+  homeTabs[0]?.parentElement.setAttribute('role','tablist');
+  homeTabs.forEach((button,index)=>{
+    button.onclick=()=>showHomePanel(button.dataset.homePanel);
+    button.onkeydown=event=>{
+      let next=index;
+      if(event.key==='ArrowRight')next=(index+1)%homeTabs.length;
+      else if(event.key==='ArrowLeft')next=(index+homeTabs.length-1)%homeTabs.length;
+      else if(event.key==='Home')next=0;
+      else if(event.key==='End')next=homeTabs.length-1;
+      else return;
+      event.preventDefault();showHomePanel(homeTabs[next].dataset.homePanel);homeTabs[next].focus();
+    };
+  });
+  showHomePanel('overview');
   document.querySelectorAll('[data-home-view]').forEach(b=>b.onclick=()=>switchView(b.dataset.homeView));
   qs('refreshHomeBtn').onclick=loadHome;
   qs('btnAdminOperations').onclick=loadOperations;

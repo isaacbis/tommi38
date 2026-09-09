@@ -8,9 +8,9 @@ Accedi al tuo account di Tommi38: la panoramica **Tutti gli stabilimenti** mostr
 
 Da **Crea stabilimento**, inserisci nome, codice univoco, username e password iniziale del gestore. La password richiede almeno 12 caratteri e al massimo 72 byte, viene salvata con bcrypt e non viene restituita nelle risposte. Comunicala al proprietario tramite un canale riservato. La creazione prepara insieme stabilimento, gestore e configurazione iniziale; i campi si aggiungono dalla gestione del nuovo stabilimento.
 
-Puoi modificare il nome di uno stabilimento oppure sospenderne e riattivarne l’accesso. La sospensione conserva i dati e impedisce l’accesso a utenti e gestori locali. L’amministratore globale può ancora aprirne la gestione. Tommi38 rimane attivo per consentire l’accesso all’amministrazione globale.
+Ogni scheda propone **Gestisci →** e **Opzioni**. Da **Opzioni** puoi consultare tutti i gestori e il loro stato, modificare il nome dello stabilimento oppure sospenderne e riattivarne l’accesso. La sospensione conserva i dati e impedisce l’accesso a utenti e gestori locali. L’amministratore globale può ancora aprirne la gestione. Tommi38 rimane attivo per consentire l’accesso all’amministrazione globale.
 
-Premi **Gestisci stabilimento →** sulla scheda desiderata. Il nome e il banner di gestione indicano sempre lo stabilimento attivo; **Tutti gli stabilimenti** riporta alla panoramica. Da qui puoi aprirne un altro senza usare le credenziali dei suoi gestori.
+Premi **Gestisci →** sulla scheda desiderata. Il nome e il banner di gestione indicano sempre lo stabilimento attivo; **Tutti gli stabilimenti** riporta alla panoramica. Da qui puoi aprirne un altro senza usare le credenziali dei suoi gestori. Usa **Indietro** e **Avanti** sotto l’elenco per raggiungere gli altri stabilimenti.
 
 ### Contesto di gestione e identità
 
@@ -22,7 +22,9 @@ Il contesto è conservato dal server nella sessione e viene ripristinato al rica
 
 ### Creare utenti e assegnare gestori
 
-Apri lo stabilimento e poi **Utenti → Crea utente o gestore**. Scegli il ruolo **Utente** oppure **Gestore** insieme a username, password iniziale e crediti. Puoi anche cambiare il ruolo di un account locale esistente. Il cambio ruolo richiede un nuovo accesso sui dispositivi di quell’account.
+Apri lo stabilimento e poi **Utenti → Crea utente o gestore**. Scegli il ruolo **Utente** oppure **Gestore** insieme a username, password iniziale e crediti. Puoi anche cambiare il ruolo di un account locale esistente da **Gestisci → Cambia ruolo**. Il cambio ruolo richiede un nuovo accesso sui dispositivi di quell’account.
+
+Nell’elenco utenti, **Crediti** apre la rettifica del saldo; **Gestisci** raccoglie password, rinomina e abilitazione o disabilitazione dell’account. Per un’iscrizione in attesa compare l’approvazione. Il cambio di ruolo è disponibile all’amministratore globale. La ricerca per username e i pulsanti di paginazione permettono di raggiungere ogni account.
 
 Il ruolo **Gestore** vale soltanto nello stabilimento selezionato. Questi comandi non assegnano il privilegio globale e non consentono di alterare il ruolo dell’account globale protetto di Tommi38.
 
@@ -46,11 +48,24 @@ Per creare una prenotazione dall’agenda, scegli un utente attivo dello stabili
 
 **Le prenotazioni inserite dalla gestione non scalano crediti.** Anche il successivo annullamento da parte dell’utente non può generare il rimborso di un credito mai addebitato. Le prenotazioni personali degli utenti ordinari continuano a costare 1 credito.
 
-Su una prenotazione confermata, **Annulla prenotazione** chiede conferma, libera il campo e conserva la prenotazione nello storico con l’autore dell’annullamento. **L’annullamento dalla gestione non rimborsa crediti automaticamente**, anche quando la prenotazione era stata pagata dall’utente. L’eventuale rettifica si esegue da **Utenti → Crediti** ed è registrata nello storico dei crediti.
+Su una prenotazione confermata, **Annulla** apre la conferma dell’annullamento, libera il campo e conserva la prenotazione nello storico con l’autore dell’annullamento. **L’annullamento dalla gestione non rimborsa crediti automaticamente**, anche quando la prenotazione era stata pagata dall’utente. L’eventuale rettifica si esegue da **Utenti → Crediti** ed è registrata nello storico dei crediti.
 
 ## Utilizzo da telefono
 
 La gestione usa schede e moduli adattabili allo schermo. La barra inferiore dà accesso a **Riepilogo**, **Agenda** e **Utenti**; il gestore trova anche **Gioca**, mentre l’amministratore globale dispone del collegamento **Orari**. Il nome dello stabilimento e il banner del contesto restano il riferimento prima di una modifica.
+
+Gli elenchi sono suddivisi in pagine con **Indietro**, indicatore della pagina corrente e **Avanti**. Il numero di elementi visibili si adatta allo spazio disponibile. La paginazione riguarda stabilimenti, utenti, agenda, partite, ricerche di giocatori, attesa, movimenti dei crediti e gli altri elenchi di gestione; anche gli orari di prenotazione sono distribuiti su più pagine. Quando l’aggiornamento restituisce lo stesso elenco, la pagina scelta viene conservata. Cambiare stabilimento o i filtri di giorno e campo apre il relativo elenco dall’inizio.
+
+La **Home** ha quattro schede:
+
+- **Riepilogo**: saldo, numero di partite, gruppi aperti e prossima partita, con i collegamenti per prenotare e trovare giocatori.
+- **Crediti**: movimenti del saldo e richiesta di ricarica.
+- **Attesa**: posti seguiti, stato della disponibilità e comandi per prenotare o lasciare la lista.
+- **Avvisi**: comunicazione del gestore.
+
+In **Cerca giocatori**, le tre schede **Aperte**, **Le tue** e **Richieste** separano le partite a cui partecipare, le proprie ricerche da gestire e le richieste di partecipazione inviate. Ogni elenco mantiene i propri comandi e la propria paginazione.
+
+**Statistiche e chiusure** apre tre schede: **Statistiche** mostra utenti, crediti e prenotazioni per campo; **Nuova chiusura** contiene il modulo per campo, giorno, orari e motivo; **Programmate** elenca le chiusure e permette di riaprire una fascia. Dopo aver salvato una chiusura si apre la scheda **Programmate**.
 
 Creazione utenti, modifica dei ruoli, crediti, prenotazioni e conferme si svolgono in finestre dell’app. Le password possono essere mostrate o nascoste dai controlli dedicati. Durante un cambio di stabilimento i dati e i moduli precedenti vengono svuotati; le risposte tardive non devono ripopolare la gestione appena aperta.
 
@@ -70,7 +85,16 @@ Repository: `isaacbis/tommi38`, ramo predefinito `main`; servizio esistente Rend
 
 Eseguire dalla radice: `node --test tests/*.test.cjs`. I test usano dati sintetici e un database simulato, con verifiche HTTP del server e delle sessioni; non modificano Firestore di produzione. La suite comprende cambio di contesto globale, isolamento degli account omonimi, revoche, ruoli locali, prenotazioni amministrative, rimborsi e protezioni dalle risposte tardive.
 
-Verifiche di questa release: **75 test superati**, senza fallimenti. L’interfaccia è stata controllata nel browser a **320, 390 e 430 px**, senza overflow orizzontale né errori nella console. Sono stati verificati il passaggio globale dallo stabilimento A a B e il ripristino dopo ricaricamento, creazione e annullamento di una prenotazione amministrativa, accesso e percorsi del gestore locale e dell’utente ordinario.
+La release del layout compatto ha superato **75 test**, senza fallimenti, test saltati o annullati. La sintassi dei **17 file JavaScript applicativi** e il controllo delle differenze sono validi.
+
+La verifica nel browser è completata per queste schermate e operazioni:
+
+- A **320 × 568 px**: login, Home, prenotazione con selezione e conferma, menu del gestore e dell’amministratore globale, agenda, utenti e orari dello stabilimento gestito dall’amministratore globale. Le schermate controllate rientrano nello spazio disponibile senza scorrimento della pagina; il pulsante di prenotazione rimane visibile dopo la selezione.
+- A **320 × 568 px**: il modulo **Nuova chiusura** rientra nel dialogo e mantiene visibile **Salva chiusura**.
+- A **390 × 844 px**: agenda; a **430 × 932 px**: menu di gestione, senza contenuti eccedenti lo spazio disponibile.
+- Con dati sintetici: una prenotazione personale ha portato il saldo da **12 a 11 crediti**; la seconda pagina dell’agenda è rimasta selezionata dopo l’aggiornamento.
+
+Nessun errore nella console durante queste verifiche.
 
 Per verificare l’interfaccia con dati sintetici, avviare `node tests/preview-server.cjs 4173` e aprire `http://127.0.0.1:4173/__preview/session?persona=root`. Le altre sessioni disponibili sono `manager-a`, `manager-b` e `user-a`. Il passaggio prepara anche la scelta dello stabilimento nel browser. Il server ascolta soltanto sul computer locale, usa Express e l’applicazione reali con sessioni e database in memoria, simula il meteo e non carica Firebase o credenziali di produzione. Il riavvio ripristina i dati dimostrativi. Verificare a 320 px almeno panoramica globale, gestione A → B → panoramica, agenda, utenti e finestre di conferma.
 
