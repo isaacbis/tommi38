@@ -68,3 +68,13 @@ test('booking stays disabled while submitting, offline, or without credits', () 
   e.run('navigator.onLine=true; updateBookingPreview();');
   assert.equal(e.node('bookBtn').disabled,false);
 });
+test('a player-search response from a previous login cannot expose contacts', async () => {
+  const e = environment();
+  e.run('STATE.me={username:"owner"}; api=()=>new Promise(resolve=>{pending.push(resolve)}); renderPlayerSearches=()=>{}; renderMyReservations=()=>{};');
+  e.context.pending=[];
+  const loading=e.run('loadPlayerSearches()');
+  e.run('STATE.me={username:"other"};');
+  e.context.pending[0]({items:[{requests:[{phone:'private'}]}]});
+  await loading;
+  assert.equal(e.run('STATE.playerSearches.length'),0);
+});
