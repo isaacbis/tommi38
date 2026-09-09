@@ -7,6 +7,7 @@ import cookieParser from "cookie-parser";
 import session from "express-session";
 
 import routes from "./src/routes.js";
+import { tenantMiddleware } from "./src/tenancy.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -69,7 +70,11 @@ app.use(
 /* ======================================================
    API ROUTES
    ====================================================== */
-app.use("/api", routes);
+app.use("/api", tenantMiddleware, routes);
+app.use((error, req, res, next) => {
+  console.error("Request failed", error.message);
+  if (!res.headersSent) res.status(500).json({error:"SERVER_ERROR"});
+});
 
 /* ======================================================
    FRONTEND STATIC (SPA)
@@ -81,7 +86,7 @@ app.use(express.static(frontendPath));
    HEALTH CHECK (KEEP-ALIVE RENDER)
    ====================================================== */
 app.get("/api/health", (req, res) => {
-  res.json({ ok: true, time: new Date().toISOString() });
+  res.json({ ok: true, version: process.env.RENDER_GIT_COMMIT || "local", time: new Date().toISOString() });
 });
 
 /* ======================================================

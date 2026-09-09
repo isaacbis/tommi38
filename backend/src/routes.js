@@ -2,12 +2,20 @@ import express from "express";
 import bcrypt from "bcrypt";
 import rateLimit from "express-rate-limit";
 import { z } from "zod";
-import { db, FieldValue } from "./db.js";
+import { FieldValue } from "./db.js";
+import { db, tenantId, establishments } from "./tenancy.js";
 
-let lastCleanup = 0;
+const cleanupTimes = new Map();
 const CLEANUP_COOLDOWN_MS = 60_000; // 1 minuto
 
 const router = express.Router();
+// Express 4 does not forward rejected async handlers by itself.
+for (const method of ['get','post','put','patch','delete']) {
+  const register = router[method].bind(router);
+  router[method] = (path, ...handlers) => register(path, ...handlers.map(handler =>
+    (req,res,next) => { try { const result = handler(req,res,next); return result?.catch ? result.catch(next) : result; } catch(error) { next(error); } }
+  ));
+}
 
 /* =================== MIDDLEWARE =================== */
 function requireAuth(req, res, next) {
@@ -90,8 +98,8 @@ function playerSearchIsExpired(search, today, nowMinutes) {
 
 async function cleanupExpiredReservations() {
   const now = Date.now();
-  if (now - lastCleanup < CLEANUP_COOLDOWN_MS) return;
-  lastCleanup = now;
+  if (now - (cleanupTimes.get(tenantId()) || 0) < CLEANUP_COOLDOWN_MS) return;
+  cleanupTimes.set(tenantId(), now);
 
   const cfgSnap = await db.collection("admin").doc("config").get();
   const cfg = cfgSnap.exists ? cfgSnap.data() : {};
@@ -132,6 +140,8 @@ function publicRequestData(doc) {
 
 
 /* =================== AUTH =================== */
+router.get("/establishments", async (req, res) => res.json({ items: await establishments() }));
+
 router.post("/login", loginLimiter, async (req, res) => {
   const schema = z.object({
     username: z.string().min(1),
@@ -154,7 +164,8 @@ router.post("/login", loginLimiter, async (req, res) => {
 
   req.session.user = {
     username,
-    role: user.role || "user"
+    role: user.role || "user",
+    establishment: tenantId()
   };
 
   res.json({ ok: true });
@@ -213,7 +224,8 @@ router.get("/reservations", requireAuth, async (req, res) => {
 
   const items = [];
   snap.forEach(d => items.push({ id: d.id, ...d.data() }));
-  res.json({ items });
+  const closed = await db.collection("admin").doc("closures").get();
+  res.json({ items, closures: closed.exists ? (closed.data().items || []).filter(c => c.date === date) : [] });
 });
 
 
@@ -344,6 +356,11 @@ router.post("/reservations", requireAuth, async (req, res) => {
   try {
     await db.runTransaction(async transaction => {
       const reservationSnap = await transaction.get(reservationRef);
+      const closureSnap = await transaction.get(db.collection("admin").doc("closures"));
+      const closures = closureSnap.exists ? closureSnap.data().items || [] : [];
+      if (closures.some(c => c.date === date && c.fieldId === fieldId && time < c.end && timeToMinutes(time) + slotMinutes > timeToMinutes(c.start))) {
+        throw Object.assign(new Error("FIELD_CLOSED"), {code:"FIELD_CLOSED"});
+      }
       if (reservationSnap.exists) {
         const error = new Error("SLOT_TAKEN");
         error.code = "SLOT_TAKEN";
@@ -358,9 +375,14 @@ router.post("/reservations", requireAuth, async (req, res) => {
           throw error;
         }
 
-        transaction.update(userRef, {
-          credits: FieldValue.increment(-1)
-        });
+        if (userSnap.data().disabled) throw Object.assign(new Error("NO_CREDITS"), {code:"NO_CREDITS"});
+        const active = await transaction.get(db.collection("reservations").where("user", "==", username));
+        const current = active.docs.map(d => d.data()).filter(r => !reservationIsExpired(r, slotMinutes, today, currentMinutes));
+        if (current.length >= maxActive || current.filter(r => r.date === date).length >= maxPerDay) {
+          throw Object.assign(new Error("BOOKING_LIMIT"), {code:"BOOKING_LIMIT"});
+        }
+        transaction.update(userRef, { credits: FieldValue.increment(-1) });
+        transaction.set(db.collection("creditLedger").doc(), { user:username, delta:-1, reason:"Prenotazione", reservationId, createdAt:FieldValue.serverTimestamp() });
       }
 
       transaction.set(reservationRef, {
@@ -372,6 +394,7 @@ router.post("/reservations", requireAuth, async (req, res) => {
       });
     });
   } catch (error) {
+    if (["FIELD_CLOSED", "BOOKING_LIMIT"].includes(error?.code)) return res.status(409).json({error:error.code});
     if (error?.code === "SLOT_TAKEN") {
       return res.status(409).json({ error: "SLOT_TAKEN" });
     }
@@ -409,6 +432,9 @@ router.delete("/reservations/:id", requireAuth, async (req, res) => {
         });
       }
 
+      if (!isAdmin && reservation.date > today) {
+        transaction.set(db.collection("creditLedger").doc(), {user:username, delta:1, reason:"Rimborso cancellazione", reservationId:req.params.id, createdAt:FieldValue.serverTimestamp()});
+      }
       transaction.delete(reservationRef);
     });
   } catch (error) {
@@ -848,7 +874,15 @@ router.put("/admin/users/credits", requireAdmin, async (req, res) => {
   const ref = db.collection("users").doc(parsed.data.username);
   if (!(await ref.get()).exists) return res.status(404).json({ error: "USER_NOT_FOUND" });
 
-  await ref.update({ credits: FieldValue.increment(parsed.data.delta) });
+  try {
+    await db.runTransaction(async tx => {
+      const user = await tx.get(ref);
+      const next = Number(user.data().credits || 0) + parsed.data.delta;
+      if (!Number.isSafeInteger(next) || next < 0) throw new Error("INVALID_BALANCE");
+      tx.update(ref, {credits:next});
+      tx.set(db.collection("creditLedger").doc(), {user:parsed.data.username, delta:parsed.data.delta, reason:"Rettifica amministratore", actor:req.session.user.username, createdAt:FieldValue.serverTimestamp()});
+    });
+  } catch { return res.status(400).json({error:"INVALID_BALANCE"}); }
   res.json({ ok: true });
 });
 
@@ -907,10 +941,17 @@ router.post("/admin/users/rename", requireAdmin, async (req, res) => {
     return res.status(409).json({ error: "TOO_MANY_RESERVATIONS" });
   }
 
+  const [history, waiting] = await Promise.all([
+    db.collection("creditLedger").where("user", "==", oldUsername).get(),
+    db.collection("waitlist").where("user", "==", oldUsername).get()
+  ]);
+  if (reservationsSnap.size + history.size + waiting.size > 498) return res.status(409).json({error:"TOO_MANY_RESERVATIONS"});
   const batch = db.batch();
   batch.set(newRef, oldSnap.data());
   batch.delete(oldRef);
   reservationsSnap.forEach(doc => batch.update(doc.ref, { user: newUsername }));
+  history.forEach(doc => batch.update(doc.ref, {user:newUsername}));
+  waiting.forEach(doc => batch.update(doc.ref, {user:newUsername}));
   await batch.commit();
 
   res.json({ ok: true });
@@ -933,5 +974,99 @@ router.get("/weather", async (req, res) => {
   }
 });
 
+
+/* =================== WAITLIST / CREDITS / OPERATIONS =================== */
+router.get('/credits', requireAuth, async (req, res) => {
+  const user = req.session.user.username;
+  const [account, history] = await Promise.all([
+    db.collection('users').doc(user).get(),
+    db.collection('creditLedger').where('user', '==', user).get()
+  ]);
+  const items = history.docs.map(d => ({id:d.id, delta:d.data().delta, reason:d.data().reason, at:d.data().createdAt?.toDate?.().toISOString() || null}));
+  items.sort((a,b) => (b.at || '').localeCompare(a.at || ''));
+  res.json({balance:account.data()?.credits || 0, items:items.slice(0,100)});
+});
+router.get('/waitlist', requireAuth, async (req,res) => {
+  const snap = await db.collection('waitlist').where('user','==',req.session.user.username).get();
+  const closures = await db.collection('admin').doc('closures').get();
+  const items = [];
+  for (const doc of snap.docs) {
+    const value = doc.data();
+    if (value.date < localISODate() || (value.date === localISODate() && value.time <= `${romeDateParts().hour}:${romeDateParts().minute}`)) continue;
+    const booked = await db.collection('reservations').doc(value.reservationId).get();
+    const blocked = (closures.data()?.items || []).some(c => c.date === value.date && c.fieldId === value.fieldId && value.time < c.end && value.end > c.start);
+    items.push({id:doc.id, fieldId:value.fieldId, date:value.date, time:value.time, available:!booked.exists && !blocked});
+  }
+  items.sort((a,b)=>`${a.date} ${a.time}`.localeCompare(`${b.date} ${b.time}`));
+  res.json({items});
+});
+router.post('/waitlist', requireAuth, async (req,res) => {
+  const schema = z.object({reservationId:z.string().min(1).max(120).refine(v=>!v.includes('/'))});
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({error:'BAD_BODY'});
+  const {reservationId} = parsed.data;
+  const username = req.session.user.username;
+  const own = await db.collection('waitlist').where('user','==',username).get();
+  if (own.docs.filter(d => !playerSearchIsExpired(d.data(), localISODate(), localMinutes())).length >= 30) return res.status(409).json({error:'WAITLIST_LIMIT'});
+  const ref = db.collection('waitlist').doc(`${reservationId}_${playerRequestId(username)}`);
+  const result = await db.runTransaction(async tx => {
+    const reservation = await tx.get(db.collection('reservations').doc(reservationId));
+    const cfg = await tx.get(db.collection('admin').doc('config'));
+    if (!reservation.exists) return 'SLOT_FREE';
+    const r = reservation.data();
+    if (r.user === username) return 'OWN_RESERVATION';
+    if (playerSearchIsExpired(r,localISODate(),localMinutes())) return 'PAST_TIME_NOT_ALLOWED';
+    const total = timeToMinutes(r.time) + Number(cfg.data()?.slotMinutes || 45);
+    tx.set(ref,{user:username,reservationId,fieldId:r.fieldId,date:r.date,time:r.time,end:`${String(Math.floor(total/60)).padStart(2,'0')}:${String(total%60).padStart(2,'0')}`});
+    return null;
+  });
+  if (result) return res.status(409).json({error:result});
+  res.json({ok:true});
+});
+router.delete('/waitlist/:id', requireAuth, async (req,res) => {
+  const ref = db.collection('waitlist').doc(req.params.id);
+  await db.runTransaction(async tx => {
+    const snap = await tx.get(ref);
+    if (snap.exists && snap.data().user === req.session.user.username) tx.delete(ref);
+  });
+  res.json({ok:true});
+});
+router.get('/admin/operations', requireAdmin, async (req,res) => {
+  const [users, reservations, closures] = await Promise.all([
+    db.collection('users').get(), db.collection('reservations').get(), db.collection('admin').doc('closures').get()
+  ]);
+  const counts = {};
+  const active = reservations.docs.map(d=>d.data()).filter(r=>r.date >= localISODate());
+  active.forEach(r=>{counts[r.fieldId]=(counts[r.fieldId] || 0)+1;});
+  res.json({users:users.size, credits:users.docs.reduce((n,d)=>n+Number(d.data().credits || 0),0), upcoming:active.length, byField:counts, closures:closures.data()?.items || []});
+});
+router.post('/admin/closures', requireAdmin, async (req,res) => {
+  const time = z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/);
+  const schema = z.object({fieldId:z.string().min(1).max(80),date:z.string().regex(/^\d{4}-\d{2}-\d{2}$/),start:time,end:time,reason:z.string().trim().min(1).max(120)});
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success || parsed.data.start >= parsed.data.end || parsed.data.date < localISODate()) return res.status(400).json({error:'BAD_BODY'});
+  const value = parsed.data;
+  const ref = db.collection('admin').doc('closures');
+  const result = await db.runTransaction(async tx => {
+    const [snap, fields, cfg, reservations] = await Promise.all([
+      tx.get(ref),tx.get(db.collection('admin').doc('fields')),tx.get(db.collection('admin').doc('config')),
+      tx.get(db.collection('reservations').where('date','==',value.date))
+    ]);
+    if (!(fields.data()?.fields || []).some(f=>f.id===value.fieldId)) return 'INVALID_FIELD';
+    if (reservations.docs.some(d=>{const r=d.data();return r.fieldId===value.fieldId && r.time < value.end && timeToMinutes(r.time)+Number(cfg.data()?.slotMinutes || 45)>timeToMinutes(value.start);})) return 'EXISTING_RESERVATIONS';
+    const items = (snap.data()?.items || []).filter(c=>c.date>=localISODate());
+    if (items.length >= 300) return 'CLOSURE_LIMIT';
+    items.push({...value,id:db.collection('closureIds').doc().id});
+    tx.set(ref,{items});
+    return null;
+  });
+  if (result) return res.status(409).json({error:result});
+  res.json({ok:true});
+});
+router.delete('/admin/closures/:id', requireAdmin, async (req,res) => {
+  const ref=db.collection('admin').doc('closures');
+  await db.runTransaction(async tx=>{const snap=await tx.get(ref);tx.set(ref,{items:(snap.data()?.items || []).filter(c=>c.id!==req.params.id)});});
+  res.json({ok:true});
+});
 
 export default router;
