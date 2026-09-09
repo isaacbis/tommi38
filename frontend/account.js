@@ -141,8 +141,8 @@
     };
     const settings=document.createElement('section');settings.className='glass-card wait-row';settings.dataset.personalAccount='';
     settings.append(button('Cambia password',changePassword));qs('viewAlerts').append(settings);
-    const ownAccount=button('Cambia la mia password',changePassword);ownAccount.dataset.personalAccount='';qs('adminMenu').append(ownAccount);
-    const globalAccount=button('Cambia la password di amministratore',changePassword);globalAccount.dataset.personalAccount='';qs('adminEstablishments').append(globalAccount);
+    const ownAccount=button('Cambia la mia password',changePassword);ownAccount.classList.add('compact-account-button');ownAccount.dataset.personalAccount='';qs('adminMenu').append(ownAccount);
+    const globalAccount=button('Cambia la password di amministratore',changePassword);globalAccount.classList.add('compact-account-button');globalAccount.dataset.personalAccount='';qs('adminEstablishments').append(globalAccount);
     qs('creditHistory').closest('section').append(button('Richiedi crediti',requestCredits));
     const admin=document.createElement('div');admin.className='home-actions';
     admin.append(button('Richieste utenti',manageRequests),button('Pacchetti crediti',managePackages));qs('adminUsers').prepend(admin);

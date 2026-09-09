@@ -1467,3 +1467,241 @@ button:focus-visible, summary:focus-visible, input:focus-visible, select:focus-v
   .admin-grid { grid-template-columns: repeat(3,minmax(0,1fr)); }
   #platformEstablishmentList { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); align-items: start; }
 }
+
+/* A phone-sized workspace. Overflow remains reachable for zoom, keyboard and long forms. */
+.app-shell { height: 100dvh; min-height: 0; }
+.main-app { display: flex; flex-direction: column; height: 100%; min-height: 0; padding: 0; }
+.main-app > .app-view { flex: 1 1 auto; min-height: 0; padding: 8px 12px; overflow-y: auto; overscroll-behavior-y: contain; scrollbar-width: thin; }
+.native-header { flex: 0 0 auto; min-height: 52px; margin: 0; padding: max(4px,env(safe-area-inset-top)) 12px 4px; gap: 8px; background: #071b2b; }
+.header-logo { width: 28px; height: 28px; border-radius: 9px; }
+.header-brand { gap: 7px; }
+.header-brand-copy > strong { font-size: 15px; line-height: 1.12; }
+.header-role { margin-top: 3px; font-size: 9px; line-height: 1.2; }
+.header-actions .change-btn { font-size: 11px; padding: 4px; }
+.header-actions .icon-btn { width: 44px; height: 44px; border: 0; }
+.management-banner { flex: 0 0 auto; position: static; display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 0; padding: 3px 12px; min-height: 48px; border: 0; border-bottom: 1px solid #76623f; border-radius: 0; box-shadow: none; background: #23313b; }
+.management-banner > div { min-width: 0; }
+.management-banner > div > span { font-size: 9px; letter-spacing: .04em; }
+.management-banner strong { margin: 2px 0 0; font-size: 12px; line-height: 1.2; }
+.management-banner .secondary-btn { flex-shrink: 0; width: auto; min-height: 44px; margin: 0; padding: 7px 10px; font-size: 11px; border: 0; background: #122638; }
+.bottom-nav, .manager-nav { position: static; flex: 0 0 auto; left: auto; bottom: auto; transform: none; width: 100%; min-height: calc(50px + env(safe-area-inset-bottom)); margin: 0; padding: 3px 7px calc(3px + env(safe-area-inset-bottom)); gap: 3px; box-shadow: 0 -3px 14px #0002; }
+.bottom-nav-item, .manager-nav button { min-height: 44px; padding: 2px; gap: 2px; font-size: 10px; line-height: 1.1; border-radius: 9px; }
+.manager-nav button > span, .nav-icon { font-size: 19px; }
+.bottom-nav .ui-icon { width: 18px; height: 18px; }
+.main-app .primary-btn, .main-app .secondary-btn, .main-app .admin-small-btn { min-height: 44px; padding: 8px 10px; font-size: 13px; border-radius: 11px; box-shadow: none; }
+.main-app .icon-btn { width: 44px; height: 44px; min-height: 44px; flex-shrink: 0; }
+.page-title-row, #adminShell > .page-title-row { margin: 0 0 8px; gap: 8px; align-items: center; }
+.page-title-row h1, #adminTitle { margin: 0; font-size: 23px !important; line-height: 1.1; }
+.page-title-row .eyebrow { font-size: 10px; line-height: 1.2; margin: 0 0 3px; }
+#adminRoleLabel { display: none; }
+.main-app > #adminShell { display: flex; flex-direction: column; }
+#adminShell > .page-title-row { flex: 0 0 auto; min-height: 30px; }
+#adminShell:has(> #adminMenu.hidden):has(> #adminEstablishments.hidden) > .page-title-row { display: none; }
+#adminAgenda > .backAdmin, #adminUsers > .backAdmin { display: none; }
+#adminShell > section { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior-y: contain; scrollbar-width: thin; }
+#adminMenu { display: flex; flex-direction: column; gap: 8px; }
+.manager-day-card { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; padding: 9px 10px; border-radius: 13px; }
+#managerDaySummary { flex: 1; min-width: 0; gap: 3px; margin: 0; }
+#managerDaySummary strong { font-size: 17px; line-height: 1.15; }
+#managerDaySummary > span { font-size: 10px; line-height: 1.3; }
+#managerDaySummary .mini-label { font-size: 10px; margin: 0; }
+.manager-day-card .primary-btn { flex: 0 0 87px; width: 87px; min-height: 44px; padding: 6px; font-size: 12px; }
+.admin-grid { flex: 1 0 auto; grid-template-columns: repeat(2,minmax(0,1fr)); grid-auto-rows: minmax(51px,1fr); gap: 6px; }
+.admin-action { min-height: 51px; padding: 8px 10px; gap: 6px; align-items: center; border-radius: 12px; }
+.admin-action .admin-action-copy { gap: 4px; }
+.admin-action-copy strong { font-size: 13px; line-height: 1.2; }
+.admin-action-copy small { font-size: 10px; line-height: 1.25; }
+.admin-action > span:last-child { font-size: 17px; }
+#adminMenu > [data-personal-account], .compact-account-button { flex: 0 0 auto; min-height: 44px; width: 100%; font-size: 12px; margin: 0; }
+.platform-intro { margin: 0 0 8px; }
+.platform-intro p { font-size: 12px; line-height: 1.4; }
+.management-details { margin: 6px 0; padding: 0 10px; border-radius: 11px; }
+.management-details > summary { min-height: 44px; font-size: 13px; }
+.management-details[open] { padding-bottom: 10px; }
+.create-establishment { padding: 0; margin: 6px 0; overflow: visible; }
+.create-establishment > summary { min-height: 44px; font-size: 14px; padding: 10px; border-radius: 10px; }
+.create-establishment form { padding: 10px; }
+.management-details[open] > summary { margin-bottom: 6px; }
+.venue-management-card, .agenda-card, .admin-item, .match-card, .game-card, .join-request-card, .player-request-card { padding: 10px; border-radius: 12px; }
+.venue-management-card .agenda-card-top h3 { font-size: 17px; }
+.venue-management-card p, .agenda-card p { margin: 4px 0; font-size: 12px; line-height: 1.3; }
+.venue-management-card .action-row { margin-top: 8px; gap: 6px; grid-template-columns: minmax(0,1fr) auto; }
+.venue-management-card .manage-venue-btn { grid-column: auto; margin: 0; }
+.venue-management-card .request-status, .agenda-card .request-status { font-size: 10px; padding: 4px 6px; }
+.agenda-card { display: grid; grid-template-columns: minmax(0,1fr) auto; column-gap: 8px; row-gap: 4px; }
+.agenda-card-top { gap: 6px; }
+.agenda-card > .agenda-card-top { grid-column: 1/-1; }
+.agenda-card-top > strong { font-size: 16px; }
+.agenda-card h3 { margin: 0 0 3px; font-size: 14px; }
+.agenda-card > .admin-small-btn { width: auto; margin: 0; padding: 7px; font-size: 11px; align-self: center; }
+.admin-section { padding: 10px; }
+.admin-section > h3, #adminAgenda .page-title-row h2 { font-size: 19px; margin: 0 0 7px; }
+.admin-section > .muted { margin: 5px 0 8px; font-size: 12px; }
+.admin-section > .backAdmin { min-height: 44px; margin-top: 5px; }
+.admin-list, .matches-list, .players-list { gap: 7px; margin: 7px 0; }
+.admin-item { gap: 7px; }
+.admin-item-main strong { font-size: 15px; }
+.admin-item-main span { font-size: 11px; margin-top: 3px; }
+.admin-item-actions { gap: 6px; }
+.main-app .admin-input, .compact-field-select { width: 100%; min-height: 44px; font-size: 16px; padding: 8px 10px; margin-bottom: 7px; border-radius: 10px; }
+.main-app .field-label { margin: 3px 0 3px; font-size: 12px; }
+.main-app .admin-two-cols, .main-app .action-row { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 7px; }
+.main-app .form-message { min-height: 0; margin: 5px 0; font-size: 12px; line-height: 1.35; }
+.main-app .form-message:empty, .main-app .muted:empty { display: none; }
+.agenda-date-controls { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr) minmax(146px,1.8fr); gap: 5px; margin: 7px 0 4px; }
+#adminAgenda .agenda-date-controls > button { padding-left: 6px; padding-right: 6px; }
+.agenda-date-controls > label { grid-column: auto; display: flex; align-items: center; margin: 0; min-width: 0; font-size: 11px; }
+.agenda-date-controls input { flex: 1; margin: 0; min-width: 0; width: 100%; padding: 5px; font-size: 16px; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; border: 0; }
+#adminAgenda .page-title-row { margin-bottom: 4px; }
+#newManagedBookingBtn { min-height: 44px; height: 44px; }
+#adminAgenda .agenda-date-controls > label { margin: 0; }
+#adminAgenda #agendaDate { min-height: 44px; height: 44px; margin: 0; }
+#agendaField { margin-bottom: 2px; }
+.page-hidden { display: none !important; }
+.list-pager { display: grid; grid-template-columns: 44px minmax(0,1fr) 44px; gap: 7px; align-items: center; margin: 4px 0; min-height: 44px; }
+.list-pager button { min-width: 44px; min-height: 44px; padding: 5px; border: 1px solid #3a566d; border-radius: 10px; background: #132d42; color: var(--text); font-size: 24px; line-height: 1; }
+.list-pager button:disabled { opacity: .4; }
+.list-pager button.pager-previous, .list-pager button.pager-next { font-size: 24px; line-height: 1; }
+.pager-status { font-size: 11px; text-align: center; color: #b6cadc; }
+.compact-tabs { display: flex; flex: 0 0 auto; gap: 4px; margin: 7px 0; padding: 3px; border: 1px solid #324c63; border-radius: 12px; background: #081d2e; }
+.compact-tabs button { flex: 1; min-width: 0; min-height: 44px; padding: 4px 5px; border-radius: 8px; background: none; color: #b6cadc; font-size: 11px; line-height: 1.2; font-weight: 650; }
+.compact-tabs button[aria-selected="true"], .compact-tabs button[aria-pressed="true"], .compact-tabs button.active { background: #253b4b; color: #ffd08a; }
+.home-panel { min-width: 0; }
+#viewHome > .page-title-row { min-height: 32px; margin-bottom: 4px; }
+#homeSummary { padding: 12px; min-height: 0; }
+#homeSummary > .eyebrow { margin: 0 0 5px; font-size: 9px; }
+#homeSummary h1 { margin: 0; font-size: 22px; line-height: 1.1; }
+.summary-grid { gap: 7px; margin: 12px 0 0; }
+.summary-grid strong { font-size: 23px; line-height: 1.1; }
+.summary-grid span { margin-top: 4px; font-size: 11px; }
+.home-actions, #viewHome .home-actions { grid-template-columns: 1fr 1fr; gap: 7px; margin: 7px 0; }
+.wait-row { margin: 7px 0; padding: 11px; }
+#viewHome h2 { margin: 0 0 6px; font-size: 16px; }
+#viewHome p { font-size: 13px; line-height: 1.4; }
+#viewHome .secondary-btn { margin-top: 4px; }
+#homeOverviewPanel > .wait-row > .secondary-btn { width: 100%; }
+#homeNext { margin: 6px 0; }
+#managerHome { padding: 8px 10px; }
+#managerHome > h2, #managerHome > .muted, #managerHomeRole { display: none; }
+#managerHome .home-actions { margin: 0; }
+.credit-rules > summary { min-height: 44px; display: flex; align-items: center; font-size: 12px; }
+.ledger-row { padding: 8px 0; font-size: 13px; }
+.ledger-row small { font-size: 10px; }
+#viewPlayers > .page-title-row { margin-bottom: 6px; }
+#viewPlayers > .secondary-btn { width: 100%; }
+#viewPlayers h3 { font-size: 14px; margin: 6px 0; }
+.game-card-top, .game-card-footer, .request-card-footer, .request-actions { gap: 6px; }
+.game-card-footer, .request-card-footer, .request-actions { margin-top: 7px; }
+.game-field { font-size: 14px; }
+.game-time { font-size: 16px; }
+.game-note, .player-names { margin-top: 5px; font-size: 12px; }
+.game-date { font-size: 11px; }
+.match-card { gap: 7px; }
+.match-date { min-width: 40px; padding: 5px; }
+.match-main strong { font-size: 15px; }
+.match-main span, .match-date span { font-size: 12px; line-height: 1.3; }
+.match-actions { gap: 6px; }
+.main-app .empty-state { margin: 0; padding: 12px; font-size: 13px; }
+#viewBook > .user-card { min-height: 30px; margin: 0; padding: 3px 0; background: none; border: 0; }
+#viewBook #welcome { display: none; }
+#viewBook .credit-pill { margin-left: auto; padding: 4px 8px; font-size: 11px; }
+.booking-section { padding-top: 4px; }
+.booking-heading h1 { font-size: 21px; margin: 0 0 5px; }
+.date-quick-grid { margin-top: 5px; }
+.selected-date-label { min-height: 18px; padding: 3px 0 0; font-size: 11px; }
+.step-label { display: block; margin: 7px 0 4px; font-size: 12px; }
+.field-buttons { gap: 5px; }
+.field-chip { min-height: 44px; padding: 6px; font-size: 12px; }
+.compact-field-select { display: none; color: var(--text); background: #142f46; border: 1px solid #486079; }
+.slot-heading { margin: 6px 0 2px; }
+.slot-heading h2 { font-size: 13px; margin: 0; }
+.slot-heading > span { font-size: 10px; }
+.availability-status { min-height: 16px; margin: 2px 0 5px; font-size: 11px; }
+.time-grid { grid-template-columns: repeat(3,minmax(0,1fr)); gap: 5px; }
+.time-slot { min-height: 44px; padding: 4px; }
+.time-slot strong { font-size: 16px; }
+.time-slot small { font-size: 10px; }
+.booking-dock { position: static; display: grid; grid-template-columns: minmax(0,1fr) 88px; gap: 7px; align-items: center; margin-top: 5px; padding: 6px; border-radius: 12px; }
+.booking-preview-card { min-height: 32px; gap: 5px; }
+.preview-logo { display: none; }
+.preview-copy strong, .preview-copy span { font-size: 11px; line-height: 1.2; margin: 0; }
+.booking-dock .book-btn { margin: 0; min-height: 44px; width: 88px; font-size: 12px; }
+#bookMsg { grid-column: 1/-1; }
+.booking-dock:not(.has-selection) > .booking-preview-card, .booking-dock:not(.has-selection) > .book-btn { display: none; }
+.booking-dock:not(.has-selection) { grid-template-columns: 1fr; }
+.notice-card, .notification-card, .weather-card { margin-bottom: 8px; padding: 10px; }
+.notice-card h3, .notification-card h3, .weather-card h3 { font-size: 15px; }
+.notice-card .muted, .notification-card .muted { font-size: 12px; line-height: 1.4; }
+.weather-row { gap: 5px; grid-template-columns: repeat(7,65px); }
+.weather-day { padding: 5px 3px; }
+.weather-temp { font-size: 10px; }
+.confirm-dialog { max-height: calc(100dvh - 24px); padding: 13px; border-radius: 18px; overflow-y: auto; }
+.players-dialog { display: flex; flex-direction: column; overflow-y: auto; }
+.players-dialog:not([open]) { display: none; }
+.players-dialog > .page-title-row { flex: 0 0 auto; margin: 0 0 7px; }
+.players-dialog .page-title-row h2 { font-size: 20px; margin: 0; }
+#appModalBody { min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.players-dialog .field-label { margin: 5px 0 3px; font-size: 12px; }
+.players-dialog .admin-two-cols { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; }
+.players-dialog input, .players-dialog select { min-height: 44px; margin: 0 0 5px; font-size: 16px; padding: 8px; }
+.players-dialog .primary-btn, .players-dialog .secondary-btn { min-height: 44px; font-size: 14px; padding: 9px; margin-top: 7px; }
+.players-dialog .helper-text, .booking-admin-note { font-size: 12px; line-height: 1.4; margin: 4px 0; padding: 8px; }
+.players-dialog .compact-tabs button { font-size: 11px; }
+.dialog-actions { grid-template-columns: 1fr 1fr; gap: 7px; margin-top: 14px; }
+.login-screen { height: 100dvh; min-height: 0; overflow-y: auto; padding: max(8px,env(safe-area-inset-top)) 14px max(8px,env(safe-area-inset-bottom)); }
+.login-topline { min-height: 44px; }
+.text-nav { min-height: 44px; font-size: 13px; }
+.login-hero { display: grid; grid-template-columns: 54px minmax(0,1fr); column-gap: 12px; align-items: center; padding: 5px 0 12px; text-align: left; }
+.login-logo { grid-row: 1/3; width: 54px; height: 54px; border-radius: 15px; margin: 0; }
+.login-hero h1 { font-size: 23px; line-height: 1.1; margin: 0; }
+.login-hero p { font-size: 12px; margin: 5px 0 0; }
+.login-panel { padding: 12px; border-radius: 15px; }
+#loginForm .field-label { font-size: 12px; margin: 0 0 4px; }
+#loginForm .input-shell { margin-bottom: 9px; }
+#loginForm .input-shell input { min-height: 46px; font-size: 16px; border-radius: 10px; padding-top: 10px; padding-bottom: 10px; }
+#loginForm .primary-btn { width: 100%; min-height: 44px; margin: 0; font-size: 15px; padding: 8px; }
+#loginForm .helper-text { font-size: 11px; margin: 8px 0 0; line-height: 1.3; }
+.login-panel > div.form-stack { display: flex; gap: 6px; margin-top: 8px; }
+.login-panel > div.form-stack > button { flex: 1; min-height: 44px; padding: 6px; font-size: 12px; border-radius: 10px; }
+.selected-establishment { margin-top: 8px; min-height: 44px; padding: 6px 10px; gap: 8px; border-radius: 11px; }
+.selected-establishment .mini-label, .selected-establishment .mini-logo { display: none; }
+.selected-establishment .establishment-row strong { font-size: 13px; overflow-wrap: anywhere; }
+.selected-establishment .change-btn { min-height: 44px; font-size: 12px; padding: 4px; }
+.login-gallery-details { margin-top: 5px; border-radius: 10px; }
+.login-gallery-details > summary { min-height: 44px; display: flex; align-items: center; justify-content: center; color: var(--muted); font-size: 12px; cursor: pointer; }
+.login-gallery-details:has(.login-gallery:empty) { display: none; }
+.login-gallery { margin-top: 0; padding: 4px 0 8px; }
+#establishmentPicker h1 { font-size: 26px; line-height: 1.1; margin: 16px 0 12px; }
+#establishmentPicker > .muted { font-size: 13px; }
+.venue-choice { min-height: 52px; padding: 12px; font-size: 15px; margin-bottom: 7px; }
+@media(max-height:700px) {
+  #adminConfig > .muted { display: none; }
+  #adminConfig .checkbox-label { margin: 8px 0; }
+  .admin-action-copy small { display: none; }
+  #fieldButtons, #fieldButtons + .list-pager { display: none; }
+  .compact-field-select { display: block; }
+  .booking-heading h1 { font-size: 19px; }
+  #viewBook > .user-card { min-height: 22px; }
+  #homeSummary { padding: 10px; }
+  #homeSummary > .eyebrow { display: none; }
+  .summary-grid { margin-top: 9px; }
+  .summary-grid strong { font-size: 21px; }
+  .home-tabs { margin: 6px 0; }
+  #viewHome > .page-title-row { min-height: 26px; }
+  #viewHome > .page-title-row .icon-btn { height: 44px; }
+  .platform-intro { margin-bottom: 5px; }
+}
+@media(min-height:701px) {
+  .admin-action { padding: 12px; }
+  .admin-action-copy strong { font-size: 15px; }
+  .manager-day-card { padding: 13px; }
+  #managerDaySummary strong { font-size: 20px; }
+  #managerDaySummary > span { font-size: 11px; }
+  .main-app > .app-view { padding: 12px; }
+  .compact-field-select { display: none; }
+}
+@media(min-width:600px) {
+  .main-app > .app-view { padding-left: 20px; padding-right: 20px; }
+  #platformEstablishmentList { grid-template-columns: 1fr; }
+}
