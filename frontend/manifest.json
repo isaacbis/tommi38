@@ -1,11 +1,10 @@
 {
-  "name": "Tommi38 – Prenotazione Campi",
+  "name": "Tommi38",
   "short_name": "Tommi38",
   "start_url": "/",
-  "scope": "/",
   "display": "standalone",
-  "background_color": "#08101d",
-  "theme_color": "#0b1220",
+  "background_color": "#061525",
+  "theme_color": "#061525",
   "icons": [
     {
       "src": "/icon-192.png",

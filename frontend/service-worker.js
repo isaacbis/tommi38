@@ -1,5 +1,4 @@
-const CACHE_NAME = "tommi38-pwa-v7-player-search";
-
+const CACHE_NAME = "tommi38-pwa-v8";
 const ASSETS = [
   "/",
   "/index.html",
@@ -11,19 +10,15 @@ const ASSETS = [
 ];
 
 self.addEventListener("install", event => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS))
-  );
+  event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS)));
   self.skipWaiting();
 });
 
 self.addEventListener("activate", event => {
   event.waitUntil(
-    caches.keys().then(keys =>
-      Promise.all(
-        keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))
-      )
-    )
+    caches.keys().then(keys => Promise.all(
+      keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))
+    ))
   );
   self.clients.claim();
 });
@@ -33,11 +28,7 @@ self.addEventListener("fetch", event => {
   if (request.method !== "GET") return;
 
   const url = new URL(request.url);
-
-  // Le API contengono dati personali e devono arrivare sempre dal server.
-  if (url.origin !== self.location.origin || url.pathname.startsWith("/api/")) {
-    return;
-  }
+  if (url.origin !== self.location.origin || url.pathname.startsWith("/api/")) return;
 
   event.respondWith(
     fetch(request)

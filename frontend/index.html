@@ -2,9 +2,9 @@
 <html lang="it">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#0b1220">
-  <title>Tommi38 – Prenotazione Campi</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#061525">
+  <title>Tommi38 – Prenotazione campi</title>
 
   <link rel="stylesheet" href="/style.css">
   <link rel="manifest" href="/manifest.json">
@@ -15,270 +15,280 @@
   <meta name="apple-mobile-web-app-title" content="Tommi38">
 </head>
 <body>
-
-<header class="topbar">
-  <div class="topbar-inner">
-    <div class="brand-wrap">
-      <span class="brand-mark" aria-hidden="true"></span>
-      <div>
-        <div class="brand">Tommi38</div>
-        <div class="brand-subtitle">Prenotazione campi</div>
-      </div>
-    </div>
-    <button id="logoutBtn" class="btn-ghost btn-small hidden" type="button">Esci</button>
-  </div>
-</header>
-
-<main class="wrap">
-
-  <!-- LOGIN -->
-  <section id="loginBox" class="card login-card">
-    <div id="loginGallery" class="login-gallery"></div>
-    <div class="login-mark" aria-hidden="true"><span></span></div>
-    <h1 class="login-title">Tommi38</h1>
-    <p class="login-subtitle">Prenotazione campi</p>
-
-    <div class="form-stack">
-      <label class="field-label" for="username">Username</label>
-      <input id="username" autocomplete="username" placeholder="Inserisci username">
-
-      <label class="field-label" for="password">Password</label>
-      <input id="password" type="password" autocomplete="current-password" placeholder="Inserisci password">
-
-      <button id="loginBtn" class="btn" type="button">Accedi</button>
-      <div id="loginErr" class="error hidden" role="alert"></div>
-    </div>
-  </section>
-
-  <!-- LOADER GLOBALE -->
   <div id="appLoader" class="app-loader" aria-live="polite">
+    <img src="/icon-192.png" alt="" class="loader-logo">
     <div class="loader-ring" aria-hidden="true"></div>
-    <div class="loader-text">Caricamento<span class="dots"></span></div>
+    <div class="loader-text">Tommi38</div>
   </div>
 
-  <section id="app" class="hidden">
-
-    <!-- PROFILO -->
-    <section class="card user-strip">
-      <div>
-        <h2 id="welcome"></h2>
-        <div id="creditsBox" class="credits-text"></div>
+  <main class="app-shell">
+    <!-- LOGIN -->
+    <section id="loginBox" class="login-screen hidden">
+      <div class="login-topline">
+        <button id="loginBackBtn" class="text-nav" type="button" aria-label="Torna agli stabilimenti">‹ <span>Stabilimenti</span></button>
       </div>
-      <span id="roleBadge" class="badge"></span>
+
+      <div class="login-hero">
+        <img src="/icon-512.png" alt="Tommi38" class="login-logo">
+        <h1>Benvenuto da<br><span>Tommi<span class="accent">38</span></span></h1>
+        <p>Accedi per prenotare il tuo campo.</p>
+      </div>
+
+      <section class="glass-card login-panel">
+        <div class="form-stack">
+          <label class="field-label" for="username">Username</label>
+          <div class="input-shell">
+            <span class="input-icon" aria-hidden="true">♙</span>
+            <input id="username" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="Il tuo username">
+          </div>
+
+          <label class="field-label" for="password">Password</label>
+          <div class="input-shell">
+            <span class="input-icon lock-icon" aria-hidden="true">▢</span>
+            <input id="password" type="password" autocomplete="current-password" placeholder="La tua password">
+            <button id="passwordToggle" class="password-toggle" type="button" aria-label="Mostra password">◉</button>
+          </div>
+
+          <button id="loginBtn" class="primary-btn login-btn" type="button">Accedi</button>
+          <div id="loginErr" class="form-message error hidden" role="alert"></div>
+          <p class="helper-text">Per le credenziali, rivolgiti al gestore.</p>
+        </div>
+      </section>
+
+      <section class="glass-card selected-establishment">
+        <div>
+          <div class="mini-label">Stabilimento selezionato</div>
+          <div class="establishment-row">
+            <img src="/icon-192.png" alt="" class="mini-logo">
+            <strong>Tommi38</strong>
+          </div>
+        </div>
+        <button id="loginChangeBtn" class="change-btn" type="button">Cambia ›</button>
+      </section>
+
+      <p class="login-note">Le credenziali sono valide per questo stabilimento.</p>
+      <div id="loginGallery" class="login-gallery"></div>
+      <p class="preview-note">Tommi38 · Prenotazione campi</p>
     </section>
 
-    <!-- PRENOTAZIONE PRINCIPALE -->
-    <section class="card booking-card">
-      <div class="section-heading">
-        <div>
-          <p class="eyebrow">Prenotazione</p>
-          <h2>Scegli il campo</h2>
+    <!-- APP -->
+    <section id="app" class="main-app hidden">
+      <header class="native-header">
+        <div class="header-brand">
+          <img src="/icon-192.png" alt="Tommi38" class="header-logo">
+          <strong>Tommi38</strong>
         </div>
-        <span class="live-pill"><span aria-hidden="true"></span>Disponibilità live</span>
-      </div>
+        <div class="header-actions">
+          <button id="switchBathBtn" class="change-btn" type="button">Cambia ›</button>
+          <button id="logoutBtn" class="icon-btn" type="button" aria-label="Esci">↗</button>
+        </div>
+      </header>
 
-      <div class="grid3">
-        <div class="control-group date-control-group">
-          <label for="datePick">Data</label>
-          <div class="date-input-shell">
-            <input id="datePick" type="date">
+      <!-- PRENOTA -->
+      <section id="viewBook" class="app-view active-view">
+        <section class="glass-card user-card">
+          <h2 id="welcome">Ciao</h2>
+          <div id="creditsBox" class="credit-pill">0 crediti</div>
+          <span id="roleBadge" class="role-badge hidden"></span>
+        </section>
+
+        <section class="booking-section">
+          <div class="booking-heading">
+            <h1>Prenota il tuo campo</h1>
+          </div>
+
+          <div class="date-quick-grid">
+            <button id="quickToday" class="date-quick active" type="button">Oggi</button>
+            <button id="quickTomorrow" class="date-quick" type="button">Domani</button>
+            <label class="calendar-button" for="datePick" aria-label="Scegli una data">
+              <span aria-hidden="true">▣</span>
+              <input id="datePick" type="date">
+            </label>
+          </div>
+          <div id="selectedDateLabel" class="selected-date-label"></div>
+
+          <div id="fieldButtons" class="field-buttons" aria-label="Scegli il campo"></div>
+          <select id="fieldSelect" class="native-hidden-control" aria-hidden="true" tabindex="-1"></select>
+          <select id="timeSelect" class="native-hidden-control" aria-hidden="true" tabindex="-1"></select>
+
+          <div class="slot-heading">
+            <h2>Scegli l’orario</h2>
+            <span id="slotDurationLabel">40 minuti</span>
+          </div>
+
+          <div id="timeGrid" class="time-grid" aria-live="polite"></div>
+
+          <div id="bookingPreview" class="booking-preview-card" aria-live="polite"></div>
+
+          <button id="bookBtn" class="primary-btn book-btn" type="button">Conferma prenotazione</button>
+          <div id="bookMsg" class="form-message" aria-live="polite"></div>
+        </section>
+      </section>
+
+      <!-- LE MIE PARTITE -->
+      <section id="viewMatches" class="app-view hidden">
+        <div class="page-title-row">
+          <div>
+            <p class="eyebrow">Prenotazioni</p>
+            <h1>Le mie partite</h1>
+          </div>
+          <button id="refreshMatchesBtn" class="icon-btn" type="button" aria-label="Aggiorna">↻</button>
+        </div>
+        <div id="matchesList" class="matches-list"></div>
+      </section>
+
+      <!-- AVVISI -->
+      <section id="viewAlerts" class="app-view hidden">
+        <div class="page-title-row">
+          <div>
+            <p class="eyebrow">Tommi38</p>
+            <h1>Avvisi</h1>
           </div>
         </div>
 
-        <div class="control-group">
-          <label for="fieldSelect">Campo</label>
-          <select id="fieldSelect"></select>
-        </div>
+        <section class="glass-card notice-card">
+          <div class="notice-icon">!</div>
+          <div>
+            <h3>Comunicazioni</h3>
+            <div id="notesView" class="muted"></div>
+          </div>
+        </section>
 
-        <div class="control-group">
-          <label for="timeSelect">Orario</label>
-          <select id="timeSelect"></select>
-        </div>
-      </div>
+        <section id="weatherBox" class="glass-card weather-card hidden">
+          <div class="card-title-row">
+            <h3>Meteo Senigallia</h3>
+            <span>7 giorni</span>
+          </div>
+          <div id="weatherRow" class="weather-row"></div>
+        </section>
 
-      <div id="bookingPreview" class="booking-preview" aria-live="polite"></div>
+        <section class="glass-card notification-card">
+          <div class="notice-icon bell">⌁</div>
+          <div>
+            <h3>Promemoria partita</h3>
+            <p class="muted">Nell’app iPhone puoi ricevere un avviso prima dell’inizio della prenotazione.</p>
+          </div>
+        </section>
 
-      <button id="bookBtn" class="btn btn-book" type="button">Conferma prenotazione</button>
-      <div id="bookMsg" class="form-message" aria-live="polite"></div>
-
-      <div id="fieldInfo" class="field-panel">
-        <!-- popolato via JavaScript -->
-      </div>
-    </section>
-
-    <!-- PRENOTAZIONI UTENTE -->
-    <section class="card">
-      <div class="section-heading compact-heading">
-        <div>
-          <p class="eyebrow">Riepilogo</p>
-          <h3>Le tue prenotazioni</h3>
-        </div>
-        <span class="section-number">02</span>
-      </div>
-      <div id="reservationsList" class="list"></div>
-    </section>
-
-    <!-- CERCA GIOCATORI -->
-    <section id="playerSearchSection" class="card community-card">
-      <div class="section-heading compact-heading">
-        <div>
-          <p class="eyebrow">Community</p>
-          <h3>Gioca con altri</h3>
-        </div>
-        <span class="community-icon" aria-hidden="true">+</span>
-      </div>
-
-      <p class="community-intro">Unisciti a una partita già organizzata oppure cerca giocatori per la tua prenotazione.</p>
-
-      <div class="community-block">
-        <div class="community-title">Partite aperte</div>
-        <div id="openGamesList" class="list"></div>
-      </div>
-
-      <div id="myJoinRequestsWrap" class="community-block hidden">
-        <div class="community-title">Le tue richieste</div>
-        <div id="myJoinRequestsList" class="list"></div>
-      </div>
-    </section>
-
-    <!-- INFORMAZIONI -->
-    <div class="info-grid">
-      <section class="card info-card">
-        <h3>Comunicazioni</h3>
-        <div id="notesView" class="muted"></div>
+        <button id="openAdminBtn" class="secondary-btn hidden" type="button">Area amministratore</button>
       </section>
 
-      <section id="weatherBox" class="card info-card hidden">
-        <h3>Meteo Senigallia</h3>
-        <div id="weatherRow" class="weather-row"></div>
+      <!-- ADMIN -->
+      <section id="adminShell" class="app-view hidden">
+        <div class="page-title-row">
+          <div>
+            <p class="eyebrow">Gestione</p>
+            <h1>Amministrazione</h1>
+          </div>
+          <button id="closeAdminBtn" class="icon-btn" type="button" aria-label="Chiudi">×</button>
+        </div>
+
+        <section id="adminMenu" class="glass-card admin-card hidden">
+          <div class="admin-grid">
+            <button id="btnAdminConfig" class="admin-action" type="button">Configurazione <span>›</span></button>
+            <button id="btnAdminNotes" class="admin-action" type="button">Comunicazioni <span>›</span></button>
+            <button id="btnAdminFields" class="admin-action" type="button">Campi <span>›</span></button>
+            <button id="btnAdminUsers" class="admin-action" type="button">Utenti <span>›</span></button>
+            <button id="btnAdminGallery" class="admin-action" type="button">Galleria login <span>›</span></button>
+          </div>
+        </section>
+
+        <section id="adminConfig" class="glass-card admin-section hidden">
+          <h3>Configurazione</h3>
+          <label class="field-label" for="cfgSlotMinutes">Durata slot in minuti</label>
+          <input id="cfgSlotMinutes" class="admin-input" type="number" min="5" step="5">
+          <div class="admin-two-cols">
+            <div>
+              <label class="field-label" for="cfgDayStart">Apertura</label>
+              <input id="cfgDayStart" class="admin-input" type="time">
+            </div>
+            <div>
+              <label class="field-label" for="cfgDayEnd">Chiusura</label>
+              <input id="cfgDayEnd" class="admin-input" type="time">
+            </div>
+          </div>
+          <label class="field-label" for="cfgMaxPerDay">Prenotazioni massime al giorno</label>
+          <input id="cfgMaxPerDay" class="admin-input" type="number" min="1">
+          <label class="field-label" for="cfgMaxActive">Prenotazioni attive massime</label>
+          <input id="cfgMaxActive" class="admin-input" type="number" min="1">
+          <div class="action-row">
+            <button id="saveConfigBtn" class="primary-btn" type="button">Salva</button>
+            <button class="secondary-btn backAdmin" type="button">Indietro</button>
+          </div>
+        </section>
+
+        <section id="adminNotes" class="glass-card admin-section hidden">
+          <h3>Comunicazioni</h3>
+          <label class="field-label" for="notesText">Testo mostrato agli utenti</label>
+          <textarea id="notesText" class="admin-input" rows="6"></textarea>
+          <div class="action-row">
+            <button id="saveNotesBtn" class="primary-btn" type="button">Salva</button>
+            <button class="secondary-btn backAdmin" type="button">Indietro</button>
+          </div>
+        </section>
+
+        <section id="adminFields" class="glass-card admin-section hidden">
+          <h3>Campi</h3>
+          <div class="admin-two-cols">
+            <div>
+              <label class="field-label" for="newFieldId">ID campo</label>
+              <input id="newFieldId" class="admin-input" placeholder="Es. volley1">
+            </div>
+            <div>
+              <label class="field-label" for="newFieldName">Nome campo</label>
+              <input id="newFieldName" class="admin-input" placeholder="Es. Volley 1">
+            </div>
+          </div>
+          <button id="addFieldBtn" class="secondary-btn" type="button">Aggiungi campo</button>
+          <div id="fieldsList" class="admin-list"></div>
+          <div class="action-row">
+            <button id="saveFieldsBtn" class="primary-btn" type="button">Salva campi</button>
+            <button class="secondary-btn backAdmin" type="button">Indietro</button>
+          </div>
+        </section>
+
+        <section id="adminUsers" class="glass-card admin-section hidden">
+          <h3>Utenti</h3>
+          <label class="field-label" for="userSearch">Cerca utente</label>
+          <input id="userSearch" class="admin-input" type="search" placeholder="Scrivi lo username">
+          <div id="usersList" class="admin-list users-scroll"></div>
+          <button class="secondary-btn backAdmin" type="button">Indietro</button>
+        </section>
+
+        <section id="adminGallery" class="glass-card admin-section hidden">
+          <h3>Galleria login</h3>
+          <label class="field-label" for="galleryUrl">URL immagine</label>
+          <input id="galleryUrl" class="admin-input" inputmode="url" placeholder="https://...">
+          <label class="field-label" for="galleryCaption">Didascalia</label>
+          <input id="galleryCaption" class="admin-input" placeholder="Facoltativa">
+          <label class="field-label" for="galleryLink">Link di destinazione</label>
+          <input id="galleryLink" class="admin-input" inputmode="url" placeholder="https://...">
+          <button id="addGalleryBtn" class="secondary-btn" type="button">Aggiungi immagine</button>
+          <div id="galleryList" class="admin-list"></div>
+          <div class="action-row">
+            <button id="saveGalleryBtn" class="primary-btn" type="button">Salva galleria</button>
+            <button class="secondary-btn backAdmin" type="button">Indietro</button>
+          </div>
+        </section>
       </section>
-    </div>
 
-    <!-- ADMIN MENU -->
-    <section id="adminMenu" class="card admin-card hidden">
-      <div class="section-heading compact-heading">
-        <div>
-          <p class="eyebrow">Gestione</p>
-          <h3>Area amministratore</h3>
-        </div>
-      </div>
-      <div class="admin-grid">
-        <button id="btnAdminConfig" class="admin-action" type="button">Configurazione</button>
-        <button id="btnAdminNotes" class="admin-action" type="button">Comunicazioni</button>
-        <button id="btnAdminFields" class="admin-action" type="button">Campi</button>
-        <button id="btnAdminUsers" class="admin-action" type="button">Utenti</button>
-        <button id="btnAdminGallery" class="admin-action" type="button">Galleria login</button>
-      </div>
+      <nav id="bottomNav" class="bottom-nav" aria-label="Navigazione principale">
+        <button class="bottom-nav-item active" data-view="book" type="button">
+          <span class="nav-icon">▣</span>
+          <span>Prenota</span>
+        </button>
+        <button class="bottom-nav-item" data-view="matches" type="button">
+          <span class="nav-icon">♜</span>
+          <span>Le mie partite</span>
+        </button>
+        <button class="bottom-nav-item" data-view="alerts" type="button">
+          <span class="nav-icon">♢</span>
+          <span>Avvisi</span>
+        </button>
+      </nav>
     </section>
+  </main>
 
-    <!-- ADMIN CONFIG -->
-    <section id="adminConfig" class="card admin-section hidden">
-      <h3>Configurazione</h3>
-
-      <label class="field-label" for="cfgSlotMinutes">Durata slot in minuti</label>
-      <input id="cfgSlotMinutes" type="number" min="5" step="5" placeholder="Durata slot">
-
-      <div class="admin-two-cols">
-        <div>
-          <label class="field-label" for="cfgDayStart">Apertura</label>
-          <input id="cfgDayStart" type="time">
-        </div>
-        <div>
-          <label class="field-label" for="cfgDayEnd">Chiusura</label>
-          <input id="cfgDayEnd" type="time">
-        </div>
-      </div>
-
-      <label class="field-label" for="cfgMaxPerDay">Prenotazioni massime al giorno</label>
-      <input id="cfgMaxPerDay" type="number" min="1" placeholder="Massimo giornaliero">
-
-      <label class="field-label" for="cfgMaxActive">Prenotazioni attive massime</label>
-      <input id="cfgMaxActive" type="number" min="1" placeholder="Massimo attive">
-
-      <div class="action-row">
-        <button id="saveConfigBtn" class="btn" type="button">Salva</button>
-        <button class="btn-ghost backAdmin" type="button">Indietro</button>
-      </div>
-    </section>
-
-    <!-- ADMIN NOTES -->
-    <section id="adminNotes" class="card admin-section hidden">
-      <h3>Comunicazioni</h3>
-      <label class="field-label" for="notesText">Testo mostrato agli utenti</label>
-      <textarea id="notesText" placeholder="Scrivi una comunicazione pubblica"></textarea>
-      <div class="action-row">
-        <button id="saveNotesBtn" class="btn" type="button">Salva</button>
-        <button class="btn-ghost backAdmin" type="button">Indietro</button>
-      </div>
-    </section>
-
-    <!-- ADMIN FIELDS -->
-    <section id="adminFields" class="card admin-section hidden">
-      <h3>Campi</h3>
-      <div class="admin-two-cols">
-        <div>
-          <label class="field-label" for="newFieldId">ID campo</label>
-          <input id="newFieldId" placeholder="Es. volley1">
-        </div>
-        <div>
-          <label class="field-label" for="newFieldName">Nome campo</label>
-          <input id="newFieldName" placeholder="Es. Volley 1">
-        </div>
-      </div>
-      <button id="addFieldBtn" class="btn-secondary" type="button">Aggiungi campo</button>
-      <div id="fieldsList" class="list admin-list"></div>
-      <div class="action-row">
-        <button id="saveFieldsBtn" class="btn" type="button">Salva campi</button>
-        <button class="btn-ghost backAdmin" type="button">Indietro</button>
-      </div>
-    </section>
-
-    <!-- ADMIN USERS -->
-    <section id="adminUsers" class="card admin-section hidden">
-      <h3>Utenti</h3>
-      <label class="field-label" for="userSearch">Cerca utente</label>
-      <input id="userSearch" type="search" placeholder="Scrivi lo username">
-      <div id="usersList" class="list users-scroll"></div>
-      <button class="btn-ghost backAdmin" type="button">Indietro</button>
-    </section>
-
-    <!-- ADMIN GALLERY -->
-    <section id="adminGallery" class="card admin-section hidden">
-      <h3>Galleria login</h3>
-
-      <label class="field-label" for="galleryUrl">URL immagine</label>
-      <input id="galleryUrl" inputmode="url" placeholder="https://...">
-
-      <label class="field-label" for="galleryCaption">Didascalia</label>
-      <input id="galleryCaption" placeholder="Didascalia facoltativa">
-
-      <label class="field-label" for="galleryLink">Link di destinazione</label>
-      <input id="galleryLink" inputmode="url" placeholder="https://...">
-
-      <button id="addGalleryBtn" class="btn-secondary" type="button">Aggiungi immagine</button>
-      <div id="galleryList" class="list admin-list"></div>
-
-      <div class="action-row">
-        <button id="saveGalleryBtn" class="btn" type="button">Salva galleria</button>
-        <button class="btn-ghost backAdmin" type="button">Indietro</button>
-      </div>
-    </section>
-
-  </section>
-</main>
-
-<!-- MODALE APP -->
-<div id="appModal" class="app-modal hidden" role="dialog" aria-modal="true" aria-labelledby="appModalTitle">
-  <div class="app-modal-backdrop" data-close-modal="true"></div>
-  <div class="app-modal-panel">
-    <div class="app-modal-header">
-      <h3 id="appModalTitle">Dettagli</h3>
-      <button id="appModalClose" class="modal-close" type="button" aria-label="Chiudi">×</button>
-    </div>
-    <div id="appModalBody" class="app-modal-body"></div>
-  </div>
-</div>
-
-<script src="/script.js" defer></script>
+  <script src="/script.js" defer></script>
 </body>
 </html>
