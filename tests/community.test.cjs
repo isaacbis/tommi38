@@ -6,7 +6,7 @@ const {AsyncLocalStorage}=require('node:async_hooks');
 const {z}=require('../backend/node_modules/zod');
 const source=fs.readFileSync(__dirname+'/../backend/src/routes.js','utf8').replace(/^import .*;$/gm,'').replace('export default router;','');
 function setup(){
- const data=new Map([['admin/config',{slotMinutes:45,maxActiveBookingsPerUser:1,maxBookingsPerUserPerDay:1}],['admin/fields',{fields:[{id:'volley',name:'Volley'}]}],['users/alice',{credits:3}],['users/bob',{credits:4}]]);
+ const data=new Map([['admin/config',{slotMinutes:45,maxActiveBookingsPerUser:1,maxBookingsPerUserPerDay:1}],['admin/fields',{fields:[{id:'volley',name:'Volley'}]}],['users/admin',{role:'admin',credits:0}],['users/alice',{role:'user',credits:3}],['users/bob',{credits:4}]]);
  let id=0;
  const snapshot=path=>({id:path.split('/').pop(),ref:doc(path),exists:data.has(path),data:()=>data.get(path)});
  const apply=(path,changes)=>{const value={...data.get(path)};for(const [k,v] of Object.entries(changes))value[k]=v && typeof v==='object' && 'increment' in v ? (value[k]||0)+v.increment:v;data.set(path,value);};
@@ -17,7 +17,8 @@ function setup(){
   const run=queue.then(async()=>{const writes=[];let wrote=false;const result=await fn({get:ref=>{assert.equal(wrote,false,'Firestore reads must precede writes');return ref.get()},set:(ref,value)=>{wrote=true;writes.push(()=>data.set(ref.path,value))},update:(ref,value)=>{wrote=true;writes.push(()=>apply(ref.path,value))},delete:ref=>{wrote=true;writes.push(()=>data.delete(ref.path))}});writes.forEach(f=>f());return result});queue=run.catch(()=>{});return run;
  }};
  const routes={};const router={};for(const method of ['get','post','put','patch','delete'])router[method]=(path,...handlers)=>routes[method+' '+path]=handlers;
- const ctx=vm.createContext({console,Buffer,Date,Intl,db,z,tenantId:()=> 'tommi38',FieldValue:{increment:n=>({increment:n}),serverTimestamp:()=>({toDate:()=>new Date()})},express:{Router:()=>router},rateLimit:()=> (req,res,next)=>next(),bcrypt:{compare:async(p,h)=>p===h},establishments:async()=>[]});
+ const ctx=vm.createContext({console,Buffer,Date,Intl,db,z,tenantId:()=> 'tommi38',FieldValue:{increment:n=>({increment:n}),serverTimestamp:()=>({toDate:()=>new Date()})},express:{Router:()=>router},rateLimit:()=> (req,res,next)=>next(),bcrypt:require('../backend/node_modules/bcrypt'),establishments:async()=>[]});
+ vm.runInContext(fs.readFileSync(__dirname+'/../backend/src/permissions.js','utf8').replace(/^import .*;$/gm,'').replace(/export /g,''),ctx);
  vm.runInContext(source,ctx);
  async function call(method,path,user='alice',body={},params={},query={}){
   const req={session:user?{user:{username:user,role:user==='admin'?'admin':'user'}}:{},body,params,query};

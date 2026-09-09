@@ -6,6 +6,7 @@ const source=fs.readFileSync(require('node:path').join(__dirname,'../backend/src
 function setup(){
  const data=new Map([
  ['admin/config',{}],
+ ...['owner','alice','bob','stranger','admin'].map(username=>['users/'+username,{role:username==='admin'?'admin':'user'}]),
  ['playerSearches/game',{ownerUser:'owner',date:'2099-01-01',time:'18:00',spotsNeeded:2,spotsFilled:0,status:'open'}],
  ['playerSearches/game/requests/a',{requesterUser:'alice',participantNames:['Alice Test'],phone:'3331234567',count:2,status:'pending'}],
  ['playerSearches/game/requests/b',{requesterUser:'bob',participantNames:['Bob Test'],phone:'3337654321',count:1,status:'pending'}]
@@ -15,9 +16,10 @@ function setup(){
  const update=(ref,changes)=>data.set(ref.path,{...data.get(ref.path),...changes});
  const db={collection,batch:()=>({update,delete:ref=>data.delete(ref.path),commit:async()=>{}}),runTransaction:async fn=>fn({get:ref=>ref.get(),update,delete:ref=>data.delete(ref.path)})};
  const routes={};const router={};for(const method of ['get','post','put','patch','delete'])router[method]=(path,...handlers)=>routes[method+' '+path]=handlers;
- const ctx=vm.createContext({console,Buffer,Date,Intl,db,tenantId:()=>"tommi38",FieldValue:{serverTimestamp:()=>0},express:{Router:()=>router},rateLimit:()=>()=>{},z:{enum:()=>({}),object:()=>({safeParse:body=>({success:true,data:body})})}});
+ const ctx=vm.createContext({console,Buffer,Date,Intl,db,tenantId:()=>"tommi38",FieldValue:{serverTimestamp:()=>0},express:{Router:()=>router},rateLimit:()=>()=>{},z:require('../backend/node_modules/zod').z});
+ vm.runInContext(fs.readFileSync(__dirname+'/../backend/src/permissions.js','utf8').replace(/^import .*;$/gm,'').replace(/export /g,''),ctx);
  vm.runInContext(source,ctx);
- async function call(method,path,user,body={},params={}){const req={session:user?{user:{username:user,role:user==='admin'?'admin':'user'}}:{},body,params};const res={code:200,status(n){this.code=n;return this},json(value){this.body=value;return this}};const handlers=routes[method+' '+path];let allowed=false;handlers[0](req,res,()=>allowed=true);if(allowed)await handlers[1](req,res);return res;}
+ async function call(method,path,user,body={},params={}){const req={session:user?{user:{username:user,role:user==='admin'?'admin':'user'}}:{},body,params};const res={code:200,status(n){this.code=n;return this},json(value){this.body=value;return this}};const handlers=routes[method+' '+path];let allowed=false;await handlers[0](req,res,()=>allowed=true);if(allowed)await handlers[1](req,res);return res;}
  return {call,data};
 }
 test('player searches require authentication',async()=>{assert.equal((await setup().call('get','/player-searches',null)).code,401)});

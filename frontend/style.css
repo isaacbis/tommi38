@@ -1320,3 +1320,40 @@ body.modal-open { overflow: hidden; }
 .login-topline { display:flex; }
 .selected-establishment { display:flex; }
 #switchBathBtn { display:inline-flex; }
+
+/* Venue management and central administration. */
+.management-details { margin: 20px 0; border: 1px solid var(--line); border-radius: 12px; padding: 14px; }
+.management-details > summary { cursor: pointer; font-weight: 700; min-height: 30px; }
+.management-details[open] > summary { margin-bottom: 14px; }
+.management-details .form-stack { gap: 8px; }
+.management-details .helper-text { margin: 0 0 8px; }
+.management-details .primary-btn { margin-top: 12px; }
+.checkbox-label { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; line-height: 1.5; margin: 16px 0; }
+.checkbox-label input { width: 20px; height: 20px; margin: 0; flex-shrink: 0; accent-color: var(--orange); }
+.agenda-date-controls { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 18px 0; }
+.agenda-date-controls > label { grid-column: 1/-1; margin: 0; }
+.agenda-date-controls .selected { border-color: var(--orange); color: var(--orange); }
+.agenda-card, .venue-management-card { border: 1px solid var(--line); border-radius: 14px; padding: 16px; overflow-wrap: anywhere; background: #0b2236; }
+.agenda-card h3, .venue-management-card h3 { margin: 10px 0 6px; font-size: 18px; }
+.agenda-card p, .venue-management-card p { margin: 8px 0; font-size: 14px; line-height: 1.5; }
+.agenda-card-top { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 8px; }
+.agenda-card-top > strong { font-size: 20px; font-variant-numeric: tabular-nums; }
+.venue-management-card .agenda-card-top h3 { margin: 0; }
+.agenda-card-top .request-status { flex-shrink: 0; }
+.venue-management-card .action-row { margin-top: 14px; }
+#adminShell > .page-title-row h1 { font-size: clamp(1.6rem, 6vw, 2rem); overflow-wrap: anywhere; }
+#managerHome h2 { font-size: 21px; line-height: 1.3; }
+#managerHome .home-actions { margin-bottom: 10px; }
+#managerHome .home-actions > button { font-size: 14px; padding: 12px; }
+#adminAgenda .page-title-row h2 { font-size: 22px; }
+#agendaList { gap: 10px; }
+#adminEstablishments h2 { font-size: 24px; }
+#adminEstablishments input, #adminUsers input, #adminAgenda input, #adminAgenda select, .players-dialog input, .players-dialog select { box-sizing: border-box; width: 100%; max-width: 100%; min-width: 0; }
+.match-actions { flex-wrap: wrap; }
+.match-actions > button { flex-basis: 120px; }
+@media (max-width: 359px) {
+  #managerHome .home-actions { grid-template-columns: 1fr; }
+  .summary-grid { gap: 6px; }
+  .summary-grid strong { font-size: 1.4rem; }
+  .management-details { padding: 10px; }
+}
