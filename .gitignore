@@ -1,5 +1,10 @@
 # env
 .env
+.env.*
+!.env.example
+
+# Local operational notes must never be published or versioned.
+frontend/info/
 
 # firebase
 serviceAccountKey.json

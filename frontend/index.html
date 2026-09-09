@@ -90,6 +90,13 @@
       <section id="viewHome" class="app-view hidden">
         <div class="page-title-row"><p class="eyebrow">Home</p><button id="refreshHomeBtn" class="icon-btn" aria-label="Aggiorna home" type="button">↻</button></div>
         <section id="homeSummary" class="glass-card user-card" aria-live="polite"></section>
+        <section id="managerHome" class="glass-card wait-row hidden">
+          <p id="managerHomeRole" class="eyebrow">Gestore dello stabilimento</p>
+          <h2>Il tuo stabilimento, sotto controllo</h2>
+          <p class="muted">Consulta le prenotazioni per giorno, imposta gli orari e gestisci i crediti degli utenti di <strong data-establishment-name>Tommi38</strong>.</p>
+          <div class="home-actions"><button id="homeAgendaBtn" class="primary-btn" type="button">Agenda prenotazioni</button><button id="homeManagementBtn" class="secondary-btn" type="button">Gestisci stabilimento</button></div>
+          <button id="homePlatformBtn" class="secondary-btn hidden" type="button">I tuoi stabilimenti</button>
+        </section>
         <div class="home-actions"><button class="primary-btn" data-home-view="book" type="button">Prenota un campo</button><button class="secondary-btn" data-home-view="players" type="button">Cerca giocatori</button></div>
         <section class="glass-card wait-row"><h2>La prossima partita</h2><p id="homeNext"></p><button class="secondary-btn" data-home-view="matches" type="button">Le mie partite</button></section>
         <section class="glass-card wait-row"><h2>Dal gestore</h2><p id="homeNotice"></p></section>
@@ -197,31 +204,59 @@
           </div>
         </section>
 
-        <button id="openAdminBtn" class="secondary-btn hidden" type="button">Area amministratore</button>
+        <button id="openAdminBtn" class="secondary-btn hidden" type="button">Gestisci il tuo stabilimento</button>
       </section>
 
       <!-- ADMIN -->
       <section id="adminShell" class="app-view hidden">
         <div class="page-title-row">
           <div>
-            <p class="eyebrow">Gestione</p>
-            <h1>Amministrazione</h1>
+            <p id="adminRoleLabel" class="eyebrow">Gestore dello stabilimento</p>
+            <h1 id="adminTitle">Gestisci stabilimento</h1>
           </div>
           <button id="closeAdminBtn" class="icon-btn" type="button" aria-label="Chiudi">×</button>
         </div>
 
         <section id="adminMenu" class="glass-card admin-card hidden">
-          <div class="admin-grid"><button id="btnAdminOperations" class="admin-action" type="button">Statistiche e chiusure <span>›</span></button>
-            <button id="btnAdminConfig" class="admin-action" type="button">Configurazione <span>›</span></button>
+          <p class="muted">Stai gestendo <strong data-establishment-name>Tommi38</strong>. Prenotazioni, utenti e crediti appartengono a questo stabilimento.</p>
+          <div class="admin-grid"><button id="btnPlatformEstablishments" class="admin-action hidden" type="button">Stabilimenti e gestori <span>›</span></button>
+            <button id="btnAdminAgenda" class="admin-action" type="button">Agenda prenotazioni <span>›</span></button>
+            <button id="btnAdminOperations" class="admin-action" type="button">Statistiche e chiusure <span>›</span></button>
+            <button id="btnAdminConfig" class="admin-action" type="button">Orari e regole <span>›</span></button>
             <button id="btnAdminNotes" class="admin-action" type="button">Comunicazioni <span>›</span></button>
             <button id="btnAdminFields" class="admin-action" type="button">Campi <span>›</span></button>
-            <button id="btnAdminUsers" class="admin-action" type="button">Utenti <span>›</span></button>
+            <button id="btnAdminUsers" class="admin-action" type="button">Utenti e crediti <span>›</span></button>
             <button id="btnAdminGallery" class="admin-action" type="button">Galleria login <span>›</span></button>
           </div>
         </section>
 
+        <section id="adminEstablishments" class="glass-card admin-section hidden">
+          <p class="eyebrow">Amministratore della piattaforma</p><h2>Stabilimenti e gestori</h2>
+          <p class="muted">Crea uno stabilimento e il suo gestore. Il proprietario seleziona il proprio stabilimento all’accesso e gestisce soltanto i suoi campi, utenti e prenotazioni.</p>
+          <details class="management-details"><summary>Aggiungi uno stabilimento</summary>
+            <form id="establishmentCreateForm" class="form-stack">
+              <label class="field-label" for="establishmentName">Nome dello stabilimento</label><input id="establishmentName" class="admin-input" required maxlength="80" placeholder="Es. Bagni Claudia">
+              <label class="field-label" for="establishmentId">Codice dello stabilimento</label><input id="establishmentId" class="admin-input" required maxlength="60" pattern="[a-z0-9]+(-[a-z0-9]+)*" autocapitalize="none" spellcheck="false" placeholder="Es. bagni-claudia" aria-describedby="establishmentIdHelp"><p id="establishmentIdHelp" class="helper-text">Lettere minuscole, numeri e trattini. Il codice non potrà essere cambiato.</p>
+              <label class="field-label" for="establishmentManager">Username del gestore</label><input id="establishmentManager" class="admin-input" required minlength="3" maxlength="80" pattern="[a-zA-Z0-9][a-zA-Z0-9._@\-]{2,79}" autocomplete="off" autocapitalize="none" spellcheck="false">
+              <label class="field-label" for="establishmentPassword">Password iniziale del gestore</label><input id="establishmentPassword" class="admin-input" type="password" required minlength="12" maxlength="72" autocomplete="new-password" aria-describedby="establishmentPasswordHelp"><p id="establishmentPasswordHelp" class="helper-text">Almeno 12 caratteri. Comunicala al proprietario con un canale riservato: dopo il salvataggio non sarà mostrata.</p>
+              <button id="createEstablishmentBtn" class="primary-btn" type="submit">Crea stabilimento e gestore</button>
+            </form>
+          </details>
+          <p id="establishmentStatus" class="form-message" role="status"></p><div id="platformEstablishmentList" class="admin-list" aria-live="polite"></div>
+          <button class="secondary-btn backAdmin" type="button">Indietro</button>
+        </section>
+
+        <section id="adminAgenda" class="glass-card admin-section hidden">
+          <div class="page-title-row"><h2>Agenda prenotazioni</h2><button id="refreshAgendaBtn" class="icon-btn" type="button" aria-label="Aggiorna agenda">↻</button></div>
+          <p class="muted">Prenotazioni di <strong data-establishment-name>Tommi38</strong>, con il nome dell’utente che ha prenotato.</p>
+          <div class="agenda-date-controls"><button id="agendaTodayBtn" class="secondary-btn" type="button">Oggi</button><button id="agendaTomorrowBtn" class="secondary-btn" type="button">Domani</button><label class="field-label" for="agendaDate">Scegli il giorno<input id="agendaDate" class="admin-input" type="date" required></label></div>
+          <label class="field-label" for="agendaField">Campo</label><select id="agendaField" class="admin-input"><option value="">Tutti i campi</option></select>
+          <p id="agendaStatus" class="form-message" role="status"></p><div id="agendaList" class="admin-list" aria-live="polite"></div>
+          <button class="secondary-btn backAdmin" type="button">Indietro</button>
+        </section>
+
         <section id="adminConfig" class="glass-card admin-section hidden">
-          <h3>Configurazione</h3>
+          <h3>Orari e regole</h3><p class="muted">Imposta l’apertura e la chiusura giornaliera dei campi di <strong data-establishment-name>Tommi38</strong>. Per una singola data usa “Statistiche e chiusure”.</p>
           <label class="field-label" for="cfgSlotMinutes">Durata slot in minuti</label>
           <input id="cfgSlotMinutes" class="admin-input" type="number" min="5" step="5">
           <div class="admin-two-cols">
@@ -238,6 +273,7 @@
           <input id="cfgMaxPerDay" class="admin-input" type="number" min="1">
           <label class="field-label" for="cfgMaxActive">Prenotazioni attive massime</label>
           <input id="cfgMaxActive" class="admin-input" type="number" min="1">
+          <label class="checkbox-label" for="cfgRegistrationEnabled"><input id="cfgRegistrationEnabled" type="checkbox">Consenti richieste di registrazione (approvate dal gestore)</label>
           <div class="action-row">
             <button id="saveConfigBtn" class="primary-btn" type="button">Salva</button>
             <button class="secondary-btn backAdmin" type="button">Indietro</button>
@@ -275,7 +311,13 @@
         </section>
 
         <section id="adminUsers" class="glass-card admin-section hidden">
-          <h3>Utenti</h3>
+          <h3>Utenti e crediti</h3><p class="muted">Account e saldi del tuo stabilimento.</p>
+          <details class="management-details"><summary>Crea un utente</summary><form id="createUserForm" class="form-stack">
+            <label class="field-label" for="newUserUsername">Username</label><input id="newUserUsername" class="admin-input" required minlength="3" maxlength="80" pattern="[a-zA-Z0-9][a-zA-Z0-9._@\-]{2,79}" autocomplete="off" autocapitalize="none" spellcheck="false">
+            <label class="field-label" for="newUserPassword">Password iniziale</label><input id="newUserPassword" class="admin-input" type="password" required minlength="12" maxlength="72" autocomplete="new-password">
+            <label class="field-label" for="newUserCredits">Crediti iniziali</label><input id="newUserCredits" class="admin-input" type="number" min="0" max="100000" step="1" required value="0">
+            <button id="createUserBtn" class="primary-btn" type="submit">Crea utente</button><p id="createUserStatus" class="form-message" role="status"></p>
+          </form></details>
           <label class="field-label" for="userSearch">Cerca utente</label>
           <input id="userSearch" class="admin-input" type="search" placeholder="Scrivi lo username">
           <div id="usersList" class="admin-list users-scroll"></div>
@@ -333,5 +375,6 @@
   <noscript><p class="empty-state">Attiva JavaScript nel browser per utilizzare Tommi38.</p></noscript>
   <script src="/script.js" defer></script>
   <script src="/community.js" defer></script>
+  <script src="/account.js" defer></script>
 </body>
 </html>

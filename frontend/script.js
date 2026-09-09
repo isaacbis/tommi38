@@ -54,6 +54,7 @@ function confirmAction(title, details, action = "Conferma") {
 
 function errorMessage(error) {
   if (error?.status === 401) return "La sessione è scaduta. Accedi di nuovo.";
+  if (error?.status === 403) return "Non hai accesso a questa funzione con il tuo account.";
   if (error?.status === 429) return "Troppe richieste. Attendi un momento e riprova.";
   if (error?.error === "NETWORK") return "Connessione non disponibile. Controlla Internet e riprova.";
   if (error?.error === "TIMEOUT") return "La risposta sta impiegando troppo tempo. Riprova tra poco.";
@@ -153,6 +154,7 @@ async function api(path, options = {}) {
         matchesRequest++;
         playersRequest++;
         STATE.playerSearches = [];
+        resetManagementViews();
         closeAppModal();
         loadedDate = "";
         hide(qs("app"));
@@ -307,6 +309,7 @@ async function logout() {
   matchesRequest++;
   playersRequest++;
   STATE.playerSearches = [];
+  resetManagementViews();
   closeAppModal();
   loadedDate = "";
   stopAutoRefresh();
@@ -347,8 +350,9 @@ async function loadAll(setToday = false) {
   const displayName = firstName.charAt(0).toUpperCase() + firstName.slice(1);
   qs("welcome").innerHTML = `Ciao <strong>${escapeHTML(displayName)}</strong>`;
   qs("creditsBox").textContent = `${Number(me.credits || 0)} ${Number(me.credits) === 1 ? "credito" : "crediti"}`;
-  qs("roleBadge").textContent = me.role === "admin" ? "Admin" : "";
-  me.role === "admin" ? show(qs("roleBadge")) : hide(qs("roleBadge"));
+  qs("roleBadge").textContent = me.platformAdmin ? "Amministratore della piattaforma" : me.role === "admin" ? "Gestore" : "";
+  me.role === "admin" || me.platformAdmin ? show(qs("roleBadge")) : hide(qs("roleBadge"));
+  configureManagementAccess();
   qs("notesView").textContent = STATE.notes || "Nessuna comunicazione al momento.";
 
   qs("datePick").min = localISODate();
@@ -372,12 +376,13 @@ async function loadAll(setToday = false) {
     qs("cfgDayEnd").value = pub.dayEnd;
     qs("cfgMaxPerDay").value = pub.maxBookingsPerUserPerDay;
     qs("cfgMaxActive").value = pub.maxActiveBookingsPerUser;
+    qs("cfgRegistrationEnabled").checked = pub.registrationEnabled === true;
     qs("notesText").value = STATE.notes;
     renderFieldsAdmin();
     renderGalleryAdmin();
     loadUsers().catch(() => { qs("usersList").textContent = "Impossibile caricare gli utenti. Riapri questa sezione per riprovare."; });
   } else {
-    hide(qs("openAdminBtn"));
+    if (!me.platformAdmin) hide(qs("openAdminBtn"));
   }
 
   await Promise.all([
@@ -604,6 +609,7 @@ async function book() {
       error?.error === "ACTIVE_BOOKING_LIMIT" ? "Hai raggiunto il limite di prenotazioni attive." :
       error?.error === "MAX_PER_DAY_LIMIT" ? "Hai raggiunto il limite di prenotazioni per questo giorno." :
       error?.error === "SLOT_TAKEN" ? "Questo orario è appena stato prenotato." :
+      error?.error === "CONFIG_CHANGED" ? "Il gestore ha aggiornato gli orari. Aggiorna e scegli di nuovo." :
       error?.error === "NO_CREDITS" ? "Non hai crediti disponibili." :
       error?.error === "PAST_TIME_NOT_ALLOWED" ? "Questo orario è già iniziato." :
       error?.error === "NETWORK" || error?.error === "TIMEOUT" ? "Non abbiamo ricevuto conferma. Controlla Le mie partite prima di riprovare." :
@@ -621,7 +627,9 @@ async function book() {
 async function deleteReservation(id) {
   if (deleting.has(id)) return;
   deleting.add(id);
-  if (!await confirmAction("Cancella la partita", "La prenotazione verrà rimossa e il campo tornerà disponibile.", "Cancella partita")) { deleting.delete(id); return; }
+  const item = STATE.myReservations.find(reservation => reservation.id === id);
+  const refund = STATE.me?.role === "admin" ? "Le prenotazioni del gestore non consumano crediti." : item?.date > localISODate() ? "Riceverai il rimborso di 1 credito." : "Per le cancellazioni del giorno stesso non è previsto un rimborso.";
+  if (!await confirmAction("Cancella la partita", "La prenotazione verrà rimossa e il campo tornerà disponibile.\n" + refund, "Cancella partita")) { deleting.delete(id); return; }
 
   try {
     await api(`/reservations/${encodeURIComponent(id)}`, { method: "DELETE" });
@@ -718,6 +726,18 @@ function renderMyReservations() {
     button.addEventListener("click", () => deleteReservation(item.id));
     const actions = document.createElement("div");
     actions.className = "match-actions";
+    const repeat = document.createElement("button");
+    repeat.type = "button";
+    repeat.className = "secondary-btn";
+    repeat.textContent = "Prenota di nuovo";
+    repeat.onclick = () => {
+      qs("fieldSelect").value = item.fieldId;
+      STATE.selectedTime = "";
+      renderFieldButtonsState();
+      setDate(item.date >= localISODate() ? item.date : localISODate());
+      switchView("book", false);
+    };
+    actions.appendChild(repeat);
     const search = STATE.playerSearches.find(search => search.reservationId === item.id);
     if (search || item.date > localISODate() || (item.date === localISODate() && (Number(item.time.slice(0, 2)) * 60 + Number(item.time.slice(3))) > nowMinutes())) {
       const players = document.createElement("button");
@@ -1206,7 +1226,7 @@ function switchView(name, refresh = true) {
 }
 
 function openAdminShell() {
-  if (STATE.me?.role !== "admin") return;
+  if (STATE.me?.role !== "admin" && !STATE.me?.platformAdmin) return;
   hide(qs("viewHome"));
   hide(qs("viewBook"));
   hide(qs("viewMatches"));
@@ -1223,7 +1243,7 @@ function closeAdminShell() {
 }
 
 function openAdmin(id) {
-  ["adminMenu", "adminConfig", "adminNotes", "adminFields", "adminUsers", "adminGallery"]
+  ["adminMenu", "adminConfig", "adminNotes", "adminFields", "adminUsers", "adminGallery", "adminAgenda", "adminEstablishments"]
     .forEach(sectionId => hide(qs(sectionId)));
   show(qs(id));
 }
@@ -1296,7 +1316,8 @@ async function saveConfig() {
       dayStart: qs("cfgDayStart").value,
       dayEnd: qs("cfgDayEnd").value,
       maxBookingsPerUserPerDay: Number(qs("cfgMaxPerDay").value),
-      maxActiveBookingsPerUser: Number(qs("cfgMaxActive").value)
+      maxActiveBookingsPerUser: Number(qs("cfgMaxActive").value),
+      registrationEnabled: qs("cfgRegistrationEnabled").checked
     })
   });
 
@@ -1308,7 +1329,10 @@ async function saveConfig() {
 }
 
 async function loadUsers() {
+  const user = STATE.me;
+  const venue = selectedEstablishment;
   const response = await api("/admin/users");
+  if (user !== STATE.me || venue !== selectedEstablishment) return;
   STATE.users = response.items || [];
   renderUsers(qs("userSearch")?.value || "");
 }
@@ -1330,30 +1354,14 @@ function renderUsers(filter = "") {
 
     const main = document.createElement("div");
     main.className = "admin-item-main";
-    main.innerHTML = `<strong>${escapeHTML(user.username)}</strong><span>${Number(user.credits || 0)} crediti · ${user.disabled ? "disabilitato" : "attivo"}</span>`;
+    main.innerHTML = `<strong>${escapeHTML(user.username)}</strong><span>${Number(user.credits || 0)} crediti · ${user.role === "admin" ? "gestore · " : ""}${user.pendingApproval ? "in attesa di approvazione" : user.disabled ? "disabilitato" : "attivo"}</span>`;
 
     const actions = document.createElement("div");
     actions.className = "admin-item-actions";
 
-    const credits = adminButton("Crediti", async () => {
-      const value = prompt("Nuovi crediti", user.credits);
-      if (value === null || !Number.isFinite(Number(value))) return;
-      await api("/admin/users/credits", {
-        method: "PUT",
-        body: JSON.stringify({ username: user.username, delta: Number(value) - Number(user.credits) })
-      });
-      await loadUsers();
-    });
+    const credits = adminButton("Crediti", () => openUserCredits(user));
 
-    const password = adminButton("Password", async () => {
-      const newPassword = prompt("Nuova password");
-      if (!newPassword) return;
-      await api("/admin/users/password", {
-        method: "PUT",
-        body: JSON.stringify({ username: user.username, newPassword })
-      });
-      alert("Password aggiornata.");
-    });
+    const password = adminButton("Password", () => openUserPassword(user));
 
     const rename = adminButton("Rinomina", async () => {
       const newUsername = prompt("Nuovo username", user.username)?.trim();
@@ -1369,7 +1377,7 @@ function renderUsers(filter = "") {
       }
     });
 
-    const toggle = adminButton(user.disabled ? "Abilita" : "Disabilita", async () => {
+    const toggle = adminButton(user.pendingApproval ? "Approva iscrizione" : user.disabled ? "Abilita" : "Disabilita", async () => {
       await api("/admin/users/status", {
         method: "PUT",
         body: JSON.stringify({ username: user.username, disabled: !user.disabled })
@@ -1391,7 +1399,7 @@ function adminButton(label, handler) {
   button.onclick = async () => {
     if (button.disabled) return;
     button.disabled = true;
-    try { await handler(); } catch (error) { alert(errorMessage(error)); }
+    try { await handler(); } catch (error) { alert(managementError(error)); }
     finally { button.disabled = false; }
   };
   return button;
@@ -1476,6 +1484,7 @@ async function refreshVisibleData() {
     if (!qs("viewBook").classList.contains("hidden")) jobs.push(loadReservations());
     if (!qs("viewMatches").classList.contains("hidden")) jobs.push(loadMyReservations(), loadPlayerSearches());
     if (!qs("viewPlayers").classList.contains("hidden")) jobs.push(loadPlayerSearches());
+    if (!qs("adminShell").classList.contains("hidden") && !qs("adminAgenda").classList.contains("hidden")) jobs.push(loadManagerAgenda());
     await Promise.allSettled(jobs);
   } finally { refreshBusy = false; }
 }
@@ -1530,7 +1539,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const button = event.currentTarget;
     if (button.disabled) return;
     button.disabled = true;
-    try { await handler(); } catch (error) { alert(errorMessage(error)); }
+    try { await handler(); } catch (error) { alert(managementError(error)); }
     finally { button.disabled = false; }
   };
   qs("saveConfigBtn").onclick = guarded(saveConfig);

@@ -14,7 +14,8 @@ export const db = {
 };
 export async function establishments() {
   const snap = await root.collection('establishments').get();
-  const items = [{ id: 'tommi38', name: 'Tommi38' }];
+  const legacy = snap.docs.find(d=>d.id === 'tommi38');
+  const items = [{ id: 'tommi38', name: String(legacy?.data().name || 'Tommi38').slice(0,80) }];
   for (const doc of snap.docs) {
     const value = doc.data();
     if (doc.id !== 'tommi38' && value.enabled === true && /^[a-z0-9-]{1,60}$/.test(doc.id)) {
@@ -25,7 +26,7 @@ export async function establishments() {
 }
 export async function tenantMiddleware(req, res, next) {
   try {
-    if (req.path === "/establishments") return next();
+    if (req.path === "/establishments" || req.path === "/logout") return next();
     const id = req.get('X-Establishment') || 'tommi38';
     if (!/^[a-z0-9-]{1,60}$/.test(id)) return res.status(400).json({error:'INVALID_ESTABLISHMENT'});
     if (id !== 'tommi38' && !(await establishments()).some(item => item.id === id)) {
