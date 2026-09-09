@@ -27,22 +27,58 @@ let STATE = {
 };
 
 let AUTO_REFRESH_TIMER = null;
+let reservationRequest = 0;
+let matchesRequest = 0;
+let loadedDate = "";
+let bookingBusy = false;
+let refreshBusy = false;
+const deleting = new Set();
+
+function confirmAction(title, details, action = "Conferma") {
+  const dialog = qs("confirmDialog");
+  if (dialog.open) return Promise.resolve(false);
+  qs("confirmTitle").textContent = title;
+  qs("confirmDetails").textContent = details;
+  qs("confirmAction").textContent = action;
+  dialog.returnValue = "cancel";
+  document.body.classList.add("dialog-open");
+  return new Promise(resolve => {
+    dialog.addEventListener("close", () => {
+      document.body.classList.remove("dialog-open");
+      resolve(dialog.returnValue === "confirm");
+    }, { once: true });
+    dialog.showModal();
+  });
+}
+
+function errorMessage(error) {
+  if (error?.status === 401) return "La sessione è scaduta. Accedi di nuovo.";
+  if (error?.status === 429) return "Troppe richieste. Attendi un momento e riprova.";
+  if (error?.error === "NETWORK") return "Connessione non disponibile. Controlla Internet e riprova.";
+  if (error?.error === "TIMEOUT") return "La risposta sta impiegando troppo tempo. Riprova tra poco.";
+  return "Non è stato possibile aggiornare i dati. Riprova.";
+}
+
+function connectionChanged() {
+  qs("connectionStatus").classList.toggle("hidden", navigator.onLine);
+  updateBookingPreview();
+  if (navigator.onLine && STATE.me) refreshVisibleData();
+}
 
 /* ===================== DATE / TIME ===================== */
 function localISODate(date = new Date()) {
-  const tz = date.getTimezoneOffset() * 60000;
-  return new Date(date.getTime() - tz).toISOString().slice(0, 10);
+  return new Intl.DateTimeFormat("sv-SE", { timeZone: "Europe/Rome", year: "numeric", month: "2-digit", day: "2-digit" }).format(date);
 }
 
 function tomorrowISODate() {
-  const d = new Date();
-  d.setDate(d.getDate() + 1);
+  const d = new Date(localISODate() + "T12:00:00Z");
+  d.setUTCDate(d.getUTCDate() + 1);
   return localISODate(d);
 }
 
 function nowMinutes() {
-  const d = new Date();
-  return d.getHours() * 60 + d.getMinutes();
+  const parts = new Intl.DateTimeFormat("en-GB", { timeZone: "Europe/Rome", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).formatToParts(new Date());
+  return Number(parts.find(p => p.type === "hour").value) * 60 + Number(parts.find(p => p.type === "minute").value);
 }
 
 function minutes(time) {
@@ -90,19 +126,51 @@ function updateDateUI() {
   qs("selectedDateLabel").textContent = formatLongDate(date);
   qs("quickToday").classList.toggle("active", date === localISODate());
   qs("quickTomorrow").classList.toggle("active", date === tomorrowISODate());
+  qs("quickToday").setAttribute("aria-pressed", String(date === localISODate()));
+  qs("quickTomorrow").setAttribute("aria-pressed", String(date === tomorrowISODate()));
 }
 
 /* ===================== API ===================== */
 async function api(path, options = {}) {
-  const response = await fetch(API + path, {
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
-    ...options
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 15000);
+  try {
+    const response = await fetch(API + path, {
+      credentials: "include", cache: "no-store", ...options,
+      signal: controller.signal,
+      headers: { "Content-Type": "application/json", ...options.headers }
+    });
+    if (!response.headers.get("content-type")?.includes("application/json")) {
+      throw { error: "INVALID_RESPONSE", status: response.status };
+    }
+    const data = await response.json();
+    if (!response.ok) {
+      if (response.status === 401 && STATE.me && path !== "/login") {
+        stopAutoRefresh();
+        STATE.me = null;
+        reservationRequest++;
+        matchesRequest++;
+        loadedDate = "";
+        hide(qs("app"));
+        show(qs("loginBox"));
+        qs("password").value = "";
+        qs("loginErr").textContent = "La sessione è scaduta. Accedi di nuovo.";
+        show(qs("loginErr"));
+      }
+      throw { ...data, status: response.status };
+    }
+    return data;
+  } catch (error) {
+    if (error.name === "AbortError") throw { error: "TIMEOUT" };
+    if (error instanceof TypeError) throw { error: "NETWORK" };
+    throw error;
+  } finally { clearTimeout(timer); }
+}
 
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw data;
-  return data;
+let publicConfigRequest = null;
+function loadPublicConfig() {
+  if (!publicConfigRequest) publicConfigRequest = api("/public/config").finally(() => { publicConfigRequest = null; });
+  return publicConfigRequest;
 }
 
 /* ===================== NATIVE BRIDGE ===================== */
@@ -176,7 +244,7 @@ function updateBookingPreview() {
   const remaining = Math.max(0, credits - (STATE.me?.role === "admin" ? 0 : 1));
   const creditText = STATE.me?.role === "admin"
     ? "Prenotazione amministratore"
-    : `1 credito · Ne resteranno ${remaining}`;
+    : (credits < 1 ? "Crediti esauriti: rivolgiti al gestore" : `1 credito · Ne resteranno ${remaining}`);
 
   box.innerHTML = `
     <img src="/icon-192.png" alt="" class="preview-logo">
@@ -186,19 +254,20 @@ function updateBookingPreview() {
     </div>
   `;
 
-  qs("bookBtn").disabled = false;
+  qs("bookBtn").disabled = bookingBusy || !navigator.onLine || loadedDate !== qs("datePick").value || (STATE.me?.role !== "admin" && credits < 1);
 }
 
 /* ===================== LOGIN ===================== */
 async function loadPublicLoginGallery() {
   try {
-    const pub = await api("/public/config");
+    const pub = await loadPublicConfig();
     STATE.gallery = pub.gallery || [];
     renderLoginGallery();
   } catch {}
 }
 
 async function login() {
+  if (qs("loginBtn").disabled || !qs("loginForm").reportValidity()) return;
   hide(qs("loginErr"));
   qs("loginBtn").disabled = true;
   qs("loginBtn").textContent = "Accesso…";
@@ -212,8 +281,9 @@ async function login() {
       })
     });
     await loadAll(true);
-  } catch {
-    qs("loginErr").textContent = "Username o password non corretti.";
+    qs("password").value = "";
+  } catch (error) {
+    qs("loginErr").textContent = error?.status === 401 ? "Username o password non corretti." : errorMessage(error);
     show(qs("loginErr"));
   } finally {
     qs("loginBtn").disabled = false;
@@ -222,7 +292,12 @@ async function login() {
 }
 
 async function logout() {
-  try { await api("/logout", { method: "POST" }); } catch {}
+  if (!await confirmAction("Vuoi uscire?", "Potrai accedere di nuovo con le tue credenziali.", "Esci")) return;
+  try { await api("/logout", { method: "POST" }); }
+  catch (error) { setBookMessage(errorMessage(error), "error"); return; }
+  reservationRequest++;
+  matchesRequest++;
+  loadedDate = "";
   stopAutoRefresh();
   STATE.me = null;
   STATE.nativeSynced = false;
@@ -246,7 +321,7 @@ function unavailableEstablishmentMessage() {
 async function loadAll(setToday = false) {
   const [me, pub] = await Promise.all([
     api("/me"),
-    api("/public/config")
+    loadPublicConfig()
   ]);
 
   STATE.me = me;
@@ -292,18 +367,17 @@ async function loadAll(setToday = false) {
     qs("notesText").value = STATE.notes;
     renderFieldsAdmin();
     renderGalleryAdmin();
-    await loadUsers();
+    loadUsers().catch(() => { qs("usersList").textContent = "Impossibile caricare gli utenti. Riapri questa sezione per riprovare."; });
   } else {
     hide(qs("openAdminBtn"));
   }
 
   await Promise.all([
     loadReservations(),
-    loadMyReservations(),
-    loadWeather()
+    loadMyReservations()
   ]);
 
-  switchView("book");
+  switchView("book", false);
   startAutoRefresh();
 }
 
@@ -331,7 +405,7 @@ function renderFields() {
       select.value = field.id;
       STATE.selectedTime = "";
       renderFieldButtonsState();
-      renderTimeGrid();
+      if (loadedDate === qs("datePick").value) renderTimeGrid();
       updateBookingPreview();
       setBookMessage();
     });
@@ -351,22 +425,43 @@ function renderFieldButtonsState() {
   const selected = qs("fieldSelect").value;
   document.querySelectorAll(".field-chip").forEach(button => {
     button.classList.toggle("active", button.dataset.fieldId === selected);
+    button.setAttribute("aria-pressed", String(button.dataset.fieldId === selected));
   });
 }
 
 /* ===================== RESERVATIONS / SLOTS ===================== */
 async function loadReservations() {
   const date = qs("datePick").value;
-  if (!date || isPastDate(date)) return;
-
-  const response = await api(`/reservations?date=${encodeURIComponent(date)}`);
-  STATE.dayReservationsAll = response.items || [];
-  STATE.reservations = STATE.me?.role === "admin"
-    ? STATE.dayReservationsAll
-    : STATE.dayReservationsAll.filter(item => item.user === STATE.me.username);
-
-  renderTimeGrid();
-  updateBookingPreview();
+  if (!STATE.me || !date || isPastDate(date)) return;
+  const request = ++reservationRequest;
+  if (loadedDate !== date) {
+    loadedDate = "";
+    STATE.selectedTime = "";
+    qs("timeGrid").innerHTML = '<div class="empty-state">Caricamento degli orari…</div>';
+    qs("availabilityStatus").textContent = "Controllo le disponibilità";
+    updateBookingPreview();
+  }
+  qs("timeGrid").setAttribute("aria-busy", "true");
+  try {
+    const response = await api(`/reservations?date=${encodeURIComponent(date)}`);
+    if (request !== reservationRequest || date !== qs("datePick").value || !STATE.me) return;
+    STATE.dayReservationsAll = response.items || [];
+    STATE.reservations = STATE.dayReservationsAll.filter(item => item.user === STATE.me.username);
+    loadedDate = date;
+    renderTimeGrid();
+    updateBookingPreview();
+  } catch (error) {
+    if (request !== reservationRequest || !STATE.me) return;
+    loadedDate = "";
+    STATE.selectedTime = "";
+    qs("availabilityStatus").textContent = "Disponibilità non aggiornata";
+    const box = qs("timeGrid");
+    box.innerHTML = `<div class="empty-state">${escapeHTML(errorMessage(error))}<br><button class="secondary-btn" type="button">Riprova</button></div>`;
+    box.querySelector("button").onclick = loadReservations;
+    updateBookingPreview();
+  } finally {
+    if (request === reservationRequest) qs("timeGrid").setAttribute("aria-busy", "false");
+  }
 }
 
 function renderTimeGrid() {
@@ -376,6 +471,11 @@ function renderTimeGrid() {
   const fieldId = qs("fieldSelect").value;
   const date = qs("datePick").value;
   const slot = currentSlotMinutes();
+  if (!Number.isFinite(slot) || slot <= 0) {
+    box.innerHTML = '<div class="empty-state">Orari non disponibili. Contatta il gestore.</div>';
+    STATE.selectedTime = "";
+    return;
+  }
   const start = minutes(STATE.config.dayStart || "09:00");
   const end = minutes(STATE.config.dayEnd || "20:00");
   const today = localISODate();
@@ -395,6 +495,7 @@ function renderTimeGrid() {
     const past = date < today || (date === today && m <= now);
     const busy = taken.has(time);
     const selectable = !past && !busy;
+    if (past) continue;
 
     if (selectable) available.push(time);
 
@@ -431,15 +532,17 @@ function renderTimeGrid() {
   if (STATE.selectedTime) qs("timeSelect").value = STATE.selectedTime;
   renderTimeSelectionState();
 
-  if (!available.length) {
-    box.innerHTML = `<div class="empty-state" style="grid-column:1/-1">Nessun orario disponibile per questo campo.</div>`;
-  }
+  qs("availabilityStatus").textContent = available.length
+    ? `${available.length} ${available.length === 1 ? "orario disponibile" : "orari disponibili"} · ${fieldName(fieldId)}`
+    : "Nessun orario libero. Prova un altro campo o un’altra data.";
+  if (!box.children.length) box.innerHTML = '<div class="empty-state">Non ci sono orari programmati.</div>';
 }
 
 function renderTimeSelectionState() {
   document.querySelectorAll(".time-slot").forEach(button => {
     const selected = button.dataset.time === STATE.selectedTime && !button.disabled;
     button.classList.toggle("selected", selected);
+    button.setAttribute("aria-pressed", String(selected));
     const small = button.querySelector("small");
     if (selected && small) small.textContent = "Selezionato";
     else if (small && button.classList.contains("free")) small.textContent = "Libero";
@@ -447,6 +550,7 @@ function renderTimeSelectionState() {
 }
 
 async function book() {
+  if (bookingBusy || qs("bookBtn").disabled) return;
   const fieldId = qs("fieldSelect").value;
   const field = currentField();
   const date = qs("datePick").value;
@@ -459,7 +563,9 @@ async function book() {
 
   const slot = currentSlotMinutes();
   const end = timeStr(minutes(time) + slot);
-  if (!confirm(`Confermi la prenotazione?\n\n${field.name}\n${formatLongDate(date)}\n${time}–${end}`)) return;
+  bookingBusy = true;
+  const confirmed = await confirmAction("Conferma la tua partita", `${field.name}\n${formatLongDate(date)}\n${time}–${end}\n${STATE.me?.role === "admin" ? "Prenotazione amministratore" : "Costo: 1 credito"}`, "Prenota");
+  if (!confirmed || !STATE.me) { bookingBusy = false; updateBookingPreview(); return; }
 
   qs("bookBtn").disabled = true;
   qs("bookBtn").textContent = "Prenotazione…";
@@ -479,11 +585,7 @@ async function book() {
     });
 
     STATE.selectedTime = "";
-    await Promise.all([
-      refreshCredits(),
-      loadReservations(),
-      loadMyReservations()
-    ]);
+    await Promise.allSettled([refreshCredits(), loadReservations(), loadMyReservations()]);
     setBookMessage(`Prenotazione confermata: ${field.name}, ore ${time}.`, "success");
   } catch (error) {
     const message =
@@ -492,48 +594,60 @@ async function book() {
       error?.error === "SLOT_TAKEN" ? "Questo orario è appena stato prenotato." :
       error?.error === "NO_CREDITS" ? "Non hai crediti disponibili." :
       error?.error === "PAST_TIME_NOT_ALLOWED" ? "Questo orario è già iniziato." :
-      "Non è stato possibile completare la prenotazione.";
+      error?.error === "NETWORK" || error?.error === "TIMEOUT" ? "Non abbiamo ricevuto conferma. Controlla Le mie partite prima di riprovare." :
+      errorMessage(error);
 
     await loadReservations().catch(() => {});
     setBookMessage(message, "error");
   } finally {
+    bookingBusy = false;
     qs("bookBtn").textContent = "Conferma prenotazione";
     updateBookingPreview();
   }
 }
 
 async function deleteReservation(id) {
-  if (!confirm("Vuoi cancellare questa prenotazione?")) return;
+  if (deleting.has(id)) return;
+  deleting.add(id);
+  if (!await confirmAction("Cancella la partita", "La prenotazione verrà rimossa e il campo tornerà disponibile.", "Cancella partita")) { deleting.delete(id); return; }
 
   try {
     await api(`/reservations/${encodeURIComponent(id)}`, { method: "DELETE" });
     cancelNativeBookingNotification(id);
-    await Promise.all([
-      refreshCredits(),
-      loadReservations(),
-      loadMyReservations()
-    ]);
-  } catch {
-    alert("Non è stato possibile cancellare la prenotazione.");
-  }
+    await Promise.allSettled([refreshCredits(), loadReservations(), loadMyReservations()]);
+  } catch (error) {
+    qs("matchesStatus").textContent = errorMessage(error);
+  } finally { deleting.delete(id); }
 }
 
 async function refreshCredits() {
   const me = await api("/me");
+  if (!STATE.me || STATE.me.username !== me.username) return;
   STATE.me.credits = me.credits;
   qs("creditsBox").textContent = `${Number(me.credits || 0)} ${Number(me.credits) === 1 ? "credito" : "crediti"}`;
+  updateBookingPreview();
 }
 
 /* ===================== MY MATCHES ===================== */
 async function loadMyReservations() {
-  let items = [];
-
+  if (!STATE.me) return;
+  const request = ++matchesRequest;
+  let items;
+  qs("refreshMatchesBtn").disabled = true;
+  qs("matchesList").setAttribute("aria-busy", "true");
   try {
     const response = await api("/reservations/mine");
+    if (request !== matchesRequest || !STATE.me) return;
     items = response.items || [];
-  } catch {
-    // Compatibilità temporanea finché il backend non viene aggiornato.
-    items = STATE.reservations || [];
+    qs("matchesStatus").textContent = items.length ? `${items.length} ${items.length === 1 ? "partita in programma" : "partite in programma"}` : "";
+  } catch (error) {
+    if (request === matchesRequest && STATE.me) qs("matchesStatus").textContent = errorMessage(error);
+    return;
+  } finally {
+    if (request === matchesRequest) {
+      qs("refreshMatchesBtn").disabled = false;
+      qs("matchesList").setAttribute("aria-busy", "false");
+    }
   }
 
   const today = localISODate();
@@ -564,7 +678,8 @@ function renderMyReservations() {
   box.innerHTML = "";
 
   if (!STATE.myReservations.length) {
-    box.innerHTML = `<div class="empty-state">Non hai prenotazioni attive.</div>`;
+    box.innerHTML = '<div class="empty-state"><strong>Il campo ti aspetta</strong><br>Non hai partite in programma.<br><button class="secondary-btn" type="button">Prenota una partita</button></div>';
+    box.querySelector("button").onclick = () => switchView("book");
     return;
   }
 
@@ -657,7 +772,7 @@ function renderWeather(data) {
 }
 
 /* ===================== NAVIGATION ===================== */
-function switchView(name) {
+function switchView(name, refresh = true) {
   hide(qs("viewBook"));
   hide(qs("viewMatches"));
   hide(qs("viewAlerts"));
@@ -670,8 +785,11 @@ function switchView(name) {
 
   document.querySelectorAll(".bottom-nav-item").forEach(button => {
     button.classList.toggle("active", button.dataset.view === name);
+    if (button.dataset.view === name) button.setAttribute("aria-current", "page");
+    else button.removeAttribute("aria-current");
   });
 
+  if (name === "book" && STATE.me && refresh) loadReservations();
   if (name === "matches") loadMyReservations();
   if (name === "alerts") loadWeather();
   window.scrollTo({ top: 0, behavior: "smooth" });
@@ -739,7 +857,7 @@ async function saveFields() {
     body: JSON.stringify({ fields: STATE.fieldsDraft })
   });
 
-  const pub = await api("/public/config");
+  const pub = await loadPublicConfig();
   STATE.fields = pub.fields || [];
   STATE.fieldsDraft = [...STATE.fields];
   renderFields();
@@ -770,7 +888,7 @@ async function saveConfig() {
     })
   });
 
-  const pub = await api("/public/config");
+  const pub = await loadPublicConfig();
   STATE.config = pub;
   qs("slotDurationLabel").textContent = `${currentSlotMinutes()} minuti`;
   await loadReservations();
@@ -858,7 +976,12 @@ function adminButton(label, handler) {
   button.type = "button";
   button.className = "admin-small-btn";
   button.textContent = label;
-  button.onclick = handler;
+  button.onclick = async () => {
+    if (button.disabled) return;
+    button.disabled = true;
+    try { await handler(); } catch (error) { alert(errorMessage(error)); }
+    finally { button.disabled = false; }
+  };
   return button;
 }
 
@@ -930,18 +1053,22 @@ function renderLoginGallery() {
 }
 
 /* ===================== AUTO REFRESH ===================== */
+async function refreshVisibleData() {
+  if (refreshBusy || document.hidden || !STATE.me || !navigator.onLine || bookingBusy) return;
+  refreshBusy = true;
+  try {
+    qs("datePick").min = localISODate();
+    if (isPastDate(qs("datePick").value)) setDate(localISODate());
+    const jobs = [refreshCredits()];
+    if (!qs("viewBook").classList.contains("hidden")) jobs.push(loadReservations());
+    if (!qs("viewMatches").classList.contains("hidden")) jobs.push(loadMyReservations());
+    await Promise.allSettled(jobs);
+  } finally { refreshBusy = false; }
+}
+
 function startAutoRefresh() {
   stopAutoRefresh();
-  AUTO_REFRESH_TIMER = setInterval(async () => {
-    if (document.hidden || !STATE.me) return;
-    try {
-      await loadReservations();
-      await refreshCredits();
-      if (!qs("viewMatches").classList.contains("hidden")) await loadMyReservations();
-    } catch (error) {
-      console.warn("Aggiornamento automatico fallito", error);
-    }
-  }, 10_000);
+  AUTO_REFRESH_TIMER = setInterval(refreshVisibleData, 30000);
 }
 
 function stopAutoRefresh() {
@@ -951,25 +1078,18 @@ function stopAutoRefresh() {
 
 /* ===================== INIT ===================== */
 document.addEventListener("DOMContentLoaded", () => {
-  qs("loginBtn").onclick = login;
+  qs("loginForm").onsubmit = event => { event.preventDefault(); login(); };
   qs("logoutBtn").onclick = logout;
   qs("passwordToggle").onclick = togglePassword;
   qs("loginBackBtn").onclick = unavailableEstablishmentMessage;
   qs("loginChangeBtn").onclick = unavailableEstablishmentMessage;
   qs("switchBathBtn").onclick = unavailableEstablishmentMessage;
 
-  [qs("username"), qs("password")].forEach(input => {
-    input.addEventListener("keydown", event => {
-      if (event.key === "Enter") login();
-    });
-  });
-
   qs("quickToday").onclick = () => setDate(localISODate());
   qs("quickTomorrow").onclick = () => setDate(tomorrowISODate());
   qs("datePick").onchange = () => {
-    STATE.selectedTime = "";
-    updateDateUI();
-    loadReservations();
+    const date = qs("datePick").value;
+    setDate(!date || isPastDate(date) ? localISODate() : date);
   };
 
   qs("bookBtn").onclick = book;
@@ -984,16 +1104,23 @@ document.addEventListener("DOMContentLoaded", () => {
   qs("btnAdminConfig").onclick = () => openAdmin("adminConfig");
   qs("btnAdminNotes").onclick = () => openAdmin("adminNotes");
   qs("btnAdminFields").onclick = () => openAdmin("adminFields");
-  qs("btnAdminUsers").onclick = () => openAdmin("adminUsers");
+  qs("btnAdminUsers").onclick = () => { openAdmin("adminUsers"); loadUsers().catch(error => { qs("usersList").textContent = errorMessage(error); }); };
   qs("btnAdminGallery").onclick = () => openAdmin("adminGallery");
   document.querySelectorAll(".backAdmin").forEach(button => button.onclick = () => openAdmin("adminMenu"));
 
-  qs("saveConfigBtn").onclick = saveConfig;
-  qs("saveNotesBtn").onclick = saveNotes;
+  const guarded = handler => async event => {
+    const button = event.currentTarget;
+    if (button.disabled) return;
+    button.disabled = true;
+    try { await handler(); } catch (error) { alert(errorMessage(error)); }
+    finally { button.disabled = false; }
+  };
+  qs("saveConfigBtn").onclick = guarded(saveConfig);
+  qs("saveNotesBtn").onclick = guarded(saveNotes);
   qs("addFieldBtn").onclick = addField;
-  qs("saveFieldsBtn").onclick = saveFields;
+  qs("saveFieldsBtn").onclick = guarded(saveFields);
   qs("addGalleryBtn").onclick = addGalleryItem;
-  qs("saveGalleryBtn").onclick = saveGallery;
+  qs("saveGalleryBtn").onclick = guarded(saveGallery);
   qs("userSearch").addEventListener("input", event => renderUsers(event.target.value));
 
   if ("serviceWorker" in navigator) {
@@ -1003,9 +1130,13 @@ document.addEventListener("DOMContentLoaded", () => {
   loadPublicLoginGallery();
 
   loadAll(true)
-    .catch(() => {
+    .catch(error => {
       show(qs("loginBox"));
       hide(qs("app"));
+      if (error?.status !== 401) {
+        qs("loginErr").textContent = errorMessage(error);
+        show(qs("loginErr"));
+      }
     })
     .finally(() => {
       const loader = qs("appLoader");
@@ -1013,5 +1144,8 @@ document.addEventListener("DOMContentLoaded", () => {
       setTimeout(() => loader?.remove(), 350);
     });
 
-  setInterval(() => fetch("/api/health").catch(() => {}), 5 * 60 * 1000);
+  window.addEventListener("online", connectionChanged);
+  window.addEventListener("offline", connectionChanged);
+  document.addEventListener("visibilitychange", refreshVisibleData);
+  connectionChanged();
 });

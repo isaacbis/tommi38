@@ -145,6 +145,59 @@ struct TommiWebView: UIViewRepresentable {
             return nil
         }
 
+        // WKWebView does not present JavaScript dialogs automatically.
+        // These are used by the existing administration forms.
+        private func dialogPresenter(for webView: WKWebView, frame: WKFrameInfo) -> UIViewController? {
+            guard frame.isMainFrame,
+                  frame.securityOrigin.protocol == "https",
+                  frame.securityOrigin.host == homeURL.host,
+                  var presenter = webView.window?.rootViewController else { return nil }
+            while let presented = presenter.presentedViewController { presenter = presented }
+            guard !(presenter is UIAlertController) else { return nil }
+            return presenter
+        }
+
+        func webView(_ webView: WKWebView, runJavaScriptAlertPanelWithMessage message: String,
+                     initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping () -> Void) {
+            guard let presenter = dialogPresenter(for: webView, frame: frame) else {
+                completionHandler(); return
+            }
+            let alert = UIAlertController(title: "Tommi38", message: message, preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: "OK", style: .default) { _ in completionHandler() })
+            presenter.present(alert, animated: true)
+        }
+
+        func webView(_ webView: WKWebView, runJavaScriptConfirmPanelWithMessage message: String,
+                     initiatedByFrame frame: WKFrameInfo, completionHandler: @escaping (Bool) -> Void) {
+            guard let presenter = dialogPresenter(for: webView, frame: frame) else {
+                completionHandler(false); return
+            }
+            let alert = UIAlertController(title: "Tommi38", message: message, preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: "Annulla", style: .cancel) { _ in completionHandler(false) })
+            alert.addAction(UIAlertAction(title: "Conferma", style: .default) { _ in completionHandler(true) })
+            presenter.present(alert, animated: true)
+        }
+
+        func webView(_ webView: WKWebView, runJavaScriptTextInputPanelWithPrompt prompt: String,
+                     defaultText: String?, initiatedByFrame frame: WKFrameInfo,
+                     completionHandler: @escaping (String?) -> Void) {
+            guard let presenter = dialogPresenter(for: webView, frame: frame) else {
+                completionHandler(nil); return
+            }
+            let alert = UIAlertController(title: "Tommi38", message: prompt, preferredStyle: .alert)
+            alert.addTextField { field in
+                field.text = defaultText
+                field.autocapitalizationType = .none
+                field.autocorrectionType = .no
+                field.isSecureTextEntry = prompt.localizedCaseInsensitiveContains("password")
+            }
+            alert.addAction(UIAlertAction(title: "Annulla", style: .cancel) { _ in completionHandler(nil) })
+            alert.addAction(UIAlertAction(title: "Conferma", style: .default) { [weak alert] _ in
+                completionHandler(alert?.textFields?.first?.text)
+            })
+            presenter.present(alert, animated: true)
+        }
+
         // Riceve i messaggi inviati da script.js dopo creazione/cancellazione prenotazione.
         func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
             guard message.frameInfo.isMainFrame,

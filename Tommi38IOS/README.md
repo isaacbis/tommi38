@@ -22,3 +22,11 @@ La webview carica https://tommi38.onrender.com/ con cookie persistenti, pull-to-
 4. Verificare riapertura con login persistente e recupero della connessione con Riprova/pull-to-refresh.
 
 Non sono state create prenotazioni né modificati dati in produzione durante la verifica.
+
+## Aggiornamento mobile
+
+L’interfaccia web include griglia compatta degli orari, riepilogo fisso sopra la navigazione, conferme accessibili integrate, login con compilazione automatica, recupero errori di rete e protezione dalle risposte obsolete quando cambia la data. Gli orari sono riferiti a Europe/Rome. Il polling avviene ogni 30 secondi soltanto con app visibile e connessione disponibile; il meteo viene caricato quando si apre Avvisi. Il service worker usa la cache v9.
+
+WKWebView ora presenta anche alert, conferme e input JavaScript dell’area amministratore. Per questa modifica nativa ricompilare l’app da Xcode; gli aggiornamenti della webapp arrivano dal sito.
+
+Validazione: flussi di accesso, prenotazione e cancellazione provati su server locale con dati fittizi, layout controllato a 320, 390 e 768 px, sei test di regressione in `tests/mobile.test.cjs` (eseguibili con `node --test tests/mobile.test.cjs`), controllo tipi Swift iOS 16 superato. Nessuna prenotazione reale creata durante i test. La build completa richiede ancora il runtime iOS in download.

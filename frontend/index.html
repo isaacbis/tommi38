@@ -2,7 +2,8 @@
 <html lang="it">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="description" content="Prenota i campi di Tommi38, gestisci le tue partite e consulta gli avvisi dal tuo cellulare.">
   <meta name="theme-color" content="#061525">
   <title>Tommi38 – Prenotazione campi</title>
 
@@ -15,6 +16,7 @@
   <meta name="apple-mobile-web-app-title" content="Tommi38">
 </head>
 <body>
+  <div id="connectionStatus" class="connection-status hidden" role="status">Connessione assente. Riconnettiti per aggiornare le disponibilità.</div>
   <div id="appLoader" class="app-loader" aria-live="polite">
     <img src="/icon-192.png" alt="" class="loader-logo">
     <div class="loader-ring" aria-hidden="true"></div>
@@ -35,24 +37,24 @@
       </div>
 
       <section class="glass-card login-panel">
-        <div class="form-stack">
+        <form id="loginForm" class="form-stack">
           <label class="field-label" for="username">Username</label>
           <div class="input-shell">
-            <span class="input-icon" aria-hidden="true">♙</span>
-            <input id="username" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="Il tuo username">
+            <span class="input-icon" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"/><path d="M4 21v-2a8 8 0 0 1 16 0v2"/></svg></span>
+            <input id="username" required enterkeyhint="next" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="Il tuo username">
           </div>
 
           <label class="field-label" for="password">Password</label>
           <div class="input-shell">
-            <span class="input-icon lock-icon" aria-hidden="true">▢</span>
-            <input id="password" type="password" autocomplete="current-password" placeholder="La tua password">
-            <button id="passwordToggle" class="password-toggle" type="button" aria-label="Mostra password">◉</button>
+            <span class="input-icon lock-icon" aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V6a4 4 0 0 1 8 0v4"/></svg></span>
+            <input id="password" required enterkeyhint="go" type="password" autocomplete="current-password" placeholder="La tua password">
+            <button id="passwordToggle" class="password-toggle" type="button" aria-label="Mostra password"><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg></button>
           </div>
 
-          <button id="loginBtn" class="primary-btn login-btn" type="button">Accedi</button>
+          <button id="loginBtn" class="primary-btn login-btn" type="submit">Accedi</button>
           <div id="loginErr" class="form-message error hidden" role="alert"></div>
           <p class="helper-text">Per le credenziali, rivolgiti al gestore.</p>
-        </div>
+        </form>
       </section>
 
       <section class="glass-card selected-establishment">
@@ -80,7 +82,7 @@
         </div>
         <div class="header-actions">
           <button id="switchBathBtn" class="change-btn" type="button">Cambia ›</button>
-          <button id="logoutBtn" class="icon-btn" type="button" aria-label="Esci">↗</button>
+          <button id="logoutBtn" class="icon-btn" type="button" aria-label="Esci"><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4H4v16h5M10 12h11m-4-4 4 4-4 4"/></svg></button>
         </div>
       </header>
 
@@ -94,6 +96,7 @@
 
         <section class="booking-section">
           <div class="booking-heading">
+            <p class="eyebrow">Il tuo prossimo match</p>
             <h1>Prenota il tuo campo</h1>
           </div>
 
@@ -101,27 +104,31 @@
             <button id="quickToday" class="date-quick active" type="button">Oggi</button>
             <button id="quickTomorrow" class="date-quick" type="button">Domani</button>
             <label class="calendar-button" for="datePick" aria-label="Scegli una data">
-              <span aria-hidden="true">▣</span>
-              <input id="datePick" type="date">
+              <span aria-hidden="true"><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M16 3v4M8 3v4M3 11h18"/></svg></span>
+              <input id="datePick" type="date" aria-label="Scegli una data">
             </label>
           </div>
           <div id="selectedDateLabel" class="selected-date-label"></div>
 
+          <p class="step-label">1. Scegli il campo</p>
           <div id="fieldButtons" class="field-buttons" aria-label="Scegli il campo"></div>
           <select id="fieldSelect" class="native-hidden-control" aria-hidden="true" tabindex="-1"></select>
           <select id="timeSelect" class="native-hidden-control" aria-hidden="true" tabindex="-1"></select>
 
           <div class="slot-heading">
-            <h2>Scegli l’orario</h2>
+            <h2>2. Scegli l’orario</h2>
             <span id="slotDurationLabel">40 minuti</span>
           </div>
 
-          <div id="timeGrid" class="time-grid" aria-live="polite"></div>
+          <p id="availabilityStatus" class="availability-status" role="status"></p>
+          <div id="timeGrid" class="time-grid"></div>
 
+          <div class="booking-dock">
           <div id="bookingPreview" class="booking-preview-card" aria-live="polite"></div>
 
           <button id="bookBtn" class="primary-btn book-btn" type="button">Conferma prenotazione</button>
           <div id="bookMsg" class="form-message" aria-live="polite"></div>
+          </div>
         </section>
       </section>
 
@@ -134,6 +141,7 @@
           </div>
           <button id="refreshMatchesBtn" class="icon-btn" type="button" aria-label="Aggiorna">↻</button>
         </div>
+        <p id="matchesStatus" class="muted" role="status"></p>
         <div id="matchesList" class="matches-list"></div>
       </section>
 
@@ -163,7 +171,7 @@
         </section>
 
         <section class="glass-card notification-card">
-          <div class="notice-icon bell">⌁</div>
+          <div class="notice-icon bell"><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg></div>
           <div>
             <h3>Promemoria partita</h3>
             <p class="muted">Nell’app iPhone puoi ricevere un avviso prima dell’inizio della prenotazione.</p>
@@ -274,21 +282,34 @@
 
       <nav id="bottomNav" class="bottom-nav" aria-label="Navigazione principale">
         <button class="bottom-nav-item active" data-view="book" type="button">
-          <span class="nav-icon">▣</span>
+          <span class="nav-icon"><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="3"/><path d="M16 3v4M8 3v4M3 11h18"/></svg></span>
           <span>Prenota</span>
         </button>
         <button class="bottom-nav-item" data-view="matches" type="button">
-          <span class="nav-icon">♜</span>
+          <span class="nav-icon"><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="4" y="3" width="16" height="18" rx="3"/><path d="m8 12 3 3 5-6"/></svg></span>
           <span>Le mie partite</span>
         </button>
         <button class="bottom-nav-item" data-view="alerts" type="button">
-          <span class="nav-icon">♢</span>
+          <span class="nav-icon"><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg></span>
           <span>Avvisi</span>
         </button>
       </nav>
     </section>
   </main>
 
+  <dialog id="confirmDialog" class="confirm-dialog" aria-labelledby="confirmTitle" aria-describedby="confirmDetails">
+    <form method="dialog">
+      <div class="sheet-handle" aria-hidden="true"></div>
+      <p class="eyebrow">Tommi38</p>
+      <h2 id="confirmTitle">Conferma prenotazione</h2>
+      <p id="confirmDetails"></p>
+      <div class="dialog-actions">
+        <button class="secondary-btn" value="cancel" autofocus>Indietro</button>
+        <button id="confirmAction" class="primary-btn" value="confirm">Conferma</button>
+      </div>
+    </form>
+  </dialog>
+  <noscript><p class="empty-state">Attiva JavaScript nel browser per utilizzare Tommi38.</p></noscript>
   <script src="/script.js" defer></script>
 </body>
 </html>
