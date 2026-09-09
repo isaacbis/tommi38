@@ -225,6 +225,7 @@ function updateBookingPreview() {
 
   const field = currentField();
   const time = STATE.selectedTime;
+  qs("bookingDock")?.classList.toggle("has-selection", Boolean(field && time));
   const slot = currentSlotMinutes();
 
   if (!field || !time) {
