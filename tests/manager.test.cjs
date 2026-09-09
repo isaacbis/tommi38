@@ -16,7 +16,7 @@ test('expired reservations are archived once instead of disappearing from manage
  await e.call('get','/admin/reservations',{tenant:'beach-a',user:'manager',query:{date:'2000-01-01'}});assert.equal([...e.data.keys()].filter(k=>k.includes('reservationHistory')).length,1);
 });
 test('manager cannot grant administrative roles when creating a user or mutate another venue',async()=>{
- const e=setup();const body={username:'new.user',password:'Fixture-secret-2026!',credits:8};assert.equal((await e.call('post','/admin/users',{tenant:'beach-a',user:'manager',body:{...body,role:'admin'}})).code,400);
+ const e=setup();const body={username:'new.user',password:'Fixture-secret-2026!',credits:8};assert.equal((await e.call('post','/admin/users',{tenant:'beach-a',user:'manager',body:{...body,role:'admin'}})).code,403);
  assert.equal((await e.call('post','/admin/users',{tenant:'beach-a',user:'manager',body})).code,201);assert.equal(e.data.get('establishments/beach-a/users/new.user').role,'user');assert.ok(!e.data.has('users/new.user'));
 });
 test('changing duration or removing a booked court cannot invalidate active bookings',async()=>{

@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { db } from './tenancy.js';
 import { FieldValue } from './db.js';
 import { requireAuth, requireAdmin } from './permissions.js';
+import { requirePersonalAccount } from './management-guards.js';
 
 const router=express.Router();
 const safe=fn=>(req,res,next)=>Promise.resolve(fn(req,res,next)).catch(next);
@@ -26,7 +27,7 @@ router.post('/register',signupLimiter,safe(async(req,res)=>{
   if(!created)return res.status(409).json({error:'USERNAME_UNAVAILABLE'});
   res.status(201).json({ok:true,pendingApproval:true});
 }));
-router.post('/password',requireAuth,safe(async(req,res)=>{
+router.post('/password',requireAuth,requirePersonalAccount,safe(async(req,res)=>{
   const parsed=z.object({currentPassword:z.string().min(1).max(100),newPassword:passwordSchema}).strict().safeParse(req.body);
   if(!parsed.success)return res.status(400).json({error:'BAD_BODY'});
   const ref=db.collection('users').doc(req.session.user.username);
@@ -41,7 +42,6 @@ router.post('/password',requireAuth,safe(async(req,res)=>{
     const version=Number(fresh.data().sessionVersion || 0)+1;
     tx.update(ref,{passwordHash,sessionVersion:version});return version;
   });
-  if(nextVersion===null)return res.status(409).json({error:'ACCOUNT_CHANGED'});
   if(nextVersion===null)return res.status(409).json({error:'ACCOUNT_CHANGED'});
   req.session.user.sessionVersion=nextVersion;
   res.json({ok:true});
@@ -67,7 +67,7 @@ router.put('/admin/credit-packages',requireAdmin,safe(async(req,res)=>{
   if(!parsed.success || new Set(parsed.data.items.map(p=>p.id)).size!==parsed.data.items.length)return res.status(400).json({error:'BAD_BODY'});
   await db.collection('admin').doc('creditPackages').set(parsed.data);res.json({ok:true});
 }));
-router.post('/credit-requests',requireAuth,safe(async(req,res)=>{
+router.post('/credit-requests',requireAuth,requirePersonalAccount,safe(async(req,res)=>{
   const parsed=z.object({packageId:z.string().min(1).max(40)}).strict().safeParse(req.body);
   if(!parsed.success)return res.status(400).json({error:'BAD_BODY'});
   const ref=db.collection('creditRequests').doc(req.session.user.username);
@@ -80,7 +80,7 @@ router.post('/credit-requests',requireAuth,safe(async(req,res)=>{
   });
   if(error)return res.status(409).json({error});res.json({ok:true});
 }));
-router.get('/credit-requests',requireAuth,safe(async(req,res)=>{
+router.get('/credit-requests',requireAuth,requirePersonalAccount,safe(async(req,res)=>{
   const snap=await db.collection('creditRequests').doc(req.session.user.username).get();
   const value=snap.data();
   res.json({item:value ? {packageTitle:value.packageTitle,credits:value.credits,status:value.status}:null});
@@ -91,8 +91,7 @@ router.get('/admin/credit-requests',requireAdmin,safe(async(req,res)=>{
 }));
 router.patch('/admin/credit-requests/:username',requireAdmin,safe(async(req,res)=>{
   const parsed=z.object({status:z.enum(['approved','rejected'])}).strict().safeParse(req.body);
-  if(!parsed.success || typeof req.params.username!=='string' || !req.params.username || req.params.username.includes('/') || Buffer.byteLength(req.params.username,'utf8')>1500)return res.status(400).json({error:'BAD_BODY'});
-  if(!z.string().min(1).max(80).refine(value=>!value.includes('/')).safeParse(req.params.username).success)return res.status(400).json({error:'BAD_BODY'});
+  if(!parsed.success || !z.string().min(1).max(80).refine(value=>!value.includes('/')).safeParse(req.params.username).success)return res.status(400).json({error:'BAD_BODY'});
   const ref=db.collection('creditRequests').doc(req.params.username);
   const userRef=db.collection('users').doc(req.params.username);
   const error=await db.runTransaction(async tx=>{
@@ -102,11 +101,11 @@ router.patch('/admin/credit-requests/:username',requireAdmin,safe(async(req,res)
     if(parsed.data.status==='approved'){
       const credits=request.data().credits;
       const balance=user.data().credits ?? 0;
-      if(!Number.isSafeInteger(credits) || credits<=0 || !Number.isSafeInteger(balance) || balance<0 || !Number.isSafeInteger(balance+credits))return 'INVALID_CREDITS';
+      if(!Number.isSafeInteger(credits) || credits<=0 || credits>10000 || !Number.isSafeInteger(balance) || balance<0 || !Number.isSafeInteger(balance+credits))return 'INVALID_CREDITS';
       tx.update(userRef,{credits:FieldValue.increment(credits)});
-      tx.set(db.collection('creditLedger').doc(),{user:req.params.username,delta:credits,reason:'Ricarica: '+request.data().packageTitle,actor:req.session.user.username,createdAt:FieldValue.serverTimestamp()});
+      tx.set(db.collection('creditLedger').doc(),{user:req.params.username,delta:credits,reason:'Ricarica: '+request.data().packageTitle,actor:req.actorId || req.session.user.username,createdAt:FieldValue.serverTimestamp()});
     }
-    tx.update(ref,{status:parsed.data.status,handledBy:req.session.user.username,handledAt:FieldValue.serverTimestamp()});return null;
+    tx.update(ref,{status:parsed.data.status,handledBy:req.actorId || req.session.user.username,handledAt:FieldValue.serverTimestamp()});return null;
   });
   if(error)return res.status(409).json({error});res.json({ok:true});
 }));

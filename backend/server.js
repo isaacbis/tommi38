@@ -93,7 +93,9 @@ export function createApp({
       maxAge: SESSION_MAX_AGE_MS
     }
   }));
-  app.use("/api/platform", tenantResolver, platformRoutes);
+  // The platform router verifies the original root account itself. Its context
+  // controls must remain reachable even while a disabled venue is selected.
+  app.use("/api/platform", platformRoutes);
   app.use("/api/auth", tenantResolver, accountRoutes);
   app.use("/api", tenantResolver, apiRoutes);
   app.use("/api", (req, res) => res.status(404).json({ error: "NOT_FOUND" }));

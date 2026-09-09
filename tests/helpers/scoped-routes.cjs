@@ -9,6 +9,7 @@ module.exports=function setup(file='account-routes.js'){
  const data=new Map();let id=0;const scope=new AsyncLocalStorage();
  for(const tenant of ['tommi38','beach-a','beach-b']){
   const prefix=tenant==='tommi38'?'':`establishments/${tenant}/`;
+  if(tenant!=='tommi38')data.set('establishments/'+tenant,{name:tenant,enabled:true});
   data.set(prefix+'admin/config',{slotMinutes:45,dayStart:'09:00',dayEnd:'20:00',maxBookingsPerUserPerDay:2,maxActiveBookingsPerUser:3,registrationEnabled:true});
   data.set(prefix+'admin/fields',{fields:[{id:'volley',name:'Volley'}]});
   data.set(prefix+'users/manager',{role:'admin',credits:0,passwordHash:fixtureHash});
@@ -21,8 +22,8 @@ module.exports=function setup(file='account-routes.js'){
  let queue=Promise.resolve();let fail=false;
  const db={collection:name=>collection((scope.getStore()==='tommi38'?'':`establishments/${scope.getStore()}/`)+name),runTransaction:fn=>{const result=queue.then(async()=>{const writes=[];let dirty=false;const tx={get:ref=>{assert.equal(dirty,false,'all reads before writes');return ref.get()},set:(ref,v)=>{dirty=true;writes.push(()=>data.set(ref.path,structuredClone(v)))},update:(ref,v)=>{dirty=true;writes.push(()=>apply(ref.path,v))},delete:ref=>{dirty=true;writes.push(()=>data.delete(ref.path))}};tx.create=tx.set;const value=await fn(tx);if(fail){fail=false;throw Error('Storage failure');}writes.forEach(fn=>fn());return value;});queue=result.catch(()=>{});return result;},batch:()=>{const writes=[];return{set:(r,v)=>writes.push(()=>data.set(r.path,v)),update:(r,v)=>writes.push(()=>apply(r.path,v)),delete:r=>writes.push(()=>data.delete(r.path)),commit:async()=>writes.forEach(fn=>fn())}}};
  const routes={};const router={};for(const method of ['get','post','put','patch','delete'])router[method]=(path,...handlers)=>routes[method+' '+path]=handlers;
- const context=vm.createContext({db,z,bcrypt,Buffer,console,Date,Intl,tenantId:()=>scope.getStore(),FieldValue:{increment:n=>({increment:n}),serverTimestamp:()=>0},express:{Router:()=>router},rateLimit:()=> (req,res,next)=>next(),establishments:async()=>[]});
- for(const module of ['permissions.js',file])vm.runInContext(fs.readFileSync(__dirname+'/../../backend/src/'+module,'utf8').replace(/^import .*;$/gm,'').replace('export default router;','').replace(/export /g,''),context);
+ const context=vm.createContext({db,root:{...db,collection},z,bcrypt,Buffer,console,Date,Intl,tenantId:()=>scope.getStore(),FieldValue:{increment:n=>({increment:n}),serverTimestamp:()=>0},express:{Router:()=>router},rateLimit:()=> (req,res,next)=>next(),establishments:async()=>[]});
+ for(const module of ['authorization.js','management-guards.js','permissions.js',file])vm.runInContext(fs.readFileSync(__dirname+'/../../backend/src/'+module,'utf8').replace(/^import .*;$/gm,'').replace('export default router;','').replace(/export /g,''),context);
  async function call(method,path,{tenant='tommi38',user='alice',session,body={},params={},query={}}={}){
   return scope.run(tenant,async()=>{
    const req={session:session || (user?{user:{username:user,role:user==='manager'?'admin':'user',establishment:tenant}}:{}),body,params,query};

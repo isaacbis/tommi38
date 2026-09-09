@@ -17,8 +17,8 @@ function setup(){
   const run=queue.then(async()=>{const writes=[];let wrote=false;const result=await fn({get:ref=>{assert.equal(wrote,false,'Firestore reads must precede writes');return ref.get()},set:(ref,value)=>{wrote=true;writes.push(()=>data.set(ref.path,value))},update:(ref,value)=>{wrote=true;writes.push(()=>apply(ref.path,value))},delete:ref=>{wrote=true;writes.push(()=>data.delete(ref.path))}});writes.forEach(f=>f());return result});queue=run.catch(()=>{});return run;
  }};
  const routes={};const router={};for(const method of ['get','post','put','patch','delete'])router[method]=(path,...handlers)=>routes[method+' '+path]=handlers;
- const ctx=vm.createContext({console,Buffer,Date,Intl,db,z,tenantId:()=> 'tommi38',FieldValue:{increment:n=>({increment:n}),serverTimestamp:()=>({toDate:()=>new Date()})},express:{Router:()=>router},rateLimit:()=> (req,res,next)=>next(),bcrypt:require('../backend/node_modules/bcrypt'),establishments:async()=>[]});
- vm.runInContext(fs.readFileSync(__dirname+'/../backend/src/permissions.js','utf8').replace(/^import .*;$/gm,'').replace(/export /g,''),ctx);
+ const ctx=vm.createContext({console,Buffer,Date,Intl,db,root:db,z,tenantId:()=> 'tommi38',FieldValue:{increment:n=>({increment:n}),serverTimestamp:()=>({toDate:()=>new Date()})},express:{Router:()=>router},rateLimit:()=> (req,res,next)=>next(),bcrypt:require('../backend/node_modules/bcrypt'),establishments:async()=>[]});
+ for(const file of ['authorization.js','management-guards.js','permissions.js'])vm.runInContext(fs.readFileSync(__dirname+'/../backend/src/'+file,'utf8').replace(/^import .*;$/gm,'').replace(/export /g,''),ctx);
  vm.runInContext(source,ctx);
  async function call(method,path,user='alice',body={},params={},query={}){
   const req={session:user?{user:{username:user,role:user==='admin'?'admin':'user'}}:{},body,params,query};
@@ -68,8 +68,8 @@ test('ledger access is private and admin cannot make balance negative or fractio
 });
 test('tenant middleware preserves legacy paths and isolates concurrent contexts',async()=>{
  const tenancy=fs.readFileSync(__dirname+'/../backend/src/tenancy.js','utf8').replace(/^import .*;$/gm,'').replace(/export /g,'');
- const root={collection:name=>({doc:id=>({collection:child=>`${name}/${id}/${child}`}),get:async()=>({docs:[{id:'claudia',data:()=>({name:'Claudia',enabled:true})}]}),name})};
- const context=vm.createContext({AsyncLocalStorage,root});vm.runInContext(tenancy,context);
+ const root={collection:name=>({doc:id=>({collection:child=>`${name}/${id}/${child}`,get:async()=>({exists:name==='users'&&id==='admin'||name==='establishments'&&id==='claudia',data:()=>name==='users'?{role:'admin'}:{name:'Claudia',enabled:true}})}),get:async()=>({docs:[{id:'claudia',data:()=>({name:'Claudia',enabled:true})}]}),name})};
+ const context=vm.createContext({AsyncLocalStorage,root});vm.runInContext(fs.readFileSync(__dirname+'/../backend/src/authorization.js','utf8').replace(/^import .*;$/gm,'').replace(/export /g,''),context);vm.runInContext(tenancy,context);
  assert.equal(vm.runInContext("db.collection('users').name",context),'users');
  const results=await vm.runInContext("Promise.all(['claudia','other'].map(id=>tenantContext.run(id,async()=>{await Promise.resolve();return db.collection('users')})))",context);
  assert.deepEqual([...results],['establishments/claudia/users','establishments/other/users']);

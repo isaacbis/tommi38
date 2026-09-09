@@ -73,7 +73,7 @@ function setup() {
   };
   const routes = {};
   const router = {};
-  for (const method of ['get', 'post', 'patch']) {
+  for (const method of ['get', 'post', 'patch', 'delete']) {
     router[method] = (path, ...handlers) => { routes[method + ' ' + path] = handlers; };
   }
   const context = vm.createContext({
@@ -81,6 +81,7 @@ function setup() {
     FieldValue: { serverTimestamp: () => ({ timestamp: true }) },
     express: { Router: () => router }
   });
+  vm.runInContext(fs.readFileSync(__dirname+'/../backend/src/authorization.js','utf8').replace(/^import .*;$/gm,'').replace(/export /g,''),context);
   vm.runInContext(source, context);
   async function call(method, path, options = {}) {
     context.currentTenant = options.tenant || 'tommi38';
@@ -122,7 +123,7 @@ test('a tenant manager cannot use a matching username or a forged platform flag 
   }
   assert.equal((await e.call('get', '/establishments', {
     tenant: 'beach-a', user: { username: 'owner', role: 'admin', establishment: 'tommi38' }
-  })).code, 403);
+  })).code, 200);
 });
 
 test('central authority is checked again after disabling or revoking the user', async () => {
@@ -132,9 +133,9 @@ test('central authority is checked again after disabling or revoking the user', 
   assert.equal((await e.call('get', '/establishments')).code, 403);
   e.data.get('users/owner').platformAdmin = true;
   e.data.get('users/owner').disabled = true;
-  assert.equal((await e.call('get', '/establishments')).code, 403);
+  assert.equal((await e.call('get', '/establishments')).code, 401);
   e.data.delete('users/owner');
-  assert.equal((await e.call('get', '/establishments')).code, 403);
+  assert.equal((await e.call('get', '/establishments')).code, 401);
 });
 
 test('a session invalidated by password reset cannot retain central access', async () => {

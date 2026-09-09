@@ -5,6 +5,7 @@ import { z } from "zod";
 import { FieldValue } from "./db.js";
 import { db, tenantId, establishments } from "./tenancy.js";
 import { requireAuth, requireAdmin, validDate } from "./permissions.js";
+import { requirePersonalAccount } from "./management-guards.js";
 
 const cleanupTimes = new Map();
 const CLEANUP_COOLDOWN_MS = 60_000; // 1 minuto
@@ -170,16 +171,16 @@ router.post("/logout", (req, res, next) => {
 });
 
 router.get("/me", requireAuth, async (req, res) => {
-  const username = req.session.user.username;
-  const snap = await db.collection("users").doc(username).get();
-  const u = snap.exists ? snap.data() : {};
-
+  const u = req.account;
   res.json({
-    username,
-    role: u.role || "user",
-    credits: u.credits ?? 0,
-    disabled: !!u.disabled,
-    platformAdmin: tenantId() === "tommi38" && u.platformAdmin === true
+    username:req.session.user.username,
+    role:req.session.user.role,
+    credits:req.isPlatformManagement ? 0 : u.credits ?? 0,
+    disabled:!!u.disabled,
+    platformAdmin:req.session.user.platformAdmin===true,
+    managementMode:!!req.isPlatformManagement,
+    establishment:req.establishment || {id:tenantId(),name:tenantId()==='tommi38'?'Tommi38':tenantId(),enabled:true},
+    homeEstablishment:req.session.user.establishment || 'tommi38'
   });
 });
 
@@ -228,7 +229,7 @@ router.get("/reservations", requireAuth, async (req, res) => {
 });
 
 
-router.get("/reservations/mine", requireAuth, async (req, res) => {
+router.get("/reservations/mine", requireAuth, requirePersonalAccount, async (req, res) => {
   await cleanupExpiredReservations();
 
   const username = req.session.user.username;
@@ -262,7 +263,7 @@ router.get("/reservations/mine", requireAuth, async (req, res) => {
   res.json({ items });
 });
 
-router.post("/reservations", requireAuth, async (req, res) => {
+async function createReservation(req, res) {
   await cleanupExpiredReservations();
 
   const schema = z.object({
@@ -274,7 +275,7 @@ router.post("/reservations", requireAuth, async (req, res) => {
   if (!parsed.success) return res.status(400).json({ error: "BAD_BODY" });
 
   const { fieldId, date, time } = parsed.data;
-  const username = req.session.user.username;
+  const username = req.adminBookingUsername || req.session.user.username;
   const isAdmin = req.session.user.role === "admin";
 
   const [cfgSnap, fieldsSnap] = await Promise.all([
@@ -376,6 +377,10 @@ router.post("/reservations", requireAuth, async (req, res) => {
         throw error;
       }
 
+      if (req.adminBookingUsername) {
+        const target=await transaction.get(userRef);
+        if(!target.exists || target.data().disabled)throw Object.assign(new Error('USER_NOT_FOUND'),{code:'USER_NOT_FOUND'});
+      }
       if (!isAdmin) {
         const userSnap = await transaction.get(userRef);
         if (!userSnap.exists || Number(userSnap.data().credits || 0) <= 0) {
@@ -400,25 +405,34 @@ router.post("/reservations", requireAuth, async (req, res) => {
         time,
         user: username,
         slotMinutes,
+        creditsCharged:isAdmin ? 0 : 1,
+        createdBy:req.actorId || req.session.user.username,
         createdAt: FieldValue.serverTimestamp()
       });
     });
   } catch (error) {
-    if (["FIELD_CLOSED", "BOOKING_LIMIT"].includes(error?.code)) return res.status(409).json({error:error.code});
+    if (["FIELD_CLOSED", "BOOKING_LIMIT", "CONFIG_CHANGED", "USER_NOT_FOUND"].includes(error?.code)) return res.status(409).json({error:error.code});
     if (error?.code === "SLOT_TAKEN") {
       return res.status(409).json({ error: "SLOT_TAKEN" });
     }
     if (error?.code === "NO_CREDITS") {
       return res.status(403).json({ error: "NO_CREDITS" });
     }
-    console.error("Errore creazione prenotazione", error);
+    console.error("Errore creazione prenotazione");
     return res.status(500).json({ error: "BOOKING_ERROR" });
   }
 
   res.json({ ok: true });
+}
+router.post('/reservations',requireAuth,requirePersonalAccount,createReservation);
+router.post('/admin/reservations',requireAdmin,async(req,res)=>{
+  const parsed=z.object({username:z.string().min(1).max(80).refine(value=>!value.includes('/')),fieldId:z.string().min(1).max(80),date:z.string().refine(validDate),time:z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/)}).strict().safeParse(req.body);
+  if(!parsed.success)return res.status(400).json({error:'BAD_BODY'});
+  req.adminBookingUsername=parsed.data.username;
+  return createReservation(req,res);
 });
 
-router.delete("/reservations/:id", requireAuth, async (req, res) => {
+async function cancelReservation(req,res) {
   const reservationRef = db.collection("reservations").doc(req.params.id);
   const username = req.session.user.username;
   const isAdmin = req.session.user.role === "admin";
@@ -436,29 +450,31 @@ router.delete("/reservations/:id", requireAuth, async (req, res) => {
         throw error;
       }
 
-      if (!isAdmin && reservation.date > today) {
+      if (!isAdmin && reservation.date > today && reservation.creditsCharged !== 0) {
         transaction.update(db.collection("users").doc(username), {
           credits: FieldValue.increment(1)
         });
       }
 
-      if (!isAdmin && reservation.date > today) {
+      if (!isAdmin && reservation.date > today && reservation.creditsCharged !== 0) {
         transaction.set(db.collection("creditLedger").doc(), {user:username, delta:1, reason:"Rimborso cancellazione", reservationId:req.params.id, createdAt:FieldValue.serverTimestamp()});
       }
-      transaction.set(db.collection("reservationHistory").doc(), { ...reservation, reservationId:req.params.id, status:"cancelled", cancelledBy:username, archivedAt:FieldValue.serverTimestamp() });
+      transaction.set(db.collection("reservationHistory").doc(), { ...reservation, reservationId:req.params.id, status:"cancelled", cancelledBy:req.actorId || username, archivedAt:FieldValue.serverTimestamp() });
       transaction.delete(reservationRef);
     });
   } catch (error) {
     if (error?.code === "NOT_ALLOWED") {
       return res.status(403).json({ error: "NOT_ALLOWED" });
     }
-    console.error("Errore cancellazione prenotazione", error);
+    console.error("Errore cancellazione prenotazione");
     return res.status(500).json({ error: "DELETE_ERROR" });
   }
 
   await deletePlayerSearchTree(req.params.id);
   res.json({ ok: true });
-});
+}
+router.delete('/reservations/:id',requireAuth,requirePersonalAccount,cancelReservation);
+router.delete('/admin/reservations/:id',requireAdmin,cancelReservation);
 
 /* =================== CERCA GIOCATORI =================== */
 router.get("/player-searches", requireAuth, async (req, res) => {
@@ -485,11 +501,11 @@ router.get("/player-searches", requireAuth, async (req, res) => {
 
     const requestsSnap = await doc.ref.collection("requests").get();
     const allRequests = requestsSnap.docs.map(publicRequestData);
-    const myRequest = requestsSnap.docs.find(requestDoc =>
+    const myRequest = !req.isPlatformManagement && requestsSnap.docs.find(requestDoc =>
       requestDoc.data().requesterUser === username
     );
 
-    const isOwner = search.ownerUser === username;
+    const isOwner = !req.isPlatformManagement && search.ownerUser === username;
     const canManage = isOwner || isAdmin;
     const spotsNeeded = Number(search.spotsNeeded || 0);
     const spotsFilled = Number(search.spotsFilled || 0);
@@ -526,7 +542,7 @@ router.get("/player-searches", requireAuth, async (req, res) => {
   res.json({ items });
 });
 
-router.post("/player-searches", requireAuth, async (req, res) => {
+router.post("/player-searches", requireAuth, requirePersonalAccount, async (req, res) => {
   const schema = z.object({
     reservationId: z.string().min(1).max(180),
     spotsNeeded: z.number().int().min(1).max(12),
@@ -580,7 +596,7 @@ router.post("/player-searches", requireAuth, async (req, res) => {
   res.json({ ok: true, id: reservationId });
 });
 
-router.post("/player-searches/:id/requests", requireAuth, async (req, res) => {
+router.post("/player-searches/:id/requests", requireAuth, requirePersonalAccount, async (req, res) => {
   const schema = z.object({
     participantNames: z.array(z.string().trim().min(2).max(80)).min(1).max(12),
     phone: z.string().trim().min(6).max(30).regex(/^[0-9+().\s-]+$/)
@@ -780,7 +796,7 @@ router.patch("/player-searches/:id/requests/:requestId", requireAuth, async (req
   res.json({ ok: true });
 });
 
-router.delete("/player-searches/:id/requests/:requestId", requireAuth, async (req, res) => {
+router.delete("/player-searches/:id/requests/:requestId", requireAuth, requirePersonalAccount, async (req, res) => {
   const searchRef = db.collection("playerSearches").doc(req.params.id);
   const requestRef = searchRef.collection("requests").doc(req.params.requestId);
   const requestSnap = await requestRef.get();
@@ -887,7 +903,8 @@ router.get("/admin/users", requireAdmin, async (req, res) => {
       role: u.role || "user",
       credits: u.credits ?? 0,
       disabled: !!u.disabled,
-      pendingApproval: !!u.pendingApproval
+      pendingApproval: !!u.pendingApproval,
+      platformAdmin: tenantId()==="tommi38" && u.platformAdmin===true
     });
   });
   res.json({ items });
@@ -910,7 +927,7 @@ router.put("/admin/users/credits", requireAdmin, async (req, res) => {
       const next = Number(user.data().credits || 0) + parsed.data.delta;
       if (!Number.isSafeInteger(next) || next < 0) throw new Error("INVALID_BALANCE");
       tx.update(ref, {credits:next});
-      tx.set(db.collection("creditLedger").doc(), {user:parsed.data.username, delta:parsed.data.delta, reason:"Rettifica amministratore", actor:req.session.user.username, createdAt:FieldValue.serverTimestamp()});
+      tx.set(db.collection("creditLedger").doc(), {user:parsed.data.username, delta:parsed.data.delta, reason:"Rettifica amministratore", actor:req.actorId || req.session.user.username, createdAt:FieldValue.serverTimestamp()});
     });
   } catch { return res.status(400).json({error:"INVALID_BALANCE"}); }
   res.json({ ok: true });
@@ -924,11 +941,11 @@ router.put("/admin/users/status", requireAdmin, async (req, res) => {
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({ error: "BAD_BODY" });
 
-  if (parsed.data.username === req.session.user.username && parsed.data.disabled) return res.status(400).json({error:"CANNOT_DISABLE_SELF"});
+  if (parsed.data.username === req.session.user.username && (req.session.user.establishment || "tommi38") === tenantId() && parsed.data.disabled) return res.status(400).json({error:"CANNOT_DISABLE_SELF"});
   const ref=db.collection("users").doc(parsed.data.username);
   const snap=await ref.get();
   if (!snap.exists) return res.status(404).json({error:"USER_NOT_FOUND"});
-  if (snap.data().platformAdmin && !req.session.user.platformAdmin) return res.status(403).json({error:"NOT_AUTHORIZED"});
+  if (tenantId()==="tommi38" && snap.data().platformAdmin && !req.session.user.platformAdmin) return res.status(403).json({error:"NOT_AUTHORIZED"});
   await ref.update({disabled:parsed.data.disabled,pendingApproval:false,sessionVersion:FieldValue.increment(1)});
   res.json({ ok: true });
 });
@@ -944,11 +961,11 @@ router.put("/admin/users/password", requireAdmin, async (req, res) => {
   const ref=db.collection("users").doc(parsed.data.username);
   const snap=await ref.get();
   if (!snap.exists) return res.status(404).json({error:"USER_NOT_FOUND"});
-  if (snap.data().platformAdmin && !req.session.user.platformAdmin) return res.status(403).json({error:"NOT_AUTHORIZED"});
+  if (tenantId()==="tommi38" && snap.data().platformAdmin && !req.session.user.platformAdmin) return res.status(403).json({error:"NOT_AUTHORIZED"});
   const hash = await bcrypt.hash(parsed.data.newPassword, 12);
   await db.runTransaction(async tx => {
     const fresh=await tx.get(ref);
-    if (!fresh.exists || (fresh.data().platformAdmin && !req.session.user.platformAdmin)) throw new Error("ACCOUNT_CHANGED");
+    if (!fresh.exists || (tenantId()==="tommi38" && fresh.data().platformAdmin && !req.session.user.platformAdmin)) throw new Error("ACCOUNT_CHANGED");
     tx.update(ref,{passwordHash:hash,sessionVersion:FieldValue.increment(1)});
     tx.delete(db.collection("recoveryRequests").doc(parsed.data.username));
   });
@@ -965,7 +982,7 @@ router.post("/admin/users/rename", requireAdmin, async (req, res) => {
 
   const { oldUsername, newUsername } = parsed.data;
   if (oldUsername === newUsername) return res.json({ ok: true });
-  if (oldUsername === req.session.user.username) {
+  if (oldUsername === req.session.user.username && (req.session.user.establishment || "tommi38") === tenantId()) {
     return res.status(400).json({ error: "CANNOT_RENAME_CURRENT_USER" });
   }
 
@@ -981,7 +998,7 @@ router.post("/admin/users/rename", requireAdmin, async (req, res) => {
       tx.get(db.collection('playerSearches'))
     ]);
     if(!oldSnap.exists)return 'USER_NOT_FOUND';
-    if(oldSnap.data().platformAdmin)return 'CANNOT_RENAME_PLATFORM_ADMIN';
+    if(tenantId()==="tommi38" && oldSnap.data().platformAdmin)return 'CANNOT_RENAME_PLATFORM_ADMIN';
     if(newSnap.exists)return 'USERNAME_TAKEN';
     const history=records.slice(0,userCollections.length);
     const named=records.slice(userCollections.length,userCollections.length+namedCollections.length*2);
@@ -1027,7 +1044,7 @@ router.get("/weather", async (req, res) => {
 
 
 /* =================== WAITLIST / CREDITS / OPERATIONS =================== */
-router.get('/credits', requireAuth, async (req, res) => {
+router.get('/credits', requireAuth, requirePersonalAccount, async (req, res) => {
   const user = req.session.user.username;
   const [account, history] = await Promise.all([
     db.collection('users').doc(user).get(),
@@ -1037,7 +1054,7 @@ router.get('/credits', requireAuth, async (req, res) => {
   items.sort((a,b) => (b.at || '').localeCompare(a.at || ''));
   res.json({balance:account.data()?.credits || 0, items:items.slice(0,100)});
 });
-router.get('/waitlist', requireAuth, async (req,res) => {
+router.get('/waitlist', requireAuth, requirePersonalAccount, async (req,res) => {
   const snap = await db.collection('waitlist').where('user','==',req.session.user.username).get();
   const closures = await db.collection('admin').doc('closures').get();
   const items = [];
@@ -1051,7 +1068,7 @@ router.get('/waitlist', requireAuth, async (req,res) => {
   items.sort((a,b)=>`${a.date} ${a.time}`.localeCompare(`${b.date} ${b.time}`));
   res.json({items});
 });
-router.post('/waitlist', requireAuth, async (req,res) => {
+router.post('/waitlist', requireAuth, requirePersonalAccount, async (req,res) => {
   const schema = z.object({reservationId:z.string().min(1).max(120).refine(v=>!v.includes('/'))});
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) return res.status(400).json({error:'BAD_BODY'});
@@ -1074,7 +1091,7 @@ router.post('/waitlist', requireAuth, async (req,res) => {
   if (result) return res.status(409).json({error:result});
   res.json({ok:true});
 });
-router.delete('/waitlist/:id', requireAuth, async (req,res) => {
+router.delete('/waitlist/:id', requireAuth, requirePersonalAccount, async (req,res) => {
   const ref = db.collection('waitlist').doc(req.params.id);
   await db.runTransaction(async tx => {
     const snap = await tx.get(ref);
@@ -1133,19 +1150,37 @@ router.get("/admin/reservations", requireAdmin, async (req,res) => {
   res.json({items,date});
 });
 router.post("/admin/users", requireAdmin, async (req,res) => {
-  const parsed=z.object({username:z.string().regex(/^[a-zA-Z0-9._-]{3,40}$/),password:z.string().min(12).max(72).refine(value => Buffer.byteLength(value,"utf8") <= 72),credits:z.number().int().min(0).max(100000)}).strict().safeParse(req.body);
+  const parsed=z.object({username:z.string().regex(/^[a-zA-Z0-9._-]{3,40}$/),password:z.string().min(12).max(72).refine(value => Buffer.byteLength(value,"utf8") <= 72),credits:z.number().int().min(0).max(100000),role:z.enum(["user","admin"]).optional()}).strict().safeParse(req.body);
   if (!parsed.success) return res.status(400).json({error:"BAD_BODY"});
-  const {username,password,credits}=parsed.data;
+  const {username,password,credits,role="user"}=parsed.data;
+  if(role==="admin" && !req.session.user.platformAdmin)return res.status(403).json({error:"NOT_AUTHORIZED"});
   const passwordHash=await bcrypt.hash(password,12);
   const ref=db.collection("users").doc(username);
   const created=await db.runTransaction(async tx=>{
     if ((await tx.get(ref)).exists) return false;
-    tx.set(ref,{passwordHash,credits,role:"user",disabled:false,sessionVersion:0});
-    if(credits) tx.set(db.collection("creditLedger").doc(),{user:username,delta:credits,reason:"Crediti iniziali",actor:req.session.user.username,createdAt:FieldValue.serverTimestamp()});
+    tx.set(ref,{passwordHash,credits,role,platformAdmin:false,disabled:false,sessionVersion:0});
+    if(credits) tx.set(db.collection("creditLedger").doc(),{user:username,delta:credits,reason:"Crediti iniziali",actor:req.actorId || req.session.user.username,createdAt:FieldValue.serverTimestamp()});
     return true;
   });
   if(!created)return res.status(409).json({error:"USERNAME_TAKEN"});
   res.status(201).json({ok:true});
+});
+
+router.put('/admin/users/role',requireAdmin,async(req,res)=>{
+  if(!req.session.user.platformAdmin)return res.status(403).json({error:'NOT_AUTHORIZED'});
+  const parsed=z.object({username:z.string().min(1).max(80).refine(value=>!value.includes('/')),role:z.enum(['user','admin'])}).strict().safeParse(req.body);
+  if(!parsed.success)return res.status(400).json({error:'BAD_BODY'});
+  const ref=db.collection('users').doc(parsed.data.username);
+  const error=await db.runTransaction(async tx=>{
+    const user=await tx.get(ref);
+    if(!user.exists)return 'USER_NOT_FOUND';
+    if(tenantId()==='tommi38' && user.data().platformAdmin)return 'PROTECTED_ACCOUNT';
+    tx.update(ref,{role:parsed.data.role,sessionVersion:FieldValue.increment(1)});
+    tx.set(db.collection('adminAudit').doc(),{action:'user_role_changed',user:parsed.data.username,role:parsed.data.role,actor:req.actorId || req.session.user.username,createdAt:FieldValue.serverTimestamp()});
+    return null;
+  });
+  if(error)return res.status(error==='USER_NOT_FOUND'?404:403).json({error});
+  res.json({ok:true});
 });
 
 export default router;
