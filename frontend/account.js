@@ -19,8 +19,9 @@
     const root = qs('accountContent');
     const venue = selectedEstablishment;
     const username = STATE.me?.username;
+    const epoch = managementContextEpoch;
     const current = () => root.isConnected && qs('appModal').open &&
-      venue === selectedEstablishment && username === STATE.me?.username;
+      venue === selectedEstablishment && username === STATE.me?.username && epoch === managementContextEpoch;
     return {root, current};
   }
   const passwordInput = (id, label, current = false) => `<label class="field-label" for="${id}">${label}</label><input id="${id}" class="admin-input" type="password" required ${current ? '' : 'minlength="12"'} maxlength="72" autocomplete="${current ? 'current-password' : 'new-password'}">`;
@@ -57,6 +58,7 @@
     });
   }
   function changePassword() {
+    if(STATE.me?.managementMode)return;
     const {root,current} = modal('Cambia la tua password', `<form class="form-stack">${passwordInput('accountCurrent','Password attuale',true)}${passwordInput('accountNew','Nuova password')}<p class="helper-text">Almeno 12 caratteri. Gli altri dispositivi dovranno accedere di nuovo.</p><button class="primary-btn" type="submit">Salva password</button><p role="status"></p></form>`);
     bindForm(root,current,async form => {
       await api('/auth/password',{method:'POST',body:JSON.stringify({currentPassword:form.querySelector('#accountCurrent').value,newPassword:form.querySelector('#accountNew').value})});
@@ -137,8 +139,10 @@
       try{const config=await loadPublicConfig();if(venue===selectedEstablishment)signup.classList.toggle('hidden',config.registrationEnabled!==true);}catch{}
       return result;
     };
-    const settings=document.createElement('section');settings.className='glass-card wait-row';
+    const settings=document.createElement('section');settings.className='glass-card wait-row';settings.dataset.personalAccount='';
     settings.append(button('Cambia password',changePassword));qs('viewAlerts').append(settings);
+    const ownAccount=button('Cambia la mia password',changePassword);ownAccount.dataset.personalAccount='';qs('adminMenu').append(ownAccount);
+    const globalAccount=button('Cambia la password di amministratore',changePassword);globalAccount.dataset.personalAccount='';qs('adminEstablishments').append(globalAccount);
     qs('creditHistory').closest('section').append(button('Richiedi crediti',requestCredits));
     const admin=document.createElement('div');admin.className='home-actions';
     admin.append(button('Richieste utenti',manageRequests),button('Pacchetti crediti',managePackages));qs('adminUsers').prepend(admin);

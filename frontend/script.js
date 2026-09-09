@@ -134,6 +134,7 @@ function updateDateUI() {
 
 /* ===================== API ===================== */
 async function api(path, options = {}) {
+  const epoch = typeof managementContextEpoch === 'undefined' ? 0 : managementContextEpoch;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 15000);
   try {
@@ -146,8 +147,9 @@ async function api(path, options = {}) {
       throw { error: "INVALID_RESPONSE", status: response.status };
     }
     const data = await response.json();
+    if (typeof managementContextEpoch !== 'undefined' && epoch !== managementContextEpoch) throw {error:'CONTEXT_CHANGED'};
     if (!response.ok) {
-      if (response.status === 401 && STATE.me && path !== "/login") {
+      if (response.status === 401 && STATE.me && path !== "/login" && (typeof managementContextEpoch === 'undefined' || epoch === managementContextEpoch)) {
         stopAutoRefresh();
         STATE.me = null;
         reservationRequest++;
@@ -175,7 +177,10 @@ async function api(path, options = {}) {
 
 let publicConfigRequest = null;
 function loadPublicConfig() {
-  if (!publicConfigRequest) publicConfigRequest = api("/public/config").finally(() => { publicConfigRequest = null; });
+  if (!publicConfigRequest) {
+    const pending = api("/public/config").finally(() => { if(publicConfigRequest===pending)publicConfigRequest=null; });
+    publicConfigRequest = pending;
+  }
   return publicConfigRequest;
 }
 
@@ -305,6 +310,11 @@ async function logout() {
   if (!await confirmAction("Vuoi uscire?", "Potrai accedere di nuovo con le tue credenziali.", "Esci")) return;
   try { await api("/logout", { method: "POST" }); }
   catch (error) { setBookMessage(errorMessage(error), "error"); return; }
+  if (STATE.me?.platformAdmin) {
+    selectedEstablishment='tommi38';
+    try{localStorage.setItem('tommi38-establishment','tommi38');}catch{}
+    applyEstablishmentName('Tommi38');
+  }
   reservationRequest++;
   matchesRequest++;
   playersRequest++;
@@ -330,12 +340,15 @@ function togglePassword() {
 
 /* ===================== LOAD APP ===================== */
 async function loadAll(setToday = false) {
+  const epoch = managementContextEpoch;
   const [me, pub] = await Promise.all([
     api("/me"),
     loadPublicConfig()
   ]);
+  if (epoch !== managementContextEpoch) return;
 
   STATE.me = me;
+  if (me.establishment?.name) applyEstablishmentName(me.establishment.name);
   STATE.config = pub;
   STATE.fields = pub.fields || [];
   STATE.fieldsDraft = [...STATE.fields];
@@ -350,7 +363,7 @@ async function loadAll(setToday = false) {
   const displayName = firstName.charAt(0).toUpperCase() + firstName.slice(1);
   qs("welcome").innerHTML = `Ciao <strong>${escapeHTML(displayName)}</strong>`;
   qs("creditsBox").textContent = `${Number(me.credits || 0)} ${Number(me.credits) === 1 ? "credito" : "crediti"}`;
-  qs("roleBadge").textContent = me.platformAdmin ? "Amministratore della piattaforma" : me.role === "admin" ? "Gestore" : "";
+  qs("roleBadge").textContent = me.platformAdmin ? "Amministratore globale" : me.role === "admin" ? "Amministratore del tuo stabilimento" : "";
   me.role === "admin" || me.platformAdmin ? show(qs("roleBadge")) : hide(qs("roleBadge"));
   configureManagementAccess();
   qs("notesView").textContent = STATE.notes || "Nessuna comunicazione al momento.";
@@ -380,17 +393,16 @@ async function loadAll(setToday = false) {
     qs("notesText").value = STATE.notes;
     renderFieldsAdmin();
     renderGalleryAdmin();
-    loadUsers().catch(() => { qs("usersList").textContent = "Impossibile caricare gli utenti. Riapri questa sezione per riprovare."; });
   } else {
     if (!me.platformAdmin) hide(qs("openAdminBtn"));
   }
 
-  await Promise.all([
-    loadReservations(),
-    loadMyReservations()
-  ]);
-
-  switchView("home", false);
+  if (me.platformAdmin && !me.managementMode) await openPlatformEstablishments();
+  else if (me.role === 'admin') openAdminShell();
+  else {
+    await Promise.all([loadReservations(),loadMyReservations()]);
+    switchView("home", false);
+  }
   startAutoRefresh();
 }
 
@@ -628,7 +640,7 @@ async function deleteReservation(id) {
   if (deleting.has(id)) return;
   deleting.add(id);
   const item = STATE.myReservations.find(reservation => reservation.id === id);
-  const refund = STATE.me?.role === "admin" ? "Le prenotazioni del gestore non consumano crediti." : item?.date > localISODate() ? "Riceverai il rimborso di 1 credito." : "Per le cancellazioni del giorno stesso non è previsto un rimborso.";
+  const refund = item?.creditsCharged === 0 || STATE.me?.role === "admin" ? "Questa prenotazione non ha consumato crediti." : item?.date > localISODate() ? "Riceverai il rimborso di 1 credito." : "Per le cancellazioni del giorno stesso non è previsto un rimborso.";
   if (!await confirmAction("Cancella la partita", "La prenotazione verrà rimossa e il campo tornerà disponibile.\n" + refund, "Cancella partita")) { deleting.delete(id); return; }
 
   try {
@@ -641,8 +653,10 @@ async function deleteReservation(id) {
 }
 
 async function refreshCredits() {
+  if (STATE.me?.managementMode) return;
+  const venue = selectedEstablishment;
   const me = await api("/me");
-  if (!STATE.me || STATE.me.username !== me.username) return;
+  if (!STATE.me || STATE.me.username !== me.username || venue !== selectedEstablishment) return;
   STATE.me.credits = me.credits;
   qs("creditsBox").textContent = `${Number(me.credits || 0)} ${Number(me.credits) === 1 ? "credito" : "crediti"}`;
   updateBookingPreview();
@@ -650,7 +664,7 @@ async function refreshCredits() {
 
 /* ===================== MY MATCHES ===================== */
 async function loadMyReservations() {
-  if (!STATE.me) return;
+  if (!STATE.me || STATE.me.managementMode) return;
   const request = ++matchesRequest;
   let items;
   qs("refreshMatchesBtn").disabled = true;
@@ -756,6 +770,7 @@ function renderMyReservations() {
 /* ================= CERCA GIOCATORI ================= */
 let playersRequest = 0;
 async function loadPlayerSearches() {
+  if (!STATE.me || STATE.me.managementMode) return;
   const request = ++playersRequest;
   const user = STATE.me;
   try {
@@ -884,6 +899,7 @@ function openAppModal(title, html) {
 
 function closeAppModal() {
   qs("appModal").close();
+  qs("appModalBody").querySelectorAll('input[type="password"]').forEach(input=>{input.value='';});
   document.body.classList.remove("modal-open");
 }
 
@@ -1199,12 +1215,14 @@ function renderWeather(data) {
 
 /* ===================== NAVIGATION ===================== */
 function switchView(name, refresh = true) {
+  if (STATE.me?.managementMode) return openAdminShell();
   hide(qs("viewHome"));
   hide(qs("viewBook"));
   hide(qs("viewMatches"));
   hide(qs("viewPlayers"));
   hide(qs("viewAlerts"));
   hide(qs("adminShell"));
+  hide(qs("managerNav"));
   show(qs("bottomNav"));
 
   const target = name === "home" ? qs("viewHome") : name === "players" ? qs("viewPlayers") : name === "matches" ? qs("viewMatches") : name === "alerts" ? qs("viewAlerts") : qs("viewBook");
@@ -1225,7 +1243,7 @@ function switchView(name, refresh = true) {
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
-function openAdminShell() {
+function openAdminShell(skipPlatformLoad = false) {
   if (STATE.me?.role !== "admin" && !STATE.me?.platformAdmin) return;
   hide(qs("viewHome"));
   hide(qs("viewBook"));
@@ -1234,18 +1252,32 @@ function openAdminShell() {
   hide(qs("viewAlerts"));
   hide(qs("bottomNav"));
   show(qs("adminShell"));
+  if(STATE.me.platformAdmin && !STATE.me.managementMode){
+    hide(qs('managerNav'));
+    openAdmin('adminEstablishments');
+    if(skipPlatformLoad !== true)loadPlatformEstablishments();
+    return;
+  }
+  show(qs('managerNav'));
   openAdmin("adminMenu");
+  loadManagementSummary();
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
 function closeAdminShell() {
-  switchView("alerts");
+  switchView("home");
 }
 
 function openAdmin(id) {
   ["adminMenu", "adminConfig", "adminNotes", "adminFields", "adminUsers", "adminGallery", "adminAgenda", "adminEstablishments"]
     .forEach(sectionId => hide(qs(sectionId)));
   show(qs(id));
+  document.querySelectorAll('#managerNav [data-admin-section]').forEach(button=>{
+    const active=button.dataset.adminSection===id;
+    button.classList.toggle('active',active);
+    if(active)button.setAttribute('aria-current','page');else button.removeAttribute('aria-current');
+  });
+  window.scrollTo({top:0,behavior:'smooth'});
 }
 
 /* ===================== ADMIN ===================== */
@@ -1331,8 +1363,9 @@ async function saveConfig() {
 async function loadUsers() {
   const user = STATE.me;
   const venue = selectedEstablishment;
+  const epoch = managementContextEpoch;
   const response = await api("/admin/users");
-  if (user !== STATE.me || venue !== selectedEstablishment) return;
+  if (user !== STATE.me || venue !== selectedEstablishment || epoch !== managementContextEpoch) return;
   STATE.users = response.items || [];
   renderUsers(qs("userSearch")?.value || "");
 }
@@ -1385,7 +1418,12 @@ function renderUsers(filter = "") {
       await loadUsers();
     });
 
-    actions.append(credits, password, rename, toggle);
+    if (user.platformAdmin) {
+      const protectedLabel=document.createElement('p');protectedLabel.className='helper-text';protectedLabel.textContent='Amministratore globale · account protetto';actions.append(protectedLabel);
+    } else {
+      actions.append(credits,password,rename,toggle);
+      if(STATE.me?.platformAdmin)actions.append(adminButton('Cambia ruolo',()=>openUserRole(user)));
+    }
     item.append(main, actions);
     list.appendChild(item);
   });
@@ -1477,6 +1515,12 @@ async function refreshVisibleData() {
   if (refreshBusy || document.hidden || !STATE.me || !navigator.onLine || bookingBusy) return;
   refreshBusy = true;
   try {
+    if(STATE.me.role==='admin' && !qs('adminShell').classList.contains('hidden')){
+      if(!qs('adminAgenda').classList.contains('hidden'))await loadManagerAgenda();
+      else if(!qs('adminMenu').classList.contains('hidden'))await loadManagementSummary();
+      return;
+    }
+    if(STATE.me.managementMode)return;
     qs("datePick").min = localISODate();
     if (isPastDate(qs("datePick").value)) setDate(localISODate());
     const jobs = [refreshCredits()];

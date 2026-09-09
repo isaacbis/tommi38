@@ -2,7 +2,7 @@ import express from "express";
 import bcrypt from "bcrypt";
 import { z } from "zod";
 import { db as root, FieldValue } from "./db.js";
-import { tenantId } from "./tenancy.js";
+import { requirePlatformAdmin, readEstablishment } from "./authorization.js";
 
 const router = express.Router();
 const establishmentId = /^(?=.{1,60}$)[a-z0-9]+(?:-[a-z0-9]+)*$/;
@@ -24,25 +24,28 @@ const updateSchema = z.object({
 const wrap = handler => (req, res, next) => Promise.resolve().then(() => handler(req, res, next)).catch(next);
 const register = (method, path, ...handlers) => router[method](path, ...handlers.map(wrap));
 
-// Central authority is read from the legacy user document on every request.
-// A venue manager or a stale/tampered session cannot grant this permission.
-async function requirePlatformAdmin(req, res, next) {
-  const user = req.session?.user;
-  if (!user) return res.status(401).json({ error: "NOT_AUTHENTICATED" });
-  if (tenantId() !== "tommi38" || (user.establishment || "tommi38") !== "tommi38" ||
-      typeof user.username !== "string" || !user.username || user.username.includes("/")) {
-    return res.status(403).json({ error: "NOT_AUTHORIZED" });
-  }
-  const snap = await root.collection("users").doc(user.username).get();
-  if (!snap.exists || snap.data().disabled || snap.data().platformAdmin !== true) {
-    return res.status(403).json({ error: "NOT_AUTHORIZED" });
-  }
-  if (Number(snap.data().sessionVersion || 0) !== Number(user.sessionVersion || 0)) {
-    delete req.session.user;
-    return res.status(401).json({ error: "NOT_AUTHENTICATED" });
-  }
-  next();
-}
+const contextSchema = z.object({ establishmentId: z.string().regex(establishmentId) }).strict();
+
+register("get", "/context", requirePlatformAdmin, async (req, res) => {
+  const establishment = await readEstablishment(req.session.managementEstablishment || "tommi38");
+  if (!establishment) return res.status(404).json({ error: "ESTABLISHMENT_NOT_FOUND" });
+  res.json({ establishment, managementMode: !!req.session.managementEstablishment });
+});
+
+register("post", "/context", requirePlatformAdmin, async (req, res) => {
+  const parsed = contextSchema.safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({ error: "BAD_BODY" });
+  const establishment = await readEstablishment(parsed.data.establishmentId);
+  if (!establishment) return res.status(404).json({ error: "ESTABLISHMENT_NOT_FOUND" });
+  // Keep the signed-in identity intact. This is an explicit administrative view.
+  req.session.managementEstablishment = establishment.id;
+  res.json({ establishment, managementMode: true });
+});
+
+register("delete", "/context", requirePlatformAdmin, async (req, res) => {
+  delete req.session.managementEstablishment;
+  res.json({ establishment: await readEstablishment("tommi38"), managementMode: false });
+});
 
 function establishmentSummary(id, value, managers = []) {
   return {

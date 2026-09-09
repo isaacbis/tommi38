@@ -4,7 +4,10 @@ function rememberedEstablishment() {
 }
 let selectedEstablishment = rememberedEstablishment() || 'tommi38';
 let establishmentItems = [];
+let managementContextEpoch = 0;
+let contextChanging = false;
 async function chooseEstablishment() {
+  if (STATE.me?.platformAdmin) return returnToPlatform();
   if (STATE.me) {
     await api('/logout', {method:'POST'});
     try { localStorage.removeItem('tommi38-establishment'); } catch {}
@@ -44,6 +47,16 @@ function applyEstablishmentName(name) {
   document.title = name + ' · Campi e partite';
 }
 async function initializeCommunity() {
+  // The server owns the active management scope. Local storage is only a login preference.
+  try {
+    const context = await api('/platform/context');
+    if (context.establishment) {
+      selectedEstablishment = context.establishment.id;
+      try { localStorage.setItem('tommi38-establishment', selectedEstablishment); } catch {}
+      applyEstablishmentName(context.establishment.name);
+      return loadAll(true);
+    }
+  } catch (error) { if (![401,403].includes(error.status)) throw error; }
   if (!rememberedEstablishment()) {
     // Preserve an existing legacy session on first upgrade.
     try { await api('/me'); } catch(e) { if (e.status === 401) return chooseEstablishment(); throw e; }
@@ -57,6 +70,7 @@ async function initializeCommunity() {
 }
 let homeRequest = 0;
 async function loadHome() {
+  if (STATE.me?.managementMode) return openAdminShell();
   const request = ++homeRequest;
   const box = qs('homeSummary');
   box.textContent = 'Caricamento…';
@@ -89,9 +103,11 @@ async function joinWaitlist(reservation) {
   catch(e) { alert(e.error==='OWN_RESERVATION'?'Questa partita è già tua.':e.error==='SLOT_FREE'?'Il posto è già libero. Aggiorna e prenota.':errorMessage(e)); }
 }
 async function loadOperations() {
+  const epoch=managementContextEpoch;
   openAppModal('Statistiche e chiusure', '<p>Caricamento…</p>');
   try {
     const data = await api('/admin/operations');
+    if(epoch!==managementContextEpoch || !qs('appModal').open)return;
     qs('appModalBody').innerHTML=`<div class="summary-grid"><div><strong>${data.users}</strong><span>Utenti</span></div><div><strong>${data.upcoming}</strong><span>Prenotazioni da oggi</span></div><div><strong>${data.credits}</strong><span>Crediti totali</span></div></div>
       <p class="muted">Situazione corrente del tuo stabilimento. Consulta l’agenda per vedere le prenotazioni di una data.</p>
       ${Object.entries(data.byField).map(([f,n])=>`<p>${escapeHTML(fieldName(f))}: ${Number(n)} prenotazioni</p>`).join('')}
@@ -111,7 +127,7 @@ async function loadOperations() {
       try {await api('/admin/closures',{method:'POST',body:JSON.stringify({fieldId:qs('closureField').value,date:qs('closureDate').value,start:qs('closureStart').value,end:qs('closureEnd').value,reason:qs('closureReason').value})});await loadOperations();}
       catch(error){qs('closureError').textContent=error.error==='EXISTING_RESERVATIONS'?'Ci sono prenotazioni nella fascia. Gestiscile prima di chiudere il campo.':'Chiusura non salvata. Verifica data, orari e connessione.';button.disabled=false;}
     };
-  } catch(e){qs('appModalBody').textContent=errorMessage(e);}
+  } catch(e){if(epoch===managementContextEpoch && qs('appModal').open)qs('appModalBody').textContent=errorMessage(e);}
 }
 
 /* The platform administrator creates venues; every venue manager keeps a scoped workspace. */
@@ -122,10 +138,26 @@ let agendaItems = [];
 function configureManagementAccess() {
   const manager = STATE.me?.role === 'admin';
   const platform = STATE.me?.platformAdmin === true;
-  const label = platform ? 'Amministratore della piattaforma' : 'Gestore dello stabilimento';
+  const label = platform ? 'Amministratore globale' : 'Amministratore del tuo stabilimento';
   qs('managerHomeRole').textContent = label;
   qs('adminRoleLabel').textContent = label;
-  qs('adminTitle').textContent = platform ? 'Amministrazione' : 'Gestisci stabilimento';
+  qs('adminTitle').textContent = platform && !STATE.me.managementMode ? 'Tutti gli stabilimenti' : (STATE.me.establishment?.name || 'Il tuo stabilimento');
+  qs('headerRole').textContent = label;
+  qs('headerRole').classList.toggle('hidden', !manager && !platform);
+  qs('switchBathBtn').textContent = platform ? 'Stabilimenti' : 'Cambia';
+  qs('managementBanner').classList.toggle('hidden', !STATE.me.managementMode);
+  qs('managementVenueName').textContent = STATE.me.establishment?.name || '';
+  document.body.classList.toggle('is-management-context', STATE.me.managementMode === true);
+  qs('newUserRoleField').classList.toggle('hidden', !platform);
+  qs('managerUserRoleHelp').classList.toggle('hidden', !platform);
+  qs('newUserRole').value = 'user';
+  qs('newUserRole').disabled = !platform;
+  qs('managerPlayBtn').classList.toggle('hidden', platform);
+  qs('managerSettingsBtn').classList.toggle('hidden', !platform);
+  qs('managerNav').classList.toggle('platform-navigation', platform);
+  qs('closeAdminBtn').classList.toggle('hidden', platform);
+  qs('createUserHeading').textContent = platform ? 'Crea utente o gestore' : 'Crea un utente';
+  document.querySelectorAll('[data-personal-account]').forEach(el=>el.classList.toggle('hidden',STATE.me.managementMode===true));
   [qs('managerHome'), qs('openAdminBtn')].forEach(el => (manager || platform ? show : hide)(el));
   [qs('homePlatformBtn'), qs('btnPlatformEstablishments')].forEach(el => (platform ? show : hide)(el));
   qs('homeAgendaBtn').classList.toggle('hidden', !manager);
@@ -134,6 +166,8 @@ function configureManagementAccess() {
 }
 
 function resetManagementViews() {
+  managementContextEpoch++;
+  homeRequest++;
   agendaRequest++;
   platformRequest++;
   agendaItems = [];
@@ -141,6 +175,63 @@ function resetManagementViews() {
   ['agendaList', 'platformEstablishmentList', 'usersList', 'agendaStatus', 'establishmentStatus', 'createUserStatus'].forEach(id => { if (qs(id)) qs(id).textContent = ''; });
   ['establishmentCreateForm', 'createUserForm'].forEach(id => qs(id)?.reset());
   ['managerHome', 'adminShell', 'openAdminBtn', 'homePlatformBtn', 'btnPlatformEstablishments'].forEach(id => hide(qs(id)));
+  hide(qs('managerNav'));
+  hide(qs('managementBanner'));
+}
+
+function clearEstablishmentData() {
+  stopAutoRefresh();
+  reservationRequest++; matchesRequest++; playersRequest++;
+  resetManagementViews();
+  closeAppModal();
+  if (qs('confirmDialog').open) qs('confirmDialog').close('cancel');
+  qs('appModalBody').textContent='';qs('appModalTitle').textContent='';qs('confirmDetails').textContent='';
+  loadedDate = ''; publicConfigRequest = null;
+  STATE.me = null;
+  Object.assign(STATE, {config:{},fields:[],fieldsDraft:[],users:[],reservations:[],dayReservationsAll:[],myReservations:[],playerSearches:[],closures:[],gallery:[],galleryDraft:[],notes:'',selectedTime:'',nativeSynced:false});
+  ['homeSummary','homeNext','homeNotice','creditHistory','waitlistItems','matchesList','matchesStatus','openGamesList','ownedGamesList','myJoinRequestsList','playersStatus','timeGrid','bookingPreview','bookMsg','fieldsList','galleryList','notesView','managerDaySummary'].forEach(id => { if(qs(id)) qs(id).textContent=''; });
+  ['agendaDate','userSearch','notesText','newFieldId','newFieldName','galleryUrl','galleryCaption','galleryLink'].forEach(id => { qs(id).value=''; });
+  document.querySelectorAll('input[type="password"]').forEach(input=>{input.value='';});
+  document.querySelectorAll('#app .app-view').forEach(hide);
+}
+
+async function changeManagementContext(establishmentId) {
+  if (!STATE.me?.platformAdmin || contextChanging) return;
+  contextChanging = true;
+  managementContextEpoch++; homeRequest++; agendaRequest++; platformRequest++; reservationRequest++; matchesRequest++; playersRequest++;
+  document.body.classList.add('context-changing');
+  qs('contextStatus').textContent='Apertura della gestione…';
+  show(qs('contextStatus'));
+  stopAutoRefresh();
+  try {
+    const data = await api('/platform/context', establishmentId
+      ? {method:'POST',body:JSON.stringify({establishmentId})} : {method:'DELETE'});
+    clearEstablishmentData();
+    selectedEstablishment = data.establishment.id;
+    try { localStorage.setItem('tommi38-establishment', selectedEstablishment); } catch {}
+    applyEstablishmentName(data.establishment.name);
+    await loadAll(true);
+  } catch(error) {
+    if (STATE.me) { startAutoRefresh(); alert(managementError(error)); }
+    else { show(qs('loginBox')); hide(qs('app')); qs('loginErr').textContent=managementError(error);show(qs('loginErr')); }
+  } finally { contextChanging=false; document.body.classList.remove('context-changing'); hide(qs('contextStatus')); }
+}
+
+async function returnToPlatform() {
+  if (STATE.me?.managementMode) return changeManagementContext();
+  return openPlatformEstablishments();
+}
+
+async function loadManagementSummary() {
+  if (STATE.me?.role !== 'admin') return;
+  const epoch=managementContextEpoch, user=STATE.me;
+  qs('managerDaySummary').textContent='Caricamento di oggi…';
+  try {
+    const data=await api('/admin/reservations?date='+localISODate());
+    if(epoch!==managementContextEpoch || user!==STATE.me)return;
+    const active=(data.items||[]).filter(item=>item.status==='active');
+    qs('managerDaySummary').innerHTML=`<span class="mini-label">Oggi · ${escapeHTML(formatLongDate(localISODate()))}</span><strong>${active.length} ${active.length===1?'prenotazione':'prenotazioni'} in programma</strong><span>${STATE.fields.length} ${STATE.fields.length===1?'campo configurato':'campi configurati'} · ${escapeHTML(STATE.config.dayStart || '—')}–${escapeHTML(STATE.config.dayEnd || '—')}</span>`;
+  }catch(error){if(epoch===managementContextEpoch)qs('managerDaySummary').textContent=managementError(error);}
 }
 
 function managementError(error) {
@@ -154,6 +245,11 @@ function managementError(error) {
     INVALID_BALANCE: 'Il saldo deve essere un numero intero e non può scendere sotto zero.',
     LEGACY_ESTABLISHMENT_REQUIRED: 'Lo stabilimento principale deve rimanere attivo.',
     PROTECTED_ACCOUNT: 'Questo account è protetto. Non puoi modificarlo da qui.'
+    , SLOT_TAKEN: 'Questo orario è già occupato. Scegli un altro orario.'
+    , SLOT_CLOSED: 'Il campo è chiuso in questo orario.'
+    , USER_NOT_FOUND: 'Seleziona un utente attivo dello stabilimento.'
+    , USER_DISABLED: 'Questo utente è disabilitato. Abilitalo prima di prenotare.'
+    , INVALID_SLOT: 'Scegli un orario tra quelli disponibili.'
   };
   return messages[error?.error] || errorMessage(error);
 }
@@ -233,13 +329,23 @@ function renderManagerAgenda() {
     row.className = 'agenda-card';
     const status = item.status === 'cancelled' ? 'Cancellata' : item.status === 'completed' ? 'Conclusa' : 'Confermata';
     row.innerHTML = `<div class="agenda-card-top"><strong>${escapeHTML(item.time)}${item.endTime ? '–' + escapeHTML(item.endTime) : ''}</strong><span class="request-status ${item.status === 'cancelled' ? 'rejected' : 'accepted'}">${status}</span></div><h3>${escapeHTML(fieldName(item.fieldId))}</h3><p>Prenotata da <strong>${escapeHTML(item.user)}</strong></p>`;
+    if (item.status === 'active') {
+      const epoch = managementContextEpoch;
+      row.appendChild(adminButton('Annulla prenotazione', async () => {
+        if (!await confirmAction('Annulla questa prenotazione?', `${item.user} · ${fieldName(item.fieldId)} · ${formatLongDate(item.date)} alle ${item.time}. Il campo tornerà disponibile. L’annullamento dalla gestione non rimborsa crediti automaticamente.`, 'Annulla prenotazione')) return;
+        if (epoch !== managementContextEpoch) return;
+        await api('/admin/reservations/'+encodeURIComponent(item.id), {method:'DELETE'});
+        if (epoch === managementContextEpoch) await loadManagerAgenda();
+      }));
+    }
     list.appendChild(row);
   });
 }
 
 async function openPlatformEstablishments() {
   if (!STATE.me?.platformAdmin) return;
-  openAdminShell();
+  if (STATE.me.managementMode) return returnToPlatform();
+  openAdminShell(true);
   openAdmin('adminEstablishments');
   qs('establishmentStatus').textContent = '';
   await loadPlatformEstablishments();
@@ -262,6 +368,9 @@ async function loadPlatformEstablishments() {
       card.innerHTML = `<div class="agenda-card-top"><h3>${escapeHTML(item.name)}</h3><span class="request-status ${item.enabled ? 'accepted' : 'rejected'}">${item.enabled ? 'Attivo' : 'Sospeso'}</span></div><p class="muted">Codice: ${escapeHTML(item.id)}</p><p>Gestore: <strong>${escapeHTML(managers)}</strong></p>`;
       const actions = document.createElement('div');
       actions.className = 'action-row';
+      const manage = adminButton('Gestisci stabilimento →', () => changeManagementContext(item.id));
+      manage.className = 'primary-btn manage-venue-btn';
+      actions.appendChild(manage);
       actions.appendChild(adminButton('Modifica nome', () => openEstablishmentName(item)));
       if (!item.legacy) actions.appendChild(adminButton(item.enabled ? 'Sospendi' : 'Riattiva', async () => {
         if (item.enabled && !await confirmAction('Sospendi ' + item.name + '?', 'Gli utenti e il gestore non potranno accedere finché non lo riattivi. Le prenotazioni e i dati saranno conservati.', 'Sospendi stabilimento')) return;
@@ -303,6 +412,7 @@ async function createEstablishment(event) {
 }
 
 function openEstablishmentName(item) {
+  const epoch=managementContextEpoch;
   openAppModal('Modifica nome stabilimento', `<form id="venueNameForm" class="form-stack"><label class="field-label" for="venueNewName">Nome</label><input id="venueNewName" class="admin-input" value="${escapeHTML(item.name)}" required maxlength="80"><p class="helper-text">Il codice e le credenziali del gestore restano gli stessi.</p><button class="primary-btn" type="submit">Salva nome</button><p id="venueNameStatus" class="form-message" role="status"></p></form>`);
   qs('venueNameForm').onsubmit = async event => {
     event.preventDefault();
@@ -311,11 +421,12 @@ function openEstablishmentName(item) {
     try {
       const name = qs('venueNewName').value.trim();
       await api('/platform/establishments/' + encodeURIComponent(item.id), {method:'PATCH',body:JSON.stringify({name})});
+      if(epoch!==managementContextEpoch)return;
       if (item.id === selectedEstablishment) applyEstablishmentName(name);
       closeAppModal();
       qs('establishmentStatus').textContent = 'Nome dello stabilimento aggiornato.';
       await loadPlatformEstablishments();
-    } catch (error) { if (qs('venueNameStatus')) qs('venueNameStatus').textContent = managementError(error); button.disabled = false; }
+    } catch (error) { if (epoch===managementContextEpoch && qs('venueNameStatus')) qs('venueNameStatus').textContent = managementError(error); button.disabled = false; }
   };
 }
 
@@ -330,16 +441,18 @@ async function createManagedUser(event) {
   qs('createUserBtn').disabled = true;
   status.textContent = 'Creazione account…';
   try {
-    await api('/admin/users',{method:'POST',body:JSON.stringify({username,password:qs('newUserPassword').value,credits:Number(qs('newUserCredits').value)})});
+    const role = STATE.me.platformAdmin ? qs('newUserRole').value : 'user';
+    await api('/admin/users',{method:'POST',body:JSON.stringify({username,password:qs('newUserPassword').value,credits:Number(qs('newUserCredits').value), ...(STATE.me.platformAdmin ? {role} : {})})});
     form.reset();
     if (user !== STATE.me) return;
-    status.textContent = `Utente ${username} creato. Può accedere selezionando questo stabilimento.`;
+    status.textContent = `${role==='admin'?'Gestore':'Utente'} ${username} creato. Può accedere selezionando questo stabilimento.`;
     await loadUsers();
   } catch (error) { if (user === STATE.me) status.textContent = managementError(error); }
   finally { qs('createUserBtn').disabled = false; }
 }
 
 function openUserPassword(user) {
+  const epoch=managementContextEpoch;
   openAppModal('Imposta password', `<form id="userPasswordForm" class="form-stack"><p>Account: <strong>${escapeHTML(user.username)}</strong></p><label class="field-label" for="managedNewPassword">Nuova password</label><input id="managedNewPassword" class="admin-input" type="password" required minlength="12" maxlength="72" autocomplete="new-password"><p class="helper-text">Almeno 12 caratteri. Comunica la nuova password all’utente con un canale riservato.</p><button class="primary-btn" type="submit">Aggiorna password</button><p id="managedPasswordStatus" class="form-message" role="status"></p></form>`);
   qs('userPasswordForm').onsubmit = async event => {
     event.preventDefault();
@@ -348,16 +461,18 @@ function openUserPassword(user) {
     button.disabled = true;
     try {
       await api('/admin/users/password',{method:'PUT',body:JSON.stringify({username:user.username,newPassword:qs('managedNewPassword').value})});
+      if(epoch!==managementContextEpoch)return;
       if (qs('managedNewPassword')) qs('managedNewPassword').value = '';
       closeAppModal();
       await loadUsers();
       qs('createUserStatus').textContent = `Password di ${user.username} aggiornata.`;
       qs('createUserForm').closest('details').open = true;
-    } catch (error) { if (qs('managedPasswordStatus')) qs('managedPasswordStatus').textContent = managementError(error); button.disabled = false; }
+    } catch (error) { if (epoch===managementContextEpoch && qs('managedPasswordStatus')) qs('managedPasswordStatus').textContent = managementError(error); button.disabled = false; }
   };
 }
 
 function openUserCredits(user) {
+  const epoch=managementContextEpoch;
   openAppModal('Gestisci crediti', `<form id="userCreditsForm" class="form-stack"><p><strong>${escapeHTML(user.username)}</strong> · saldo attuale: ${Number(user.credits || 0)} crediti</p><label class="field-label" for="creditOperation">Operazione</label><select id="creditOperation" class="admin-input"><option value="1">Aggiungi crediti</option><option value="-1">Rimuovi crediti</option></select><label class="field-label" for="creditAmount">Numero di crediti</label><input id="creditAmount" class="admin-input" type="number" min="1" max="100000" step="1" required value="1"><p class="helper-text">Il movimento viene registrato nello storico dell’utente.</p><button class="primary-btn" type="submit">Salva movimento</button><p id="managedCreditsStatus" class="form-message" role="status"></p></form>`);
   qs('userCreditsForm').onsubmit = async event => {
     event.preventDefault();
@@ -365,10 +480,71 @@ function openUserCredits(user) {
     button.disabled = true;
     try {
       await api('/admin/users/credits',{method:'PUT',body:JSON.stringify({username:user.username,delta:Number(qs('creditAmount').value)*Number(qs('creditOperation').value)})});
+      if(epoch!==managementContextEpoch)return;
       closeAppModal();
       await loadUsers();
-      if (user.username === STATE.me?.username) await refreshCredits();
-    } catch (error) { if (qs('managedCreditsStatus')) qs('managedCreditsStatus').textContent = managementError(error); button.disabled = false; }
+      if (!STATE.me?.managementMode && user.username === STATE.me?.username) await refreshCredits();
+    } catch (error) { if (epoch===managementContextEpoch && qs('managedCreditsStatus')) qs('managedCreditsStatus').textContent = managementError(error); button.disabled = false; }
+  };
+}
+
+async function openManagedBooking() {
+  if (STATE.me?.role !== 'admin') return;
+  const epoch=managementContextEpoch;
+  openAppModal('Nuova prenotazione', '<p>Caricamento utenti…</p>');
+  try {
+    await loadUsers();
+    if(epoch!==managementContextEpoch || !qs('appModal').open)return;
+    const users=STATE.users.filter(user=>!user.disabled && !user.platformAdmin);
+    if(!STATE.fields.length || !users.length){qs('appModalBody').textContent=!STATE.fields.length?'Aggiungi prima almeno un campo da Orari e campi.':'Crea prima un utente attivo da Utenti e crediti.';return;}
+    qs('appModalBody').innerHTML=`<form id="managedBookingForm" class="form-stack"><p class="booking-admin-note">Prenoti per un utente di questo stabilimento. Non verranno scalati crediti.</p><label class="field-label" for="managedBookingUser">A nome di</label><select id="managedBookingUser" class="admin-input" required><option value="">Scegli un utente</option>${users.map(user=>`<option value="${escapeHTML(user.username)}">${escapeHTML(user.username)}</option>`).join('')}</select><label class="field-label" for="managedBookingDate">Giorno</label><input id="managedBookingDate" class="admin-input" type="date" min="${localISODate()}" value="${escapeHTML(qs('agendaDate').value>=localISODate()?qs('agendaDate').value:localISODate())}" required><label class="field-label" for="managedBookingField">Campo</label><select id="managedBookingField" class="admin-input" required>${STATE.fields.map(field=>`<option value="${escapeHTML(field.id)}">${escapeHTML(field.name)}</option>`).join('')}</select><label class="field-label" for="managedBookingTime">Orario</label><select id="managedBookingTime" class="admin-input" required></select><p id="managedBookingAvailability" class="helper-text" role="status"></p><button id="managedBookingSubmit" class="primary-btn" type="submit">Conferma prenotazione</button><p id="managedBookingStatus" class="form-message" role="status"></p></form>`;
+    let availabilityRequest=0;
+    const refresh=async()=>{
+      const request=++availabilityRequest;
+      const select=qs('managedBookingTime'),submit=qs('managedBookingSubmit');
+      select.innerHTML=''; submit.disabled=true;
+      qs('managedBookingAvailability').textContent='Controllo disponibilità…';
+      try {
+        const date=qs('managedBookingDate').value, field=qs('managedBookingField').value;
+        if(!date)return;
+        const data=await api('/reservations?date='+encodeURIComponent(date));
+        if(epoch!==managementContextEpoch || request!==availabilityRequest || !select.isConnected)return;
+        const occupied=(data.items||[]).filter(item=>item.fieldId===field);
+        const closures=(data.closures||[]).filter(item=>item.fieldId===field);
+        for(let t=minutes(STATE.config.dayStart);t+currentSlotMinutes()<=minutes(STATE.config.dayEnd);t+=currentSlotMinutes()){
+          const time=timeStr(t);
+          if(date===localISODate() && t<=nowMinutes())continue;
+          if(occupied.some(item=>item.time===time) || closures.some(item=>t<minutes(item.end) && t+currentSlotMinutes()>minutes(item.start)))continue;
+          const option=document.createElement('option');option.value=time;option.textContent=time+'–'+timeStr(t+currentSlotMinutes());select.append(option);
+        }
+        submit.disabled=!select.options.length;
+        qs('managedBookingAvailability').textContent=select.options.length?'Durata '+currentSlotMinutes()+' minuti.':'Nessun orario libero: prova un altro giorno o campo.';
+      }catch(error){if(epoch===managementContextEpoch && select.isConnected)qs('managedBookingAvailability').textContent=managementError(error);}
+    };
+    qs('managedBookingDate').onchange=refresh;qs('managedBookingField').onchange=refresh;
+    qs('managedBookingForm').onsubmit=async event=>{
+      event.preventDefault();if(epoch!==managementContextEpoch || qs('managedBookingSubmit').disabled)return;
+      const submit=qs('managedBookingSubmit');submit.disabled=true;
+      const date=qs('managedBookingDate').value;
+      try {
+        await api('/admin/reservations',{method:'POST',body:JSON.stringify({username:qs('managedBookingUser').value,fieldId:qs('managedBookingField').value,date,time:qs('managedBookingTime').value})});
+        if(epoch!==managementContextEpoch)return;
+        closeAppModal();qs('agendaDate').value=date;await loadManagerAgenda();
+      }catch(error){if(epoch===managementContextEpoch && submit.isConnected){qs('managedBookingStatus').textContent=managementError(error);submit.disabled=false;}}
+    };
+    await refresh();
+  }catch(error){if(epoch===managementContextEpoch && qs('appModal').open)qs('appModalBody').textContent=managementError(error);}
+}
+
+function openUserRole(user) {
+  if (!STATE.me?.platformAdmin || user.platformAdmin) return;
+  const epoch=managementContextEpoch;
+  openAppModal('Ruolo nello stabilimento', `<form id="userRoleForm" class="form-stack"><p>Account: <strong>${escapeHTML(user.username)}</strong></p><label class="field-label" for="managedUserRole">Ruolo</label><select id="managedUserRole" class="admin-input"><option value="user" ${user.role==='admin'?'':'selected'}>Utente · prenota e gioca</option><option value="admin" ${user.role==='admin'?'selected':''}>Gestore · amministra questo stabilimento</option></select><p class="helper-text">Il gestore può modificare orari, campi, prenotazioni, utenti e crediti soltanto in questo stabilimento.</p><button class="primary-btn" type="submit">Salva ruolo</button><p id="managedRoleStatus" class="form-message" role="status"></p></form>`);
+  qs('userRoleForm').onsubmit=async event=>{
+    event.preventDefault();if(epoch!==managementContextEpoch)return;
+    const button=event.currentTarget.querySelector('button');button.disabled=true;
+    try{await api('/admin/users/role',{method:'PUT',body:JSON.stringify({username:user.username,role:qs('managedUserRole').value})});if(epoch===managementContextEpoch){closeAppModal();await loadUsers();}}
+    catch(error){if(epoch===managementContextEpoch && qs('managedRoleStatus')){qs('managedRoleStatus').textContent=managementError(error);button.disabled=false;}}
   };
 }
 
@@ -384,6 +560,14 @@ document.addEventListener('DOMContentLoaded',()=>{
   qs('establishmentCreateForm').onsubmit = createEstablishment;
   qs('createUserForm').onsubmit = createManagedUser;
   qs('refreshAgendaBtn').onclick = loadManagerAgenda;
+  qs('newManagedBookingBtn').onclick = openManagedBooking;
+  qs('returnToPlatformBtn').onclick = returnToPlatform;
+  qs('managerDashboardBtn').onclick = openAdminShell;
+  qs('managerAgendaBtn').onclick = openManagerAgenda;
+  qs('managerUsersBtn').onclick = () => {openAdminShell();openAdmin('adminUsers');loadUsers().catch(error=>{qs('usersList').textContent=managementError(error);});};
+  qs('managerPlayBtn').onclick = () => switchView('home');
+  qs('managerSettingsBtn').onclick = () => {openAdminShell();openAdmin('adminConfig');};
+  qs('managerQuickAgendaBtn').onclick = () => {qs('agendaDate').value=localISODate();openManagerAgenda();};
   qs('agendaDate').onchange = loadManagerAgenda;
   qs('agendaField').onchange = renderManagerAgenda;
   qs('agendaTodayBtn').onclick = () => { qs('agendaDate').value = localISODate(); loadManagerAgenda(); };

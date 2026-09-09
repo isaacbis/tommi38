@@ -1,18 +1,28 @@
-import { db, tenantId } from './tenancy.js';
+import { tenantId } from './tenancy.js';
+import { readSessionIdentity, readEstablishment } from './authorization.js';
 
 export async function requireAuth(req, res, next) {
   try {
-    const sessionUser = req.session?.user;
-    if (!sessionUser || (sessionUser.establishment || 'tommi38') !== tenantId()) return res.status(401).json({error:'NOT_AUTHENTICATED'});
-    const snap = await db.collection('users').doc(sessionUser.username).get();
-    const user = snap.data();
-    if (!snap.exists || user.disabled || Number(user.sessionVersion || 0) !== Number(sessionUser.sessionVersion || 0)) {
-      delete req.session.user;
-      return res.status(401).json({error:'NOT_AUTHENTICATED'});
+    const identity = await readSessionIdentity(req);
+    if (!identity) return res.status(401).json({error:'NOT_AUTHENTICATED'});
+    const expected = identity.platformAdmin ? req.session.managementEstablishment || 'tommi38' : identity.origin;
+    if (expected !== tenantId()) return res.status(identity.platformAdmin ? 409 : 401).json({
+      error: identity.platformAdmin ? 'MANAGEMENT_CONTEXT_CHANGED' : 'NOT_AUTHENTICATED'
+    });
+    if (!identity.platformAdmin && req.session.managementEstablishment) {
+      delete req.session.managementEstablishment;
+      return res.status(403).json({error:'NOT_AUTHORIZED'});
     }
-    req.account = user;
-    req.session.user.role = user.role === 'admin' ? 'admin' : 'user';
-    req.session.user.platformAdmin = tenantId() === 'tommi38' && user.platformAdmin === true;
+    const establishment = req.establishment || await readEstablishment(expected);
+    if (!establishment || (!establishment.enabled && !identity.platformAdmin)) {
+      return res.status(404).json({error:'ESTABLISHMENT_NOT_FOUND'});
+    }
+    req.account = identity.account;
+    req.establishment = establishment;
+    req.isPlatformManagement = identity.platformAdmin && !!req.session.managementEstablishment;
+    req.actorId = req.isPlatformManagement ? `platform:${identity.username}` : identity.username;
+    req.session.user.role = identity.platformAdmin || identity.account.role === 'admin' ? 'admin' : 'user';
+    req.session.user.platformAdmin = identity.platformAdmin;
     next();
   } catch(error) { next(error); }
 }

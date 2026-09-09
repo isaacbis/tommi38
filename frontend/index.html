@@ -17,6 +17,7 @@
 </head>
 <body>
   <div id="connectionStatus" class="connection-status hidden" role="status">Connessione assente. Riconnettiti per aggiornare le disponibilità.</div>
+  <div id="contextStatus" class="context-status hidden" role="status" aria-live="polite"></div>
   <div id="appLoader" class="app-loader" aria-live="polite">
     <img src="/icon-192.png" alt="" class="loader-logo">
     <div class="loader-ring" aria-hidden="true"></div>
@@ -79,13 +80,14 @@
       <header class="native-header">
         <div class="header-brand">
           <img src="/icon-192.png" alt="Tommi38" class="header-logo">
-          <strong data-establishment-name>Tommi38</strong>
+          <div class="header-brand-copy"><strong data-establishment-name>Tommi38</strong><span id="headerRole" class="header-role hidden"></span></div>
         </div>
         <div class="header-actions">
           <button id="switchBathBtn" class="change-btn" type="button">Cambia ›</button>
           <button id="logoutBtn" class="icon-btn" type="button" aria-label="Esci"><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4H4v16h5M10 12h11m-4-4 4 4-4 4"/></svg></button>
         </div>
       </header>
+      <aside id="managementBanner" class="management-banner hidden" aria-label="Stabilimento in gestione"><div><span>Amministratore globale</span><strong>Stai gestendo <span id="managementVenueName"></span></strong></div><button id="returnToPlatformBtn" class="secondary-btn" type="button">‹ Tutti gli stabilimenti</button></aside>
 
       <section id="viewHome" class="app-view hidden">
         <div class="page-title-row"><p class="eyebrow">Home</p><button id="refreshHomeBtn" class="icon-btn" aria-label="Aggiorna home" type="button">↻</button></div>
@@ -211,29 +213,30 @@
       <section id="adminShell" class="app-view hidden">
         <div class="page-title-row">
           <div>
-            <p id="adminRoleLabel" class="eyebrow">Gestore dello stabilimento</p>
+            <p id="adminRoleLabel" class="eyebrow">Amministratore del tuo stabilimento</p>
             <h1 id="adminTitle">Gestisci stabilimento</h1>
           </div>
           <button id="closeAdminBtn" class="icon-btn" type="button" aria-label="Chiudi">×</button>
         </div>
 
         <section id="adminMenu" class="glass-card admin-card hidden">
-          <p class="muted">Stai gestendo <strong data-establishment-name>Tommi38</strong>. Prenotazioni, utenti e crediti appartengono a questo stabilimento.</p>
-          <div class="admin-grid"><button id="btnPlatformEstablishments" class="admin-action hidden" type="button">Stabilimenti e gestori <span>›</span></button>
-            <button id="btnAdminAgenda" class="admin-action" type="button">Agenda prenotazioni <span>›</span></button>
-            <button id="btnAdminOperations" class="admin-action" type="button">Statistiche e chiusure <span>›</span></button>
-            <button id="btnAdminConfig" class="admin-action" type="button">Orari e regole <span>›</span></button>
-            <button id="btnAdminNotes" class="admin-action" type="button">Comunicazioni <span>›</span></button>
-            <button id="btnAdminFields" class="admin-action" type="button">Campi <span>›</span></button>
-            <button id="btnAdminUsers" class="admin-action" type="button">Utenti e crediti <span>›</span></button>
-            <button id="btnAdminGallery" class="admin-action" type="button">Galleria login <span>›</span></button>
+          <div class="manager-day-card"><div id="managerDaySummary" aria-live="polite"></div><button id="managerQuickAgendaBtn" class="primary-btn" type="button">Apri l’agenda di oggi →</button></div>
+          <p class="section-kicker">Gestione dello stabilimento</p>
+          <div class="admin-grid"><button id="btnPlatformEstablishments" class="admin-action hidden" type="button"><span class="admin-action-copy"><strong>Tutti gli stabilimenti</strong><small>Torna alla panoramica generale</small></span><span>›</span></button>
+            <button id="btnAdminAgenda" class="admin-action" type="button"><span class="admin-action-copy"><strong>Prenotazioni</strong><small>Oggi, domani e prossimi giorni</small></span><span>›</span></button>
+            <button id="btnAdminUsers" class="admin-action" type="button"><span class="admin-action-copy"><strong>Utenti e crediti</strong><small>Account, saldi e richieste</small></span><span>›</span></button>
+            <button id="btnAdminConfig" class="admin-action" type="button"><span class="admin-action-copy"><strong>Orari e regole</strong><small>Apertura, durata e limiti</small></span><span>›</span></button>
+            <button id="btnAdminFields" class="admin-action" type="button"><span class="admin-action-copy"><strong>Campi</strong><small>Aggiungi e modifica i campi</small></span><span>›</span></button>
+            <button id="btnAdminOperations" class="admin-action" type="button"><span class="admin-action-copy"><strong>Statistiche e chiusure</strong><small>Attività e fasce da bloccare</small></span><span>›</span></button>
+            <button id="btnAdminNotes" class="admin-action" type="button"><span class="admin-action-copy"><strong>Comunicazioni</strong><small>Scrivi un avviso per gli utenti</small></span><span>›</span></button>
+            <button id="btnAdminGallery" class="admin-action" type="button"><span class="admin-action-copy"><strong>Foto dello stabilimento</strong><small>Personalizza la pagina di accesso</small></span><span>›</span></button>
           </div>
+          <p class="scope-caption">Stai lavorando su <strong data-establishment-name>Tommi38</strong>. Tutti i dati in questa area appartengono a questo stabilimento.</p>
         </section>
 
         <section id="adminEstablishments" class="glass-card admin-section hidden">
-          <p class="eyebrow">Amministratore della piattaforma</p><h2>Stabilimenti e gestori</h2>
-          <p class="muted">Crea uno stabilimento e il suo gestore. Il proprietario seleziona il proprio stabilimento all’accesso e gestisce soltanto i suoi campi, utenti e prenotazioni.</p>
-          <details class="management-details"><summary>Aggiungi uno stabilimento</summary>
+          <div class="platform-intro"><span class="platform-mark" aria-hidden="true">✦</span><div><h2>Stabilimenti e gestori</h2><p>Crea gli stabilimenti, assegna i gestori e apri la gestione di ciascuno.</p></div></div>
+          <details class="management-details create-establishment"><summary>＋ Crea stabilimento</summary>
             <form id="establishmentCreateForm" class="form-stack">
               <label class="field-label" for="establishmentName">Nome dello stabilimento</label><input id="establishmentName" class="admin-input" required maxlength="80" placeholder="Es. Bagni Claudia">
               <label class="field-label" for="establishmentId">Codice dello stabilimento</label><input id="establishmentId" class="admin-input" required maxlength="60" pattern="[a-z0-9]+(-[a-z0-9]+)*" autocapitalize="none" spellcheck="false" placeholder="Es. bagni-claudia" aria-describedby="establishmentIdHelp"><p id="establishmentIdHelp" class="helper-text">Lettere minuscole, numeri e trattini. Il codice non potrà essere cambiato.</p>
@@ -243,12 +246,12 @@
             </form>
           </details>
           <p id="establishmentStatus" class="form-message" role="status"></p><div id="platformEstablishmentList" class="admin-list" aria-live="polite"></div>
-          <button class="secondary-btn backAdmin" type="button">Indietro</button>
+          <p class="scope-caption">Tu puoi gestire tutti gli stabilimenti. Ogni gestore accede soltanto al proprio.</p>
         </section>
 
         <section id="adminAgenda" class="glass-card admin-section hidden">
           <div class="page-title-row"><h2>Agenda prenotazioni</h2><button id="refreshAgendaBtn" class="icon-btn" type="button" aria-label="Aggiorna agenda">↻</button></div>
-          <p class="muted">Prenotazioni di <strong data-establishment-name>Tommi38</strong>, con il nome dell’utente che ha prenotato.</p>
+          <button id="newManagedBookingBtn" class="primary-btn" type="button">＋ Nuova prenotazione</button>
           <div class="agenda-date-controls"><button id="agendaTodayBtn" class="secondary-btn" type="button">Oggi</button><button id="agendaTomorrowBtn" class="secondary-btn" type="button">Domani</button><label class="field-label" for="agendaDate">Scegli il giorno<input id="agendaDate" class="admin-input" type="date" required></label></div>
           <label class="field-label" for="agendaField">Campo</label><select id="agendaField" class="admin-input"><option value="">Tutti i campi</option></select>
           <p id="agendaStatus" class="form-message" role="status"></p><div id="agendaList" class="admin-list" aria-live="polite"></div>
@@ -311,11 +314,12 @@
         </section>
 
         <section id="adminUsers" class="glass-card admin-section hidden">
-          <h3>Utenti e crediti</h3><p class="muted">Account e saldi del tuo stabilimento.</p>
-          <details class="management-details"><summary>Crea un utente</summary><form id="createUserForm" class="form-stack">
+          <h3>Utenti e crediti</h3><p class="muted">Account e saldi di <strong data-establishment-name>Tommi38</strong>.</p>
+          <details class="management-details"><summary id="createUserHeading">Crea un utente</summary><form id="createUserForm" class="form-stack">
             <label class="field-label" for="newUserUsername">Username</label><input id="newUserUsername" class="admin-input" required minlength="3" maxlength="80" pattern="[a-zA-Z0-9][a-zA-Z0-9._@\-]{2,79}" autocomplete="off" autocapitalize="none" spellcheck="false">
             <label class="field-label" for="newUserPassword">Password iniziale</label><input id="newUserPassword" class="admin-input" type="password" required minlength="12" maxlength="72" autocomplete="new-password">
             <label class="field-label" for="newUserCredits">Crediti iniziali</label><input id="newUserCredits" class="admin-input" type="number" min="0" max="100000" step="1" required value="0">
+            <label id="newUserRoleField" class="field-label hidden" for="newUserRole">Ruolo<select id="newUserRole" class="admin-input"><option value="user">Utente · prenota e gioca</option><option value="admin">Gestore · amministra questo stabilimento</option></select></label><p id="managerUserRoleHelp" class="helper-text hidden">Il gestore ha accesso completo a questo stabilimento.</p>
             <button id="createUserBtn" class="primary-btn" type="submit">Crea utente</button><p id="createUserStatus" class="form-message" role="status"></p>
           </form></details>
           <label class="field-label" for="userSearch">Cerca utente</label>
@@ -340,6 +344,8 @@
           </div>
         </section>
       </section>
+
+      <nav id="managerNav" class="manager-nav hidden" aria-label="Gestione stabilimento"><button id="managerDashboardBtn" data-admin-section="adminMenu" type="button"><span aria-hidden="true">⌂</span>Riepilogo</button><button id="managerAgendaBtn" data-admin-section="adminAgenda" type="button"><span aria-hidden="true">▦</span>Agenda</button><button id="managerUsersBtn" data-admin-section="adminUsers" type="button"><span aria-hidden="true">♙</span>Utenti</button><button id="managerPlayBtn" type="button"><span aria-hidden="true">↗</span>Gioca</button><button id="managerSettingsBtn" class="hidden" data-admin-section="adminConfig" type="button"><span aria-hidden="true">⚙</span>Orari</button></nav>
 
       <nav id="bottomNav" class="bottom-nav" aria-label="Navigazione principale"><button class="bottom-nav-item" data-view="home" type="button"><span class="nav-icon" aria-hidden="true">⌂</span><span>Home</span></button>
         <button class="bottom-nav-item active" data-view="book" type="button">
