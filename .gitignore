@@ -9,3 +9,9 @@ node_modules/
 
 # logs
 npm-debug.log*
+
+# macOS and local Xcode state
+.DS_Store
+xcuserdata/
+*.xcuserstate
+DerivedData/
