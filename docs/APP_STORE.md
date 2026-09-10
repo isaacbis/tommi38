@@ -6,7 +6,7 @@ Stato aggiornato il **10 settembre 2026**. CampoPronto è il nuovo nome dell’a
 
 La versione **1.0, build 1**, con il nome Tommi38, è stata caricata e inviata ad Apple il **10 settembre 2026 alle 16:52, Europe/Rome**. L’invio `a527ec0d-ac78-4a02-8660-ba4cd2da9a99` è stato successivamente ritirato per sostituire nome e icona.
 
-La versione **1.0, build 2**, con il nome CampoPronto e l’icona blu scelta dal titolare, ha un archivio nativo validato e il caricamento è in corso. **Il nuovo invio per la revisione non è ancora stato effettuato.** L’app non viene quindi dichiarata approvata o disponibile al pubblico.
+La versione **1.0, build 2**, con il nome CampoPronto e l’icona blu scelta dal titolare, è stata archiviata, validata e **caricata con successo il 10 settembre 2026 alle 17:17, Europe/Rome**. Il nome pubblico **CampoPronto: prenota campi** è già salvato nella scheda. Dopo il ritiro, la versione 1.0 risulta `developerRejected`; **il nuovo invio per la revisione non è ancora stato effettuato**. L’app non viene quindi dichiarata approvata o disponibile al pubblico.
 
 | Campo | Valore |
 | --- | --- |
@@ -17,7 +17,7 @@ La versione **1.0, build 2**, con il nome CampoPronto e l’icona blu scelta dal
 | Bundle ID invariato | `isaacmorganti.Tommi38IOS` |
 | Team Apple | `82M5KZ26B2` |
 | SKU invariato | `tommi38-ios` |
-| Versione in preparazione | `1.0`, build `2` |
+| Versione caricata | `1.0`, build `2`; nuovo invio in preparazione |
 | Prezzo e disponibilità | Gratuita, Italia |
 | Pubblicazione | Automatica dopo l’approvazione Apple |
 | Dispositivi | iPhone e iPad; disponibilità Mac e Apple Vision Pro disattivata |
@@ -102,7 +102,7 @@ L’eliminazione dell’account richiede la password attuale, invalida le sessio
 
 I crediti prenotano servizi sportivi consumati fisicamente presso lo stabilimento. I promemoria sono locali, con autorizzazione facoltativa, isolamento per account e stabilimento e riallineamento quando l’app recupera le prenotazioni; non garantiscono aggiornamenti istantanei a app chiusa per modifiche effettuate altrove. La lista d’attesa non prenota automaticamente e non invia push dal server. [Servizi fisici](https://developer.apple.com/app-store/review/guidelines/#other-purchase-methods).
 
-La release precedente ha superato **127 test JavaScript**, inclusi 17 test UGC, **8 scenari dei promemoria nativi** e i controlli di sintassi dei 17 JavaScript applicativi. Sono stati verificati nel browser i percorsi di cancellazione account e segnalazione/blocco con dati sintetici; login e schermate principali sono stati provati nei simulatori iPhone e iPad. Le prove di concorrenza usano transazioni serializzate nel database simulato e non riproducono i tentativi automatici di Firestore. Il solo cambio di marchio mantiene invariati API, identificatori del database, storage locale e bridge nativo.
+La release CampoPronto ha superato **127 test JavaScript** e **8 scenari dei promemoria nativi**. La suite comprende 17 test UGC; i controlli di sintassi dei 17 JavaScript applicativi erano già validi nella release precedente. La verifica visiva di scelta stabilimento, accesso e Home a **320 × 568 pixel** non ha rilevato overflow (`scrollWidth: 320`, `scrollHeight: 568`). Sono stati verificati nel browser i percorsi di cancellazione account e segnalazione/blocco con dati sintetici; login e schermate principali sono stati provati nei simulatori iPhone e iPad. Le prove di concorrenza usano transazioni serializzate nel database simulato e non riproducono i tentativi automatici di Firestore. Il solo cambio di marchio mantiene invariati API, identificatori del database, storage locale e bridge nativo.
 
 La build utilizza **Xcode 26.6 e SDK iOS 26.5**, con iOS minimo **16**. La firma è automatica per il team indicato; gli identificatori della scheda e del progetto devono rimanere invariati negli aggiornamenti. L’icona App Store è quadrata, opaca, a 1024 × 1024 pixel. Per ricreare e caricare l’archivio seguire il [README iOS](../Tommi38IOS/README.md). [Requisiti Apple per gli upload](https://developer.apple.com/news/upcoming-requirements/).
 
