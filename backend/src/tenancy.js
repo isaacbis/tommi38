@@ -31,6 +31,14 @@ export async function tenantMiddleware(req, res, next) {
     if (req.path === "/establishments" || req.path === "/logout") return next();
     const id = req.get('X-Establishment') || 'tommi38';
     if (!validEstablishmentId(id)) return res.status(400).json({error:'INVALID_ESTABLISHMENT'});
+    // Deletion authenticates the current password itself so an interrupted
+    // deletion can resume after its first batch has revoked the login session.
+    if(req.method==='DELETE' && req.baseUrl==='/api/auth' && req.path==='/account'){
+      const establishment=await readEstablishment(id);
+      if(!establishment)return res.status(404).json({error:'ESTABLISHMENT_NOT_FOUND'});
+      req.establishment=establishment;
+      return tenantContext.run(id,next);
+    }
     let identity = null;
     if (req.session?.user) {
       identity = await readSessionIdentity(req);

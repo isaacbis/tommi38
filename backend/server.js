@@ -24,6 +24,7 @@ export const PUBLIC_FILES = new Map([
   ...[
     "index.html", "success.html", "style.css", "script.js", "community.js",
     "account.js", "service-worker.js", "manifest.json",
+    "privacy.html", "support.html", "community-rules.html", "legal.css",
     "icon-192.png", "icon-512.png", "icons/apple-touch-icon-v2.png"
   ].map(file => [`/${file}`, file])
 ]);

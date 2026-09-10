@@ -208,13 +208,15 @@ function updateDateUI() {
 /* ===================== API ===================== */
 async function api(path, options = {}) {
   const epoch = typeof managementContextEpoch === 'undefined' ? 0 : managementContextEpoch;
+  const {timeoutMs=15000,...requestOptions}=options;
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 15000);
+  const timeout=Number.isFinite(timeoutMs)?Math.max(1000,Math.min(120000,timeoutMs)):15000;
+  const timer = setTimeout(() => controller.abort(), timeout);
   try {
     const response = await fetch(API + path, {
-      credentials: "include", cache: "no-store", ...options,
+      credentials: "include", cache: "no-store", ...requestOptions,
       signal: controller.signal,
-      headers: { "Content-Type": "application/json", "X-Establishment": typeof selectedEstablishment === "undefined" ? "tommi38" : selectedEstablishment, ...options.headers }
+      headers: { "Content-Type": "application/json", "X-Establishment": typeof selectedEstablishment === "undefined" ? "tommi38" : selectedEstablishment, ...requestOptions.headers }
     });
     if (!response.headers.get("content-type")?.includes("application/json")) {
       throw { error: "INVALID_RESPONSE", status: response.status };
@@ -224,6 +226,7 @@ async function api(path, options = {}) {
     if (!response.ok) {
       if (response.status === 401 && STATE.me && path !== "/login" && (typeof managementContextEpoch === 'undefined' || epoch === managementContextEpoch)) {
         stopAutoRefresh();
+        clearNativeBookingNotifications();
         STATE.me = null;
         reservationRequest++;
         matchesRequest++;
@@ -259,9 +262,10 @@ function loadPublicConfig() {
 
 /* ===================== NATIVE BRIDGE ===================== */
 function nativeMessage(payload) {
-  if (typeof selectedEstablishment !== "undefined" && selectedEstablishment !== "tommi38" && payload.id) {
-    payload = {...payload, id: selectedEstablishment + ":" + payload.id};
-  }
+  if (!STATE.me || STATE.me.managementMode) return;
+  const establishment = typeof selectedEstablishment === 'undefined' ? 'tommi38' : selectedEstablishment;
+  payload = {...payload, account:STATE.me.username, establishment};
+  if (payload.id && establishment !== 'tommi38') payload.id = establishment + ':' + payload.id;
   try {
     const handler = window.webkit?.messageHandlers?.tommi38Notifications;
     if (handler) handler.postMessage(payload);
@@ -283,6 +287,26 @@ function scheduleNativeBookingNotification({ id, field, date, time }) {
 
 function cancelNativeBookingNotification(id) {
   nativeMessage({ type: "bookingCancelled", id });
+}
+
+function clearNativeBookingNotifications() {
+  nativeMessage({type:'clearBookings'});
+  STATE.nativeSynced = false;
+}
+
+function syncNativeBookingNotifications(items) {
+  if (!STATE.me || STATE.me.managementMode) return;
+  if (window.tommi38Native?.notificationsVersion >= 2) {
+    const establishment = typeof selectedEstablishment === 'undefined' ? 'tommi38' : selectedEstablishment;
+    nativeMessage({type:'syncBookings',items:items.map(item=>({
+      id:establishment === 'tommi38' ? item.id : establishment+':'+item.id,
+      field:fieldName(item.fieldId),date:item.date,time:item.time,minutesBefore:30
+    }))});
+  } else if (!STATE.nativeSynced) {
+    // Existing installed app versions understand individual booking messages.
+    items.forEach(item=>scheduleNativeBookingNotification({id:item.id,field:fieldName(item.fieldId),date:item.date,time:item.time}));
+  }
+  STATE.nativeSynced = true;
 }
 
 /* ===================== COMMON UI ===================== */
@@ -383,6 +407,11 @@ async function logout() {
   if (!await confirmAction("Vuoi uscire?", "Potrai accedere di nuovo con le tue credenziali.", "Esci")) return;
   try { await api("/logout", { method: "POST" }); }
   catch (error) { setBookMessage(errorMessage(error), "error"); return; }
+  finishSignOut();
+}
+
+function finishSignOut() {
+  clearNativeBookingNotifications();
   if (STATE.me?.platformAdmin) {
     selectedEstablishment='tommi38';
     try{localStorage.setItem('tommi38-establishment','tommi38');}catch{}
@@ -421,6 +450,7 @@ async function loadAll(setToday = false) {
   if (epoch !== managementContextEpoch) return;
 
   STATE.me = me;
+  nativeMessage({type:'bookingContext'});
   if (me.establishment?.name) applyEstablishmentName(me.establishment.name);
   STATE.config = pub;
   STATE.fields = pub.fields || [];
@@ -774,19 +804,7 @@ async function loadMyReservations() {
     .filter(item => item.date >= today)
     .sort((a, b) => `${a.date} ${a.time}`.localeCompare(`${b.date} ${b.time}`));
 
-  // Al primo caricamento nell'app iPhone sincronizza anche prenotazioni già esistenti.
-  // I successivi refresh automatici non le riprogrammano continuamente.
-  if (!STATE.nativeSynced) {
-    STATE.myReservations.forEach(item => {
-      scheduleNativeBookingNotification({
-        id: item.id,
-        field: fieldName(item.fieldId),
-        date: item.date,
-        time: item.time
-      });
-    });
-    STATE.nativeSynced = true;
-  }
+  syncNativeBookingNotifications(STATE.myReservations);
 
   renderMyReservations();
 }

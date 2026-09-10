@@ -85,7 +85,7 @@ function loadApplication(memory, dates) {
     'src/management-guards.js', 'src/routes.js', 'src/account-routes.js', 'src/platform-routes.js'
   ]);
   const packages = new Set(['express', 'express-session', 'bcrypt', 'zod', 'express-rate-limit', 'helmet', 'cookie-parser']);
-  const builtins = new Set(['node:path', 'node:url', 'node:async_hooks']);
+  const builtins = new Set(['node:path', 'node:url', 'node:async_hooks', 'node:crypto']);
   const environment = Object.freeze({
     NODE_ENV: 'test', SESSION_COOKIE_NAME: PREVIEW_COOKIE, SESSION_SECRET: PREVIEW_SECRET, RENDER_GIT_COMMIT: 'local-synthetic-preview'
   });

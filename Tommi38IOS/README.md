@@ -1,32 +1,54 @@
 # Tommi38 per iOS
 
-Aprire `Tommi38IOS.xcodeproj`, schema `Tommi38IOS`, e selezionare un iPhone o un simulatore iOS. Richiede iOS 16 o successivo. Il target supporta iPhone/iPad e usa UIKit, SwiftUI e WKWebView.
+Aprire `Tommi38IOS.xcodeproj`, schema `Tommi38IOS`, e selezionare un iPhone, iPad o simulatore. Il target richiede iOS 16 o successivo e usa SwiftUI, UIKit, WKWebView, UserNotifications e CryptoKit, senza SDK esterni.
 
-Firma automatica configurata con il Personal Team esistente. Su un altro Mac selezionare il proprio Team in Signing & Capabilities. Non sono necessarie capability Push Notifications per le notifiche locali.
+La firma automatica è configurata per il team Apple Developer del proprietario. Su un altro Mac selezionare il proprio team in Signing & Capabilities. I promemoria locali non richiedono la capability Push Notifications.
 
-La webview carica https://tommi38.onrender.com/ con cookie persistenti, pull-to-refresh, gestione dei link esterni e pagina di recupero connessione. Il bridge `tommi38Notifications` accetta dal frame principale HTTPS di Tommi38 i messaggi `bookingCreated` (id, field, date yyyy-MM-dd, time HH:mm, minutesBefore) e `bookingCancelled` (id). I promemoria usano Europe/Rome, vengono sostituiti tramite ID e cancellati su richiesta della webapp. I banner sono abilitati anche in primo piano. Le notifiche locali non ricevono aggiornamenti dal server mentre l’app è chiusa.
+## Funzioni native
 
-## Verifica del 9 settembre 2026
+La webview carica [Tommi38](https://tommi38.onrender.com/) con cookie persistenti, pull-to-refresh, pagina di recupero connessione e gestione dei dialoghi JavaScript dell’area amministratore. La tastiera conserva la propria area sicura; l’interfaccia web gestisce le aree di schermo riservate al dispositivo.
 
-- Controllo tipi Swift per arm64/iOS 16: superato per entrambi i file Swift.
-- Sintassi JavaScript frontend, server e routes: superata.
-- Firma automatica, certificato Apple Development e profilo gestito visibili in Xcode.
-- Build completa ed esecuzione ancora da verificare: Xcode richiede di completare il download del supporto iOS 26.5. Il comando di build si ferma nella compilazione degli asset per assenza del runtime simulatore.
-- Render risponde a health e configurazione pubblica, ma i file pubblicati differiscono da main f53c700. `/api/reservations/mine` restituisce HTML anziché JSON: il deploy della versione aggiornata va verificato nel dashboard Render. Nessuna modifica a frontend/backend in questa branch.
+La navigazione interna e il bridge sono limitati al dominio di produzione in HTTPS sulla porta predefinita o 443. Il bridge accetta messaggi soltanto dal frame principale. I link esterni, comprese le nuove finestre, possono aprire soltanto gli schemi `http`, `https`, `tel`, `mailto` e `sms`.
 
-## Prova finale dopo il download e il deploy
+## Promemoria delle prenotazioni
 
-1. Terminare il download iOS in Xcode e premere Run con l’iPhone selezionato; accettare sul dispositivo eventuali richieste di attendibilità e consentire le notifiche.
-2. Accedere e verificare Prenota, Le mie partite e Avvisi.
-3. Con una prenotazione di prova autorizzata verificare il promemoria, poi cancellarla e verificare che il promemoria venga rimosso.
-4. Verificare riapertura con login persistente e recupero della connessione con Riprova/pull-to-refresh.
+All’avvio della pagina il contenitore espone `window.tommi38Native.notificationsVersion = 2`. Il bridge `tommi38Notifications` riceve:
 
-Non sono state create prenotazioni né modificati dati in produzione durante la verifica.
+- `bookingContext`: attiva il contesto `account` e `establishment`.
+- `bookingCreated`: programma una prenotazione con `id`, `field`, `date` (`yyyy-MM-dd`), `time` (`HH:mm`) e `minutesBefore`.
+- `bookingCancelled`: rimuove il promemoria della prenotazione indicata da `id`.
+- `syncBookings`: riconcilia l’elenco completo `items` delle prenotazioni personali.
+- `clearBookings`: rimuove i promemoria del contesto all’uscita o all’eliminazione dell’account.
 
-## Aggiornamento mobile
+Tutti i messaggi includono account e stabilimento. Gli identificativi nativi incorporano un hash di entrambi, così prenotazioni con lo stesso ID restano distinte. Il cambio di account ritira i precedenti promemoria Tommi38; uscita e cancellazione restano valide anche se una programmazione asincrona è ancora in corso. Non vengono eliminate notifiche estranee al prefisso dell’app.
 
-L’interfaccia web include griglia compatta degli orari, riepilogo fisso sopra la navigazione, conferme accessibili integrate, login con compilazione automatica, recupero errori di rete e protezione dalle risposte obsolete quando cambia la data. Gli orari sono riferiti a Europe/Rome. Il polling avviene ogni 30 secondi soltanto con app visibile e connessione disponibile; il meteo viene caricato quando si apre Avvisi. Il service worker usa la cache v9.
+Il permesso viene richiesto quando occorre programmare il primo promemoria. Gli orari usano Europe/Rome e vengono validate anche date e ore. Si programmano al massimo le 64 prenotazioni più vicine. Un nuovo appuntamento imminente può generare un avviso dopo pochi secondi; la sincronizzazione non ripete avvisi già trascorsi. I banner sono abilitati anche in primo piano.
 
-WKWebView ora presenta anche alert, conferme e input JavaScript dell’area amministratore. Per questa modifica nativa ricompilare l’app da Xcode; gli aggiornamenti della webapp arrivano dal sito.
+La webapp aggiorna i promemoria durante la sincronizzazione di Home e Le mie partite. Non ci sono push dal server: una cancellazione effettuata altrove viene riconciliata quando l’app torna a sincronizzarsi. Con l’app chiusa un promemoria già programmato può ancora essere mostrato. Gli aggiornamenti web arrivano dal sito; le modifiche al contenitore Swift richiedono una nuova build.
 
-Validazione: flussi di accesso, prenotazione e cancellazione provati su server locale con dati fittizi, layout controllato a 320, 390 e 768 px, sei test di regressione in `tests/mobile.test.cjs` (eseguibili con `node --test tests/mobile.test.cjs`), controllo tipi Swift iOS 16 superato. Nessuna prenotazione reale creata durante i test. La build completa richiede ancora il runtime iOS in download.
+## Privacy
+
+`Tommi38IOS/PrivacyInfo.xcprivacy` dichiara dati collegati all’utente e usati per le funzionalità dell’app: nome, telefono, identificativo utente, contenuti forniti dagli utenti, assistenza, storico acquisti/crediti, interazioni con il prodotto e foto/video tramite URL della galleria inseriti dagli amministratori. La dichiarazione comprende anche i dati gestiti dalla webapp.
+
+Non è dichiarato tracciamento. Il codice nativo non usa direttamente API soggette a dichiarazione del motivo d’accesso, identificatori pubblicitari o posizione GPS. Le dichiarazioni privacy in App Store Connect devono restare coerenti con il manifest e con l’informativa pubblica.
+
+## Verifiche del 10 settembre 2026
+
+- Build Release firmata e build Debug per simulatore completate con Xcode 26.6 e SDK iOS 26.5.
+- Manifest privacy validato con `plutil`.
+- Otto scenari del gestore promemoria superati: permesso contestuale, isolamento account/stabilimento, riconciliazione delle cancellazioni, uscita selettiva, uscita e cancellazione durante una programmazione, validazione date/limite di 64 e mancata ripetizione degli avvisi imminenti.
+- Sette test di regressione dell’interfaccia mobile superati; sintassi JavaScript verificata.
+
+Da root del repository:
+
+```sh
+python3 tests/native-reminders.py
+node --test tests/mobile.test.cjs
+plutil -lint Tommi38IOS/Tommi38IOS/PrivacyInfo.xcprivacy
+```
+
+Il test nativo richiede macOS, Python 3 e il compilatore Swift di Xcode. Estrae la classe di produzione e la compila con un servizio notifiche simulato in una cartella temporanea, eliminata alla fine. Non compila l’app, non usa firma o dispositivi e non invia notifiche reali.
+
+Prima della distribuzione, verificare su dispositivo accesso persistente, tastiera, cambio account/stabilimento, recupero della connessione e consegna effettiva di un promemoria. I test simulati non sostituiscono la verifica della consegna da parte di iOS.
+
+La scheda App Store Connect `6810684742` è stata creata con distribuzione gratuita in Italia. Il caricamento della build e l’invio ad App Review sono passaggi distinti: la creazione della scheda e le build locali riuscite non indicano che l’app sia pubblicata.

@@ -33,6 +33,7 @@ async function chooseEstablishment() {
   if (STATE.me?.platformAdmin) return returnToPlatform();
   if (STATE.me) {
     await api('/logout', {method:'POST'});
+    finishSignOut();
     try { localStorage.removeItem('tommi38-establishment'); } catch {}
     location.reload();
     return;
@@ -103,6 +104,7 @@ async function loadHome() {
       api('/credits'), api('/waitlist'), api('/reservations/mine'), api('/player-searches')
     ]);
     if (request !== homeRequest || !STATE.me) return;
+    syncNativeBookingNotifications(matches.items);
     STATE.me.credits = credits.balance;
     qs('creditsBox').textContent = credits.balance + ' crediti';
     box.innerHTML = `<h1>Ciao, ${escapeHTML(STATE.me.username)}</h1>
@@ -256,6 +258,7 @@ function resetManagementViews() {
 }
 
 function clearEstablishmentData() {
+  clearNativeBookingNotifications();
   stopAutoRefresh();
   reservationRequest++; matchesRequest++; playersRequest++;
   resetManagementViews();
@@ -650,7 +653,152 @@ function openUserRole(user) {
   };
 }
 
+/* Safety controls use the same screens and permissions for every release. */
+const communityReasonLabels = {harassment:'Molestie o minacce',offensive:'Contenuto offensivo',spam:'Spam o pubblicità',privacy:'Dati personali pubblicati',other:'Altro comportamento scorretto'};
+function communityError(error) {
+  return ({CONTENT_NOT_ALLOWED:'Il testo contiene espressioni non consentite. Usa nomi reali e un messaggio rispettoso.',COMMUNITY_BLOCKED:'Un blocco tra questi account impedisce questa interazione.',COMMUNITY_UNAVAILABLE:'Questo account non è più disponibile.',SEARCH_MODERATED:'La ricerca è stata rimossa dal gestore.',SEARCH_CLOSED:'Questa ricerca non è più disponibile.',NOT_ENOUGH_SPOTS:'Non ci sono abbastanza posti disponibili.',ALREADY_REQUESTED:'Hai già inviato una richiesta.',ACCOUNT_CHANGED:'L’account è cambiato: aggiorna la schermata.'})[error?.error] || errorMessage(error);
+}
+function communityModalCurrent(node, user, epoch) {
+  return node?.isConnected && qs('appModal').open && STATE.me === user && managementContextEpoch === epoch;
+}
+function communitySafetyButton(searchId, requestId) {
+  const button=document.createElement('button');
+  button.type='button';button.className='secondary-btn btn-small community-safety-action';button.textContent='Segnala / blocca';
+  button.onclick=()=>openCommunitySafety(searchId,requestId);
+  return button;
+}
+const renderPlayerSearchesWithoutSafety = renderPlayerSearches;
+let communityManagedSearch = '', communityManagedSignature = '';
+renderPlayerSearches = function() {
+  renderPlayerSearchesWithoutSafety();
+  const open=STATE.playerSearches.filter(search=>!search.isOwner && search.status==='open' && search.spotsAvailable>0 && !search.myRequest);
+  [...qs('openGamesList').querySelectorAll('.game-card')].forEach((card,index)=>{if(open[index])card.append(communitySafetyButton(open[index].id));});
+  const requests=STATE.playerSearches.filter(search=>search.myRequest);
+  [...qs('myJoinRequestsList').querySelectorAll('.join-request-card')].forEach((card,index)=>{if(requests[index])card.append(communitySafetyButton(requests[index].id));});
+  if(qs('appModal').open && qs('manageRequestsList') && communityManagedSearch){
+    const active=STATE.playerSearches.find(search=>search.id===communityManagedSearch);
+    if(!active)closeAppModal();
+    else if(JSON.stringify(active)!==communityManagedSignature)openManagePlayerSearch(active.id);
+  }
+};
+const openManagePlayerSearchWithoutSafety = openManagePlayerSearch;
+openManagePlayerSearch = function(searchId) {
+  openManagePlayerSearchWithoutSafety(searchId);
+  const search=STATE.playerSearches.find(item=>item.id===searchId);
+  if (!search) return;
+  communityManagedSearch=searchId;communityManagedSignature=JSON.stringify(search);
+  [...qs('manageRequestsList').querySelectorAll('.player-request-card')].forEach((card,index)=>{
+    const request=search.requests[index];
+    if(request && !STATE.me?.managementMode)card.append(communitySafetyButton(searchId,request.id));
+  });
+};
+async function submitCommunityForm(button, path, body) {
+  const user=STATE.me,epoch=managementContextEpoch,message=qs('playerSearchModalMsg');
+  button.disabled=true;
+  try {
+    await api(path,{method:'POST',body:JSON.stringify(body)});
+    if(!communityModalCurrent(button,user,epoch))return;
+    await loadPlayerSearches();
+    if(communityModalCurrent(button,user,epoch))closeAppModal();
+  } catch(error) {
+    if(communityModalCurrent(button,user,epoch)){message.textContent=communityError(error);message.className='form-message error';button.disabled=false;}
+  }
+}
+const openCreatePlayerSearchWithoutSafety = openCreatePlayerSearch;
+openCreatePlayerSearch = function(reservationId) {
+  openCreatePlayerSearchWithoutSafety(reservationId);
+  const button=qs('createSearchBtn');if(!button)return;
+  const help=document.createElement('p');help.className='modal-help';help.textContent='Usa un messaggio rispettoso. Un filtro di base controlla le espressioni offensive; il gestore riceve le segnalazioni.';
+  qs('searchNote').after(help);
+  button.onclick=()=>submitCommunityForm(button,'/player-searches',{reservationId,spotsNeeded:Number(qs('searchSpots').value),note:qs('searchNote').value.trim()});
+};
+const openJoinPlayerSearchWithoutSafety = openJoinPlayerSearch;
+openJoinPlayerSearch = function(searchId) {
+  openJoinPlayerSearchWithoutSafety(searchId);
+  const button=qs('sendJoinRequestBtn');if(!button)return;
+  button.onclick=()=>{
+    const participantNames=[...document.querySelectorAll('.participant-name-input')].map(input=>input.value.trim()),phone=qs('joinPhone').value.trim();
+    if(participantNames.some(name=>name.length<2) || phone.length<6){qs('playerSearchModalMsg').textContent='Inserisci tutti i nomi e un numero di telefono valido.';return;}
+    return submitCommunityForm(button,'/player-searches/'+encodeURIComponent(searchId)+'/requests',{participantNames,phone});
+  };
+};
+function openCommunitySafety(searchId, requestId) {
+  if(!STATE.me || STATE.me.managementMode)return;
+  const search=STATE.playerSearches.find(item=>item.id===searchId);if(!search)return;
+  const user=STATE.me,epoch=managementContextEpoch,target=requestId?'questo partecipante':'l’organizzatore';
+  openAppModal('Segnala o blocca',`${searchSummaryHTML(search)}<form id="communityReportForm" class="form-stack"><label for="communityReportReason">Motivo della segnalazione</label><select id="communityReportReason">${Object.entries(communityReasonLabels).map(([value,label])=>`<option value="${value}">${escapeHTML(label)}</option>`).join('')}</select><p class="modal-help">Il gestore riceve la segnalazione e il testo contestato. Per urgenze o assistenza: <a href="mailto:isaacmorg93@virgilio.it">isaacmorg93@virgilio.it</a>.</p><button class="primary-btn" type="submit">Invia segnalazione</button></form><button id="communityBlockBtn" class="secondary-btn" type="button">Blocca ${target}</button><p class="modal-help">Il blocco nasconde reciprocamente ricerche e contatti e impedisce nuove interazioni. Le prenotazioni dei campi restano valide.</p><p id="communitySafetyStatus" class="form-message" role="status"></p><a href="/community-rules.html" target="_blank" rel="noopener noreferrer">Regole della community</a>`);
+  const form=qs('communityReportForm'),block=qs('communityBlockBtn'),status=qs('communitySafetyStatus');
+  form.onsubmit=async event=>{
+    event.preventDefault();if(!communityModalCurrent(form,user,epoch))return;
+    const button=form.querySelector('button');button.disabled=true;
+    try{await api('/player-searches/'+encodeURIComponent(searchId)+'/report',{method:'POST',body:JSON.stringify({reason:qs('communityReportReason').value,...(requestId?{requestId}:{})})});if(communityModalCurrent(form,user,epoch)){status.textContent='Segnalazione inviata al gestore. Puoi anche bloccare questo account.';button.textContent='Segnalazione inviata';}}
+    catch(error){if(communityModalCurrent(form,user,epoch)){status.textContent=communityError(error);button.disabled=false;}}
+  };
+  block.onclick=async()=>{
+    if(!await confirmAction('Bloccare questo account?','Non vedrete più le rispettive ricerche e i contatti. Puoi rimuovere il tuo blocco da Sicurezza.','Blocca account'))return;
+    if(!communityModalCurrent(block,user,epoch))return;
+    block.disabled=true;
+    try{await api('/community/blocks',{method:'POST',body:JSON.stringify({searchId,...(requestId?{requestId}:{})})});if(communityModalCurrent(block,user,epoch)){closeAppModal();await loadPlayerSearches();qs('playersStatus').textContent='Account bloccato in questo stabilimento.';}}
+    catch(error){if(communityModalCurrent(block,user,epoch)){status.textContent=communityError(error);block.disabled=false;}}
+  };
+}
+async function openCommunityBlocks() {
+  const user=STATE.me,epoch=managementContextEpoch;if(!user || user.managementMode)return;
+  openAppModal('Sicurezza della community','<p class="modal-help">I blocchi valgono nello stabilimento corrente. Rimuovere il tuo blocco non rimuove quello eventualmente impostato dall’altra persona.</p><div id="communityBlocksList">Caricamento…</div><p id="communityBlocksStatus" class="form-message" role="status"></p><a href="/community-rules.html" target="_blank" rel="noopener noreferrer">Regole della community</a>');
+  const list=qs('communityBlocksList');
+  try{
+    const data=await api('/community/blocks');if(!communityModalCurrent(list,user,epoch))return;
+    list.textContent='';
+    for(const item of data.items){
+      const row=document.createElement('article');row.className='item';
+      const label=document.createElement('strong');label.textContent=item.username;
+      const button=document.createElement('button');button.className='secondary-btn';button.type='button';button.textContent='Rimuovi il mio blocco';
+      button.onclick=async()=>{
+        if(!communityModalCurrent(button,user,epoch))return;button.disabled=true;
+        try{await api('/community/blocks/'+encodeURIComponent(item.id),{method:'DELETE'});if(communityModalCurrent(button,user,epoch)){await loadPlayerSearches();if(communityModalCurrent(button,user,epoch))await openCommunityBlocks();}}
+        catch(error){if(communityModalCurrent(button,user,epoch)){qs('communityBlocksStatus').textContent=communityError(error);button.disabled=false;}}
+      };
+      row.append(label,button);list.append(row);
+    }
+    if(!data.items.length)list.textContent='Non hai bloccato alcun account.';
+    paginateCommunityList('communityBlocksList');
+  }catch(error){if(communityModalCurrent(list,user,epoch))list.textContent=communityError(error);}
+}
+async function openCommunityReports() {
+  const user=STATE.me,epoch=managementContextEpoch;if(user?.role!=='admin')return;
+  openAppModal('Segnalazioni della community','<p class="modal-help">Controlla le segnalazioni tempestivamente. Puoi rimuovere una ricerca, disabilitare un account o archiviare la segnalazione.</p><div id="communityReportsList">Caricamento…</div><p id="communityReportsStatus" class="form-message" role="status"></p>');
+  const list=qs('communityReportsList');
+  try{
+    const data=await api('/admin/community-reports');if(!communityModalCurrent(list,user,epoch))return;
+    list.textContent='';
+    for(const report of data.items){
+      const row=document.createElement('article');row.className='item community-report-card';
+      row.innerHTML=`<strong>${escapeHTML(communityReasonLabels[report.reason] || 'Segnalazione')}</strong><p>${escapeHTML(fieldNameById(report.fieldId))} · ${escapeHTML(report.date)} ${escapeHTML(report.time)}</p><p>${escapeHTML(report.content || '(Nessun messaggio)')}</p><p class="modal-help">Da ${escapeHTML(report.reporterUser)} · account segnalato: ${escapeHTML(report.reportedUser)}</p>`;
+      for(const [action,label] of [['close-search','Rimuovi ricerca'],['disable','Disabilita account'],['resolve','Archivia segnalazione']]){
+        const button=document.createElement('button');button.className='secondary-btn';button.type='button';button.textContent=label;
+        button.onclick=async()=>{
+          if(!await confirmAction(label+'?',action==='disable'?'L’account perderà l’accesso allo stabilimento.':action==='close-search'?'La ricerca verrà chiusa e nascosta; le richieste in attesa saranno rifiutate.':'La segnalazione verrà archiviata senza altre modifiche.',label))return;
+          if(!communityModalCurrent(button,user,epoch))return;button.disabled=true;
+          try{
+            if(action==='disable')await api('/admin/users/status',{method:'PUT',body:JSON.stringify({username:report.reportedUser,disabled:true})});
+            else await api('/admin/community-reports/'+encodeURIComponent(report.id),{method:'PATCH',body:JSON.stringify({action})});
+            if(communityModalCurrent(button,user,epoch)){await loadPlayerSearches();if(communityModalCurrent(button,user,epoch))await openCommunityReports();}
+          }catch(error){if(communityModalCurrent(button,user,epoch)){qs('communityReportsStatus').textContent=communityError(error);button.disabled=false;}}
+        };
+        row.append(button);
+      }
+      list.append(row);
+    }
+    if(!data.items.length)list.textContent='Nessuna segnalazione aperta.';
+    paginateCommunityList('communityReportsList');
+  }catch(error){if(communityModalCurrent(list,user,epoch))list.textContent=communityError(error);}
+}
+
 document.addEventListener('DOMContentLoaded',()=>{
+  const safety=document.createElement('button');safety.id='communitySafetyBtn';safety.type='button';safety.className='secondary-btn btn-small';safety.textContent='Sicurezza';safety.onclick=openCommunityBlocks;
+  qs('refreshPlayersBtn')?.before(safety);
+  const reports=document.createElement('button');reports.id='btnCommunityReports';reports.type='button';reports.className='admin-action';reports.innerHTML='<span class="admin-action-copy"><strong>Segnalazioni</strong><small>Moderazione della community</small></span><span>›</span>';reports.onclick=openCommunityReports;
+  qs('btnAdminNotes')?.after(reports);
   const homeTabs=[...document.querySelectorAll('[data-home-panel]')];
   homeTabs[0]?.parentElement.setAttribute('role','tablist');
   homeTabs.forEach((button,index)=>{
