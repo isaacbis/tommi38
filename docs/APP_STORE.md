@@ -6,7 +6,7 @@ Stato aggiornato il **10 settembre 2026**. CampoPronto è il nuovo nome dell’a
 
 La versione **1.0, build 1**, con il nome Tommi38, è stata caricata e inviata ad Apple il **10 settembre 2026 alle 16:52, Europe/Rome**. L’invio `a527ec0d-ac78-4a02-8660-ba4cd2da9a99` è stato successivamente ritirato per sostituire nome e icona.
 
-La versione **1.0, build 2**, con il nome CampoPronto e l’icona blu scelta dal titolare, è stata archiviata, validata e **caricata con successo il 10 settembre 2026 alle 17:17, Europe/Rome**. Il nome pubblico **CampoPronto: prenota campi** è già salvato nella scheda. Dopo il ritiro, la versione 1.0 risulta `developerRejected`; **il nuovo invio per la revisione non è ancora stato effettuato**. L’app non viene quindi dichiarata approvata o disponibile al pubblico.
+La versione **1.0, build 2**, con il nome CampoPronto e l’icona blu scelta dal titolare, è stata archiviata, validata e **caricata con successo il 10 settembre 2026 alle 17:17, Europe/Rome**. La build 2 è stata elaborata da Apple e associata alla versione 1.0. Il nome pubblico **CampoPronto: prenota campi** è già salvato nella scheda. Dopo il ritiro, la versione 1.0 risulta `developerRejected`; **il nuovo invio per la revisione non è ancora stato effettuato**. L’app non viene quindi dichiarata approvata o disponibile al pubblico.
 
 | Campo | Valore |
 | --- | --- |
@@ -17,7 +17,7 @@ La versione **1.0, build 2**, con il nome CampoPronto e l’icona blu scelta dal
 | Bundle ID invariato | `isaacmorganti.Tommi38IOS` |
 | Team Apple | `82M5KZ26B2` |
 | SKU invariato | `tommi38-ios` |
-| Versione caricata | `1.0`, build `2`; nuovo invio in preparazione |
+| Versione associata | `1.0`, build `2`; nuovo invio in preparazione |
 | Prezzo e disponibilità | Gratuita, Italia |
 | Pubblicazione | Automatica dopo l’approvazione Apple |
 | Dispositivi | iPhone e iPad; disponibilità Mac e Apple Vision Pro disattivata |
@@ -26,7 +26,7 @@ La versione **1.0, build 2**, con il nome CampoPronto e l’icona blu scelta dal
 
 Scheda: [App Store Connect](https://appstoreconnect.apple.com/apps/6810684742/distribution/ios/version/inflight).
 
-Le pagine [privacy](https://tommi38.onrender.com/privacy.html), [assistenza](https://tommi38.onrender.com/support.html) e [regole della community](https://tommi38.onrender.com/community-rules.html) sono state verificate pubblicamente nella release precedente. Il deploy web con il nuovo marchio CampoPronto è ancora da completare; gli URL restano invariati.
+Il marchio CampoPronto è distribuito in produzione con il commit `95ea019` (PR #8), mantenendo gli URL esistenti. Le pagine [privacy](https://tommi38.onrender.com/privacy.html), [assistenza](https://tommi38.onrender.com/support.html) e [regole della community](https://tommi38.onrender.com/community-rules.html) sono pubbliche. Il controllo di produzione ha rilevato un 404 per `/icons/apple-touch-icon-v3.png`: il file è presente ma mancava nella lista esplicita delle risorse pubbliche. La correzione aggiunge solo quel percorso, conserva l’icona v2 e resta da distribuire; fino al deploy il 404 impedisce anche l’installazione completa della cache PWA v18.
 
 ## Testi della scheda italiana
 
@@ -102,14 +102,14 @@ L’eliminazione dell’account richiede la password attuale, invalida le sessio
 
 I crediti prenotano servizi sportivi consumati fisicamente presso lo stabilimento. I promemoria sono locali, con autorizzazione facoltativa, isolamento per account e stabilimento e riallineamento quando l’app recupera le prenotazioni; non garantiscono aggiornamenti istantanei a app chiusa per modifiche effettuate altrove. La lista d’attesa non prenota automaticamente e non invia push dal server. [Servizi fisici](https://developer.apple.com/app-store/review/guidelines/#other-purchase-methods).
 
-La release CampoPronto ha superato **127 test JavaScript** e **8 scenari dei promemoria nativi**. La suite comprende 17 test UGC; i controlli di sintassi dei 17 JavaScript applicativi erano già validi nella release precedente. La verifica visiva di scelta stabilimento, accesso e Home a **320 × 568 pixel** non ha rilevato overflow (`scrollWidth: 320`, `scrollHeight: 568`). Sono stati verificati nel browser i percorsi di cancellazione account e segnalazione/blocco con dati sintetici; login e schermate principali sono stati provati nei simulatori iPhone e iPad. Le prove di concorrenza usano transazioni serializzate nel database simulato e non riproducono i tentativi automatici di Firestore. Il solo cambio di marchio mantiene invariati API, identificatori del database, storage locale e bridge nativo.
+La release CampoPronto con la correzione di distribuzione dell’icona ha superato **128 test JavaScript** e **8 scenari dei promemoria nativi**. La suite comprende 17 test UGC; i controlli di sintassi dei 17 JavaScript applicativi erano già validi nella release precedente. La verifica visiva di scelta stabilimento, accesso e Home a **320 × 568 pixel** non ha rilevato overflow (`scrollWidth: 320`, `scrollHeight: 568`). Sono stati verificati nel browser i percorsi di cancellazione account e segnalazione/blocco con dati sintetici; login e schermate principali sono stati provati nei simulatori iPhone e iPad. Le prove di concorrenza usano transazioni serializzate nel database simulato e non riproducono i tentativi automatici di Firestore. Il solo cambio di marchio mantiene invariati API, identificatori del database, storage locale e bridge nativo.
 
 La build utilizza **Xcode 26.6 e SDK iOS 26.5**, con iOS minimo **16**. La firma è automatica per il team indicato; gli identificatori della scheda e del progetto devono rimanere invariati negli aggiornamenti. L’icona App Store è quadrata, opaca, a 1024 × 1024 pixel. Per ricreare e caricare l’archivio seguire il [README iOS](../Tommi38IOS/README.md). [Requisiti Apple per gli upload](https://developer.apple.com/news/upcoming-requirements/).
 
 ## Passaggi rimanenti per la build 2
 
-1. Completare e verificare il deploy web CampoPronto mantenendo gli URL esistenti.
-2. Verificare che Apple abbia elaborato la build 2 e associarla alla versione 1.0.
+1. Distribuire la correzione del percorso pubblico dell’icona v3 e verificare che tutte le risorse della cache PWA siano accessibili.
+2. Ricontrollare la build 2 già elaborata e associata alla versione 1.0.
 3. Aggiornare i testi della scheda e sostituire le schermate iPhone e iPad con acquisizioni del nuovo marchio.
 4. Ricontrollare l’accesso dimostrativo e le dichiarazioni già salvate, senza riportare credenziali nei file.
 5. Usare **Aggiungi per la verifica** e poi **Invia per la verifica**; registrare qui il nuovo identificativo di invio e lo stato effettivamente confermato.

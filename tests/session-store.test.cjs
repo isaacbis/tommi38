@@ -1,6 +1,8 @@
 const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('node:path');
+const fs = require('node:fs');
+const vm = require('node:vm');
 const { pathToFileURL } = require('node:url');
 const express = require('../backend/node_modules/express');
 const storeModule = import(pathToFileURL(path.join(__dirname, '../backend/src/session-store.js')));
@@ -185,12 +187,12 @@ test('only intended frontend assets are public; internal paths never return the 
   const db = database();
   const app = createApp({ ...routeOptions(), secret: SECRET, sessionStore: new FirestoreSessionStore({ db, secret: SECRET }) });
   await serve(app, async base => {
-    for (const pathname of ['/', '/index.html', '/script.js', '/manifest.json']) {
+    for (const pathname of ['/', '/index.html', '/script.js', '/manifest.json', '/icons/apple-touch-icon-v2.png']) {
       const response = await fetch(base + pathname);
       assert.equal(response.status, 200, pathname);
       await response.arrayBuffer();
     }
-    for (const pathname of ['/info', '/info/', '/info/private.txt', '/info/qr%20code.png', '/.env', '/backend/server.js', '/unknown-page', '/%69nfo/private.txt']) {
+    for (const pathname of ['/info', '/info/', '/info/private.txt', '/info/qr%20code.png', '/.env', '/backend/server.js', '/unknown-page', '/%69nfo/private.txt', '/icons/', '/icons/unlisted.png', '/icons/../info/private.txt']) {
       const response = await fetch(base + pathname);
       assert.equal(response.status, 404, pathname);
       assert.equal(await response.text(), 'Not found');
@@ -201,6 +203,45 @@ test('only intended frontend assets are public; internal paths never return the 
     const unknownApi = await fetch(`${base}/api/unknown-route`);
     assert.equal(unknownApi.status, 404);
     assert.deepEqual(await unknownApi.json(), { error: 'NOT_FOUND' });
+  });
+});
+
+test('every service-worker precache asset and manifest icon is delivered without a session', async () => {
+  const { createApp } = await import(pathToFileURL(path.join(__dirname, '../backend/server.js')));
+  const { FirestoreSessionStore } = await storeModule;
+  const db = database();
+  const app = createApp({ ...routeOptions(), secret: SECRET, sessionStore: new FirestoreSessionStore({ db, secret: SECRET }) });
+  await serve(app, async base => {
+    const worker = await fetch(`${base}/service-worker.js`);
+    assert.equal(worker.status, 200);
+    const events = {};
+    let precache;
+    let install;
+    vm.runInNewContext(await worker.text(), {
+      self: { addEventListener: (name, listener) => { events[name] = listener; }, skipWaiting() {} },
+      caches: { open: async () => ({ addAll: async paths => { precache = Array.from(paths); } }) }
+    });
+    events.install({ waitUntil: promise => { install = promise; } });
+    await install;
+    assert.ok(precache.length > 0, 'the install event must populate its cache');
+    const manifestResponse = await fetch(`${base}/manifest.json`);
+    assert.equal(manifestResponse.status, 200);
+    const manifest = await manifestResponse.json();
+    const paths = new Set([...precache, ...manifest.icons.map(icon => icon.src)]);
+    for (const pathname of paths) {
+      assert.ok(pathname.startsWith('/') && !pathname.startsWith('//'), pathname);
+      const response = await fetch(base + pathname);
+      assert.equal(response.status, 200, pathname);
+      assert.equal(response.headers.get('set-cookie'), null, pathname);
+      const body = Buffer.from(await response.arrayBuffer());
+      if (pathname.endsWith('.png')) {
+        assert.match(response.headers.get('content-type'), /^image\/png(?:;|$)/, pathname);
+        assert.deepEqual(body.subarray(0, 8), Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), pathname);
+        assert.deepEqual(body, fs.readFileSync(path.join(__dirname, '../frontend', pathname.slice(1))), pathname);
+      }
+    }
+    assert.equal(db.reads, 0);
+    assert.equal(db.records.size, 0);
   });
 });
 
