@@ -1707,6 +1707,8 @@ button:focus-visible, summary:focus-visible, input:focus-visible, select:focus-v
 }
 
 /* All ordinary day slots remain visible together, with state available without relying on colour. */
+.legal-links { display:flex; justify-content:center; flex-wrap:wrap; gap:16px; margin:6px 0 0; }
+.legal-links a { color:#bdccda; font-size:12px; min-height:32px; display:inline-flex; align-items:center; }
 #viewBook { position: relative; }
 #viewBook > .user-card { position: absolute; top: 6px; right: 12px; min-height: 0; padding: 0; width: auto; z-index: 1; }
 #viewBook > .user-card .role-badge { display: none; }

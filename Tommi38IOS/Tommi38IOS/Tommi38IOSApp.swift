@@ -9,13 +9,6 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
     ) -> Bool {
         let center = UNUserNotificationCenter.current()
         center.delegate = self
-        center.requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
-            if let error {
-                print("Errore permesso notifiche:", error.localizedDescription)
-            } else {
-                print("Notifiche autorizzate:", granted)
-            }
-        }
         return true
     }
 

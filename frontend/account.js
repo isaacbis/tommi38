@@ -6,7 +6,11 @@
     WRONG_PASSWORD: 'La password attuale non è corretta.',
     BAD_BODY: 'Controlla i dati inseriti. La nuova password deve avere almeno 12 caratteri.',
     REQUEST_PENDING: 'Hai già una richiesta in attesa del gestore.',
-    REQUEST_ALREADY_HANDLED: 'La richiesta è già stata gestita. Aggiorna la lista.'
+    REQUEST_ALREADY_HANDLED: 'La richiesta è già stata gestita. Aggiorna la lista.',
+    PLATFORM_HANDOFF_REQUIRED: 'Richiesta registrata. Prima di eliminare questo account devi trasferire la gestione della piattaforma a un altro amministratore. Il tuo account è ancora attivo.',
+    MANAGER_HANDOFF_REQUIRED: 'Richiesta registrata. Sei l’ultimo gestore attivo: fai nominare un altro gestore, poi ripeti l’eliminazione. Il tuo account è ancora attivo.',
+    DELETION_RETRY_REQUIRED: 'L’eliminazione è iniziata ma si è interrotta. L’account è bloccato. Ripeti questa operazione con le stesse credenziali per completarla: i dati già eliminati non verranno ripristinati.',
+    DELETION_CONTEXT_CHANGED: 'Lo stato dell’account è cambiato. Chiudi questa schermata e accedi nuovamente.'
   }[error?.error] || errorMessage(error));
   const button = (label, action, className = 'secondary-btn') => {
     const element = document.createElement('button');
@@ -64,6 +68,35 @@
       await api('/auth/password',{method:'POST',body:JSON.stringify({currentPassword:form.querySelector('#accountCurrent').value,newPassword:form.querySelector('#accountNew').value})});
       form.reset(); if(current()) root.textContent = 'Password aggiornata.';
     });
+  }
+  function deleteAccount() {
+    if(STATE.me?.managementMode)return;
+    const username=STATE.me?.username || qs('username')?.value.trim() || '';
+    const {root,current}=modal('Elimina il tuo account',`<form class="form-stack" style="display:flex;flex-direction:column;gap:8px"><p>Eliminerai l’account di questo stabilimento, le sue prenotazioni, i crediti, lo storico e i contenuti associati. L’operazione è definitiva. Gli account di altri stabilimenti restano separati.</p><label class="field-label" for="deleteAccountUsername">Username</label><input id="deleteAccountUsername" class="admin-input" autocomplete="username" autocapitalize="none" required maxlength="80" value="${escapeHTML(username)}" ${STATE.me?'readonly':''}>${passwordInput('deleteAccountPassword','Password attuale',true)}<label class="checkbox-label"><input id="deleteAccountConfirm" type="checkbox" required> Ho capito: voglio eliminare definitivamente questo account e i suoi dati.</label><button class="secondary-btn" type="submit">Elimina definitivamente</button><p role="status"></p><p class="helper-text"><a href="/privacy.html">Privacy</a> · <a href="/support.html">Assistenza</a></p></form>`);
+    bindForm(root,current,async(form,status)=>{
+      if(!form.querySelector('#deleteAccountConfirm').checked)return;
+      if(!await confirmAction('Elimina definitivamente l’account?','Le prenotazioni e i crediti di questo stabilimento saranno eliminati insieme ai tuoi dati. Questa operazione non può essere annullata.','Elimina account'))return;
+      if(!current())return;
+      stopAutoRefresh();
+      status.textContent='Eliminazione in corso. Attendi la conferma prima di chiudere.';
+      try{
+        await api('/auth/account',{method:'DELETE',timeoutMs:120000,body:JSON.stringify({username:form.querySelector('#deleteAccountUsername').value.trim(),currentPassword:form.querySelector('#deleteAccountPassword').value,confirm:true})});
+        form.reset();
+        if(typeof finishSignOut==='function')finishSignOut();
+        else {if(typeof clearNativeBookingNotifications==='function')clearNativeBookingNotifications();location.reload();}
+      }catch(error){
+        if(!error.pending && STATE.me)startAutoRefresh();
+        throw error;
+      }
+    });
+  }
+  function accountSettings() {
+    if(STATE.me?.managementMode)return;
+    const {root}=modal('Account, privacy e assistenza','<p class="helper-text">Gestisci il tuo account nello stabilimento selezionato.</p>');
+    root.append(button('Cambia password',changePassword),button('Elimina account',deleteAccount));
+    const links=document.createElement('p');links.className='helper-text';
+    links.innerHTML='<a href="/privacy.html">Informativa privacy</a> · <a href="/support.html">Assistenza</a> · <a href="/community-rules.html">Regole della community</a>';
+    root.append(links);
   }
   async function requestCredits() {
     const {root,current} = modal('Richiedi crediti', '<p>Caricamento…</p>');
@@ -131,7 +164,7 @@
   document.addEventListener('DOMContentLoaded',()=>{
     const controls=document.createElement('div');controls.className='form-stack';
     const signup=button('Registrati',registration);signup.classList.add('hidden');
-    controls.append(signup,button('Password dimenticata?',recovery));qs('loginForm').after(controls);
+    controls.append(signup,button('Password dimenticata?',recovery),button('Elimina un account',deleteAccount));qs('loginForm').after(controls);
     const originalGallery=loadPublicLoginGallery;
     loadPublicLoginGallery=async function(...args){
       const venue=selectedEstablishment;signup.classList.add('hidden');
@@ -140,9 +173,9 @@
       return result;
     };
     const settings=document.createElement('section');settings.className='glass-card wait-row';settings.dataset.personalAccount='';
-    settings.append(button('Cambia password',changePassword));qs('viewAlerts').append(settings);
-    const ownAccount=button('Cambia la mia password',changePassword);ownAccount.classList.add('compact-account-button');ownAccount.dataset.personalAccount='';qs('adminMenu').append(ownAccount);
-    const globalAccount=button('Cambia la password di amministratore',changePassword);globalAccount.classList.add('compact-account-button');globalAccount.dataset.personalAccount='';qs('adminEstablishments').append(globalAccount);
+    settings.append(button('Account, privacy e assistenza',accountSettings));qs('viewAlerts').append(settings);
+    const ownAccount=button('Account, privacy e assistenza',accountSettings);ownAccount.classList.add('compact-account-button');ownAccount.dataset.personalAccount='';qs('adminMenu').append(ownAccount);
+    const globalAccount=button('Account, privacy e assistenza',accountSettings);globalAccount.classList.add('compact-account-button');globalAccount.dataset.personalAccount='';qs('adminEstablishments').append(globalAccount);
     qs('creditHistory').closest('section').append(button('Richiedi crediti',requestCredits));
     const admin=document.createElement('div');admin.className='home-actions';
     admin.append(button('Richieste utenti',manageRequests),button('Pacchetti crediti',managePackages));qs('adminUsers').prepend(admin);

@@ -2,10 +2,11 @@ import express from "express";
 import bcrypt from "bcrypt";
 import rateLimit from "express-rate-limit";
 import { z } from "zod";
-import { FieldValue } from "./db.js";
+import { FieldValue, db as root } from "./db.js";
 import { db, tenantId, establishments } from "./tenancy.js";
 import { requireAuth, requireAdmin, validDate } from "./permissions.js";
 import { requirePersonalAccount } from "./management-guards.js";
+import { randomInt } from 'node:crypto';
 
 const cleanupTimes = new Map();
 const CLEANUP_COOLDOWN_MS = 60_000; // 1 minuto
@@ -129,6 +130,49 @@ async function cleanupExpiredReservations() {
 
 function playerRequestId(username) {
   return Buffer.from(username, "utf8").toString("base64url");
+}
+
+const communityReportReasons = ['harassment', 'offensive', 'spam', 'privacy', 'other'];
+// A small first-line filter; reports and human moderation remain available for abuse it misses.
+function communityTextAllowed(value) {
+  const text = String(value).normalize('NFKD').replace(/[\u0300-\u036f\u200b-\u200d\ufeff]/g, '').toLowerCase();
+  return !/\b(?:vaffanculo|cazzo|stronz[oaie]|puttan[ae]|troi[ae]|fuck|shit|bitch|nigger|faggot)\b|\b(?:ti\s+(?:ammazzo|uccido)|kill\s+yourself|heil\s+hitler)\b/i.test(text);
+}
+function communityPair(first, second) {
+  const users = [first, second].sort();
+  return { firstUser: users[0], secondUser: users[1], id: users.map(playerRequestId).join('.') };
+}
+function communityPairRef(first, second) {
+  return db.collection('communityBlocks').doc(communityPair(first, second).id);
+}
+function communityReportId(searchId, requestId, username) {
+  return [searchId,requestId || '',username].map(playerRequestId).join('.');
+}
+async function communityModeratorActive(transaction, req) {
+  const identity=req.session.user,origin=identity.establishment || 'tommi38';
+  const users=origin===tenantId() ? db.collection('users') : origin==='tommi38' ? root.collection('users') : root.collection('establishments').doc(origin).collection('users');
+  const snap=await transaction.get(users.doc(identity.username));
+  if(!snap.exists)return false;
+  const user=snap.data();
+  return !user.disabled && !user.deletionPending && Number(user.sessionVersion || 0)===Number(identity.sessionVersion || 0) &&
+    (req.isPlatformManagement ? origin==='tommi38' && user.platformAdmin===true : user.role==='admin' || (origin==='tommi38' && user.platformAdmin===true));
+}
+async function communityBlockedUsers(username) {
+  const snapshots = await Promise.all(['firstUser', 'secondUser'].map(field =>
+    db.collection('communityBlocks').where(field, '==', username).get()));
+  return new Set(snapshots.flatMap(snap => snap.docs).filter(doc => doc.data().blockedBy?.length)
+    .map(doc => doc.data().firstUser === username ? doc.data().secondUser : doc.data().firstUser));
+}
+async function requireCommunityInteraction(transaction, first, second) {
+  const [pair, firstAccount, secondAccount] = await Promise.all([
+    transaction.get(communityPairRef(first, second)),
+    transaction.get(db.collection('users').doc(first)),
+    transaction.get(db.collection('users').doc(second))
+  ]);
+  if (pair.exists && pair.data().blockedBy?.length) throw Object.assign(new Error('COMMUNITY_BLOCKED'), {code:'COMMUNITY_BLOCKED'});
+  if (!firstAccount.exists || !secondAccount.exists || firstAccount.data().disabled || secondAccount.data().disabled || firstAccount.data().deletionPending || secondAccount.data().deletionPending) {
+    throw Object.assign(new Error('COMMUNITY_UNAVAILABLE'), {code:'COMMUNITY_UNAVAILABLE'});
+  }
 }
 
 function publicRequestData(doc) {
@@ -389,19 +433,17 @@ async function createReservation(req, res) {
         throw error;
       }
 
-      if (req.adminBookingUsername) {
-        const target=await transaction.get(userRef);
-        if(!target.exists || target.data().disabled)throw Object.assign(new Error('USER_NOT_FOUND'),{code:'USER_NOT_FOUND'});
+      const userSnap = await transaction.get(userRef);
+      if (!userSnap.exists || userSnap.data().disabled || userSnap.data().deletionPending) {
+        throw Object.assign(new Error('USER_NOT_FOUND'),{code:'USER_NOT_FOUND'});
       }
       if (!isAdmin) {
-        const userSnap = await transaction.get(userRef);
         if (!userSnap.exists || Number(userSnap.data().credits || 0) <= 0) {
           const error = new Error("NO_CREDITS");
           error.code = "NO_CREDITS";
           throw error;
         }
 
-        if (userSnap.data().disabled) throw Object.assign(new Error("NO_CREDITS"), {code:"NO_CREDITS"});
         const active = await transaction.get(db.collection("reservations").where("user", "==", username));
         const current = active.docs.map(d => d.data()).filter(r => !reservationIsExpired(r, slotMinutes, today, currentMinutes));
         if (current.length >= maxActive || current.filter(r => r.date === date).length >= maxPerDay) {
@@ -496,6 +538,7 @@ router.get("/player-searches", requireAuth, async (req, res) => {
   const isAdmin = req.session.user.role === "admin";
   const today = localISODate();
   const currentMinutes = localMinutes();
+  const blockedUsers = req.isPlatformManagement ? new Set() : await communityBlockedUsers(username);
 
   const cfgSnap = await db.collection("admin").doc("config").get();
   const cfg = cfgSnap.exists ? cfgSnap.data() : {};
@@ -510,9 +553,18 @@ router.get("/player-searches", requireAuth, async (req, res) => {
   for (const doc of snap.docs) {
     const search = doc.data();
     if (playerSearchIsExpired(search, today, currentMinutes)) continue;
+    if (search.moderationHidden || blockedUsers.has(search.ownerUser)) continue;
+    const owner = await db.collection('users').doc(search.ownerUser).get();
+    if (!owner.exists || owner.data().disabled) continue;
 
     const requestsSnap = await doc.ref.collection("requests").get();
-    const allRequests = requestsSnap.docs.map(publicRequestData);
+    const visibleRequests = [];
+    for (const requestDoc of requestsSnap.docs) {
+      if (blockedUsers.has(requestDoc.data().requesterUser)) continue;
+      const account = await db.collection('users').doc(requestDoc.data().requesterUser).get();
+      if (account.exists && !account.data().disabled && !account.data().deletionPending) visibleRequests.push(requestDoc);
+    }
+    const allRequests = visibleRequests.map(publicRequestData);
     const myRequest = !req.isPlatformManagement && requestsSnap.docs.find(requestDoc =>
       requestDoc.data().requesterUser === username
     );
@@ -556,7 +608,7 @@ router.get("/player-searches", requireAuth, async (req, res) => {
 
 router.post("/player-searches", requireAuth, requirePersonalAccount, async (req, res) => {
   const schema = z.object({
-    reservationId: z.string().min(1).max(180),
+    reservationId: z.string().min(1).max(180).refine(value=>!value.includes('/')),
     spotsNeeded: z.number().int().min(1).max(12),
     note: z.string().max(200).optional().default("")
   });
@@ -564,47 +616,29 @@ router.post("/player-searches", requireAuth, requirePersonalAccount, async (req,
   if (!parsed.success) return res.status(400).json({ error: "BAD_BODY" });
 
   const { reservationId, spotsNeeded, note } = parsed.data;
+  if (!communityTextAllowed(note)) return res.status(400).json({error:'CONTENT_NOT_ALLOWED'});
   const username = req.session.user.username;
   const isAdmin = req.session.user.role === "admin";
   const reservationRef = db.collection("reservations").doc(reservationId);
-  const reservationSnap = await reservationRef.get();
-
-  if (!reservationSnap.exists) return res.status(404).json({ error: "RESERVATION_NOT_FOUND" });
-
-  const reservation = reservationSnap.data();
-  if (!isAdmin && reservation.user !== username) {
-    return res.status(403).json({ error: "NOT_ALLOWED" });
-  }
-
-  const cfgSnap = await db.collection("admin").doc("config").get();
-  const cfg = cfgSnap.exists ? cfgSnap.data() : {};
-  const slotMinutes = Number(cfg.slotMinutes || 45);
-  if (playerSearchIsExpired(reservation, localISODate(), localMinutes())) {
-    return res.status(400).json({ error: "RESERVATION_EXPIRED" });
-  }
-
   const searchRef = db.collection("playerSearches").doc(reservationId);
-  const existing = await searchRef.get();
-  if (existing.exists && ["open", "full"].includes(existing.data().status || "open")) {
-    return res.status(409).json({ error: "SEARCH_ALREADY_EXISTS" });
-  }
-
-  if (existing.exists) await deletePlayerSearchTree(reservationId);
-
-  await searchRef.set({
-    reservationId,
-    fieldId: reservation.fieldId,
-    date: reservation.date,
-    time: reservation.time,
-    ownerUser: reservation.user,
-    spotsNeeded,
-    spotsFilled: 0,
-    status: "open",
-    note: note.trim(),
-    createdAt: FieldValue.serverTimestamp(),
-    updatedAt: FieldValue.serverTimestamp()
+  const error = await db.runTransaction(async tx=>{
+    const [reservationSnap,existing,actor] = await Promise.all([tx.get(reservationRef),tx.get(searchRef),tx.get(db.collection('users').doc(username))]);
+    if (!actor.exists || actor.data().disabled || actor.data().deletionPending) return 'COMMUNITY_UNAVAILABLE';
+    if (!reservationSnap.exists) return 'RESERVATION_NOT_FOUND';
+    const reservation = reservationSnap.data();
+    if (!isAdmin && reservation.user !== username) return 'NOT_ALLOWED';
+    const owner = await tx.get(db.collection('users').doc(reservation.user));
+    if (!owner.exists || owner.data().disabled || owner.data().deletionPending) return 'COMMUNITY_UNAVAILABLE';
+    if (playerSearchIsExpired(reservation,localISODate(),localMinutes())) return 'RESERVATION_EXPIRED';
+    if (existing.exists && existing.data().moderationHidden) return 'SEARCH_MODERATED';
+    if (existing.exists && ['open','full'].includes(existing.data().status || 'open')) return 'SEARCH_ALREADY_EXISTS';
+    const requests = existing.exists ? await tx.get(searchRef.collection('requests')) : null;
+    if (requests && requests.size > 480) return 'TOO_MANY_REQUESTS';
+    requests?.docs.forEach(doc=>tx.delete(doc.ref));
+    tx.set(searchRef,{reservationId,fieldId:reservation.fieldId,date:reservation.date,time:reservation.time,ownerUser:reservation.user,spotsNeeded,spotsFilled:0,status:'open',note:note.trim(),createdAt:FieldValue.serverTimestamp(),updatedAt:FieldValue.serverTimestamp()});
+    return null;
   });
-
+  if (error) return res.status(error === 'RESERVATION_NOT_FOUND' ? 404 : error === 'NOT_ALLOWED' ? 403 : 409).json({error});
   res.json({ ok: true, id: reservationId });
 });
 
@@ -620,13 +654,15 @@ router.post("/player-searches/:id/requests", requireAuth, requirePersonalAccount
   const searchRef = db.collection("playerSearches").doc(req.params.id);
   const requestRef = searchRef.collection("requests").doc(playerRequestId(username));
   const participantNames = parsed.data.participantNames.map(name => name.replace(/\s+/g, " "));
+  if (!participantNames.every(communityTextAllowed)) return res.status(400).json({error:'CONTENT_NOT_ALLOWED'});
   const count = participantNames.length;
 
   try {
     await db.runTransaction(async transaction => {
-      const [searchSnap, requestSnap] = await Promise.all([
+      const [searchSnap, requestSnap, ownRequests] = await Promise.all([
         transaction.get(searchRef),
-        transaction.get(requestRef)
+        transaction.get(requestRef),
+        transaction.get(searchRef.collection('requests').where('requesterUser','==',username))
       ]);
 
       if (!searchSnap.exists) {
@@ -636,6 +672,8 @@ router.post("/player-searches/:id/requests", requireAuth, requirePersonalAccount
       }
 
       const search = searchSnap.data();
+      if (search.moderationHidden) throw Object.assign(new Error('SEARCH_CLOSED'), {code:'SEARCH_CLOSED'});
+      await requireCommunityInteraction(transaction, username, search.ownerUser);
       if (playerSearchIsExpired(search, localISODate(), localMinutes())) {
         const error = new Error("SEARCH_CLOSED");
         error.code = "SEARCH_CLOSED";
@@ -660,13 +698,16 @@ router.post("/player-searches/:id/requests", requireAuth, requirePersonalAccount
         throw error;
       }
 
-      if (requestSnap.exists && ["pending", "accepted"].includes(requestSnap.data().status)) {
+      if (ownRequests.docs.some(doc=>['pending','accepted'].includes(doc.data().status))) {
         const error = new Error("ALREADY_REQUESTED");
         error.code = "ALREADY_REQUESTED";
         throw error;
       }
 
-      transaction.set(requestRef, {
+      // A renamed account keeps its historical request ID. Never overwrite it
+      // if the old username is later registered by a different person.
+      const writeRef=requestSnap.exists && requestSnap.data().requesterUser!==username ? searchRef.collection('requests').doc() : requestRef;
+      transaction.set(writeRef, {
         requesterUser: username,
         participantNames,
         phone: parsed.data.phone,
@@ -683,6 +724,7 @@ router.post("/player-searches/:id/requests", requireAuth, requirePersonalAccount
       "SEARCH_CLOSED",
       "NOT_ENOUGH_SPOTS",
       "ALREADY_REQUESTED"
+      , "COMMUNITY_BLOCKED", "COMMUNITY_UNAVAILABLE"
     ];
     if (known.includes(error?.code)) {
       return res.status(error.code === "SEARCH_NOT_FOUND" ? 404 : 409).json({ error: error.code });
@@ -719,6 +761,7 @@ router.patch("/player-searches/:id/requests/:requestId", requireAuth, async (req
 
       const search = searchSnap.data();
       const request = requestSnap.data();
+      if (search.moderationHidden) throw Object.assign(new Error('SEARCH_CLOSED'), {code:'SEARCH_CLOSED'});
 
       if (playerSearchIsExpired(search, localISODate(), localMinutes())) {
         const error = new Error("SEARCH_CLOSED");
@@ -730,6 +773,10 @@ router.patch("/player-searches/:id/requests/:requestId", requireAuth, async (req
         const error = new Error("NOT_ALLOWED");
         error.code = "NOT_ALLOWED";
         throw error;
+      }
+      await requireCommunityInteraction(transaction, search.ownerUser, request.requesterUser);
+      if (!req.isPlatformManagement && username !== search.ownerUser) {
+        await requireCommunityInteraction(transaction, username, request.requesterUser);
       }
 
       if (request.status !== "pending") {
@@ -781,6 +828,7 @@ router.patch("/player-searches/:id/requests/:requestId", requireAuth, async (req
       "REQUEST_ALREADY_HANDLED",
       "SEARCH_CLOSED",
       "NOT_ENOUGH_SPOTS"
+      , "COMMUNITY_BLOCKED", "COMMUNITY_UNAVAILABLE"
     ];
     if (known.includes(error?.code)) {
       return res.status(error.code === "NOT_FOUND" ? 404 : 409).json({ error: error.code });
@@ -811,19 +859,22 @@ router.patch("/player-searches/:id/requests/:requestId", requireAuth, async (req
 router.delete("/player-searches/:id/requests/:requestId", requireAuth, requirePersonalAccount, async (req, res) => {
   const searchRef = db.collection("playerSearches").doc(req.params.id);
   const requestRef = searchRef.collection("requests").doc(req.params.requestId);
-  const requestSnap = await requestRef.get();
-
-  if (!requestSnap.exists) return res.status(404).json({ error: "REQUEST_NOT_FOUND" });
-  const request = requestSnap.data();
-
-  if (request.requesterUser !== req.session.user.username) {
-    return res.status(403).json({ error: "NOT_ALLOWED" });
+  try {
+    const result = await db.runTransaction(async tx=>{
+      const [requestSnap,search] = await Promise.all([tx.get(requestRef),tx.get(searchRef)]);
+      if (!requestSnap.exists || !search.exists) return 'REQUEST_NOT_FOUND';
+      const request = requestSnap.data();
+      if (request.requesterUser !== req.session.user.username) return 'NOT_ALLOWED';
+      if (request.status !== 'pending') return 'REQUEST_ALREADY_HANDLED';
+      await requireCommunityInteraction(tx,request.requesterUser,search.data().ownerUser);
+      tx.delete(requestRef);
+      return null;
+    });
+    if (result) return res.status(result==='REQUEST_NOT_FOUND' ? 404 : result==='NOT_ALLOWED' ? 403 : 409).json({error:result});
+  } catch(error) {
+    if (['COMMUNITY_BLOCKED','COMMUNITY_UNAVAILABLE'].includes(error?.code)) return res.status(409).json({error:error.code});
+    throw error;
   }
-  if (request.status !== "pending") {
-    return res.status(409).json({ error: "REQUEST_ALREADY_HANDLED" });
-  }
-
-  await requestRef.delete();
   res.json({ ok: true });
 });
 
@@ -859,6 +910,108 @@ router.delete("/player-searches/:id", requireAuth, async (req, res) => {
 });
 
 /* =================== ADMIN =================== */
+const communityTargetSchema = z.object({
+  searchId:z.string().min(1).max(180).refine(value => !value.includes('/')),
+  requestId:z.string().min(1).max(180).refine(value => !value.includes('/')).optional()
+});
+async function communityTarget(transaction, req, value) {
+  const searchSnap = await transaction.get(db.collection('playerSearches').doc(value.searchId));
+  if (!searchSnap.exists) return {error:'SEARCH_NOT_FOUND'};
+  const search = searchSnap.data();
+  let username = search.ownerUser, content = search.note || '';
+  if (value.requestId) {
+    if (search.ownerUser !== req.session.user.username && req.session.user.role !== 'admin') return {error:'NOT_ALLOWED'};
+    const request = await transaction.get(searchSnap.ref.collection('requests').doc(value.requestId));
+    if (!request.exists) return {error:'REQUEST_NOT_FOUND'};
+    username = request.data().requesterUser;
+    content = (request.data().participantNames || []).join(', ');
+  }
+  if (!username || username === req.session.user.username) return {error:'CANNOT_TARGET_SELF'};
+  return {username, content:String(content).slice(0,400), search};
+}
+router.get('/community/blocks', requireAuth, requirePersonalAccount, async (req,res) => {
+  const username = req.session.user.username;
+  const snapshots = await Promise.all(['firstUser','secondUser'].map(field => db.collection('communityBlocks').where(field,'==',username).get()));
+  const items = snapshots.flatMap(snap=>snap.docs).filter(doc=>(doc.data().blockedBy || []).includes(username))
+    .map(doc=>({id:doc.id,username:doc.data().firstUser === username ? doc.data().secondUser : doc.data().firstUser}));
+  res.json({items});
+});
+router.post('/community/blocks', requireAuth, requirePersonalAccount, async (req,res) => {
+  const parsed = communityTargetSchema.strict().safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({error:'BAD_BODY'});
+  const username = req.session.user.username;
+  const result = await db.runTransaction(async tx => {
+    const target = await communityTarget(tx,req,parsed.data);
+    if (target.error) return target;
+    const [actor,account] = await Promise.all([tx.get(db.collection('users').doc(username)),tx.get(db.collection('users').doc(target.username))]);
+    if (!actor.exists || !account.exists || actor.data().disabled || account.data().disabled || actor.data().deletionPending || account.data().deletionPending) return {error:'COMMUNITY_UNAVAILABLE'};
+    const pair = communityPair(username,target.username), ref = db.collection('communityBlocks').doc(pair.id);
+    const old = await tx.get(ref);
+    tx.set(ref,{firstUser:pair.firstUser,secondUser:pair.secondUser,blockedBy:[...new Set([...(old.exists ? old.data().blockedBy || [] : []),username])],updatedAt:FieldValue.serverTimestamp()});
+    return {ok:true,id:pair.id};
+  });
+  res.status(result.error ? 400 : 200).json(result);
+});
+router.delete('/community/blocks/:id', requireAuth, requirePersonalAccount, async (req,res) => {
+  const username = req.session.user.username, ref = db.collection('communityBlocks').doc(req.params.id);
+  const result = await db.runTransaction(async tx=>{
+    const snap = await tx.get(ref);
+    if (!snap.exists) return {ok:true};
+    const pair = snap.data();
+    if (![pair.firstUser,pair.secondUser].includes(username)) return {error:'NOT_ALLOWED'};
+    const remaining = (pair.blockedBy || []).filter(user=>user !== username);
+    if (remaining.length) tx.update(ref,{blockedBy:remaining,updatedAt:FieldValue.serverTimestamp()});
+    else tx.delete(ref);
+    return {ok:true};
+  });
+  res.status(result.error ? 403 : 200).json(result);
+});
+router.post('/player-searches/:id/report', requireAuth, requirePersonalAccount, async (req,res) => {
+  const parsed = communityTargetSchema.extend({reason:z.enum(communityReportReasons)}).strict().safeParse({...req.body,searchId:req.params.id});
+  if (!parsed.success) return res.status(400).json({error:'BAD_BODY'});
+  const username = req.session.user.username;
+  const result = await db.runTransaction(async tx=>{
+    const target = await communityTarget(tx,req,parsed.data);
+    if (target.error) return target;
+    if (target.search.moderationHidden) return {error:'SEARCH_CLOSED'};
+    const accounts = await Promise.all([username,target.username].map(user=>tx.get(db.collection('users').doc(user))));
+    if (accounts.some(account=>!account.exists || account.data().disabled || account.data().deletionPending)) return {error:'COMMUNITY_UNAVAILABLE'};
+    const reportId = communityReportId(parsed.data.searchId,parsed.data.requestId,username);
+    const ref = db.collection('communityReports').doc(reportId);
+    const old = await tx.get(ref);
+    if (!old.exists || old.data().status !== 'open') tx.set(ref,{searchId:parsed.data.searchId,requestId:parsed.data.requestId || null,reporterUser:username,reportedUser:target.username,reason:parsed.data.reason,content:target.content,fieldId:target.search.fieldId || '',date:target.search.date || '',time:target.search.time || '',status:'open',createdAt:FieldValue.serverTimestamp()});
+    return {ok:true};
+  });
+  res.status(result.error ? 400 : 200).json(result);
+});
+router.get('/admin/community-reports', requireAdmin, async (req,res) => {
+  const snap = await db.collection('communityReports').where('status','==','open').get();
+  const items = snap.docs.map(doc=>({id:doc.id,...doc.data()}));
+  items.sort((a,b)=>`${a.date} ${a.time}`.localeCompare(`${b.date} ${b.time}`));
+  res.json({items});
+});
+router.patch('/admin/community-reports/:id', requireAdmin, async (req,res) => {
+  const parsed = z.object({action:z.enum(['close-search','resolve'])}).strict().safeParse(req.body);
+  if (!parsed.success) return res.status(400).json({error:'BAD_BODY'});
+  const ref = db.collection('communityReports').doc(req.params.id);
+  const result = await db.runTransaction(async tx=>{
+    if (!await communityModeratorActive(tx,req)) return {error:'NOT_AUTHORIZED'};
+    const report = await tx.get(ref);
+    if (!report.exists) return {error:'REPORT_NOT_FOUND'};
+    const searchRef = db.collection('playerSearches').doc(report.data().searchId);
+    const search = await tx.get(searchRef);
+    const requests = parsed.data.action === 'close-search' && search.exists ? await tx.get(searchRef.collection('requests')) : null;
+    if (requests && requests.size > 480) return {error:'TOO_MANY_REQUESTS'};
+    if (requests) {
+      tx.update(searchRef,{status:'closed',moderationHidden:true,updatedAt:FieldValue.serverTimestamp()});
+      requests.docs.filter(doc=>doc.data().status === 'pending').forEach(doc=>tx.update(doc.ref,{status:'rejected',updatedAt:FieldValue.serverTimestamp()}));
+    }
+    tx.update(ref,{status:'resolved',action:parsed.data.action,resolvedBy:req.actorId || req.session.user.username,resolvedAt:FieldValue.serverTimestamp()});
+    return {ok:true};
+  });
+  res.status(result.error === 'NOT_AUTHORIZED' ? 403 : result.error ? 409 : 200).json(result);
+});
+
 router.put("/admin/config", requireAdmin, async (req, res) => {
   const time = z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/);
   const parsed = z.object({slotMinutes:z.number().int().min(5).max(240), dayStart:time, dayEnd:time,
@@ -936,6 +1089,7 @@ router.put("/admin/users/credits", requireAdmin, async (req, res) => {
   try {
     await db.runTransaction(async tx => {
       const user = await tx.get(ref);
+      if (!user.exists || user.data().deletionPending) throw new Error('ACCOUNT_CHANGED');
       const next = Number(user.data().credits || 0) + parsed.data.delta;
       if (!Number.isSafeInteger(next) || next < 0) throw new Error("INVALID_BALANCE");
       tx.update(ref, {credits:next});
@@ -955,10 +1109,15 @@ router.put("/admin/users/status", requireAdmin, async (req, res) => {
 
   if (parsed.data.username === req.session.user.username && (req.session.user.establishment || "tommi38") === tenantId() && parsed.data.disabled) return res.status(400).json({error:"CANNOT_DISABLE_SELF"});
   const ref=db.collection("users").doc(parsed.data.username);
-  const snap=await ref.get();
-  if (!snap.exists) return res.status(404).json({error:"USER_NOT_FOUND"});
-  if (tenantId()==="tommi38" && snap.data().platformAdmin && !req.session.user.platformAdmin) return res.status(403).json({error:"NOT_AUTHORIZED"});
-  await ref.update({disabled:parsed.data.disabled,pendingApproval:false,sessionVersion:FieldValue.increment(1)});
+  const error = await db.runTransaction(async tx=>{
+    const snap=await tx.get(ref);
+    if (!snap.exists) return 'USER_NOT_FOUND';
+    if (snap.data().deletionPending) return 'ACCOUNT_CHANGED';
+    if (tenantId()==='tommi38' && snap.data().platformAdmin && !req.session.user.platformAdmin) return 'NOT_AUTHORIZED';
+    tx.update(ref,{disabled:parsed.data.disabled,pendingApproval:false,sessionVersion:FieldValue.increment(1)});
+    return null;
+  });
+  if (error) return res.status(error==='USER_NOT_FOUND' ? 404 : error==='NOT_AUTHORIZED' ? 403 : 409).json({error});
   res.json({ ok: true });
 });
 
@@ -973,14 +1132,16 @@ router.put("/admin/users/password", requireAdmin, async (req, res) => {
   const ref=db.collection("users").doc(parsed.data.username);
   const snap=await ref.get();
   if (!snap.exists) return res.status(404).json({error:"USER_NOT_FOUND"});
+  if (snap.data().deletionPending) return res.status(409).json({error:'ACCOUNT_CHANGED'});
   if (tenantId()==="tommi38" && snap.data().platformAdmin && !req.session.user.platformAdmin) return res.status(403).json({error:"NOT_AUTHORIZED"});
   const hash = await bcrypt.hash(parsed.data.newPassword, 12);
-  await db.runTransaction(async tx => {
+  const error = await db.runTransaction(async tx => {
     const fresh=await tx.get(ref);
-    if (!fresh.exists || (tenantId()==="tommi38" && fresh.data().platformAdmin && !req.session.user.platformAdmin)) throw new Error("ACCOUNT_CHANGED");
+    if (!fresh.exists || fresh.data().deletionPending || (tenantId()==="tommi38" && fresh.data().platformAdmin && !req.session.user.platformAdmin)) return 'ACCOUNT_CHANGED';
     tx.update(ref,{passwordHash:hash,sessionVersion:FieldValue.increment(1)});
     tx.delete(db.collection("recoveryRequests").doc(parsed.data.username));
   });
+  if (error) return res.status(409).json({error});
   res.json({ ok: true });
 });
 
@@ -1002,7 +1163,7 @@ router.post("/admin/users/rename", requireAdmin, async (req, res) => {
   const newRef = db.collection("users").doc(newUsername);
   const error=await db.runTransaction(async tx=>{
     const userCollections=['reservations','creditLedger','waitlist','reservationHistory'];
-    const namedCollections=['creditRequests','recoveryRequests'];
+    const namedCollections=['creditRequests','recoveryRequests','accountDeletionRequests'];
     const [oldSnap,newSnap,...records]=await Promise.all([
       tx.get(oldRef),tx.get(newRef),
       ...userCollections.map(name=>tx.get(db.collection(name).where('user','==',oldUsername))),
@@ -1010,6 +1171,7 @@ router.post("/admin/users/rename", requireAdmin, async (req, res) => {
       tx.get(db.collection('playerSearches'))
     ]);
     if(!oldSnap.exists)return 'USER_NOT_FOUND';
+    if(oldSnap.data().deletionPending)return 'ACCOUNT_CHANGED';
     if(tenantId()==="tommi38" && oldSnap.data().platformAdmin)return 'CANNOT_RENAME_PLATFORM_ADMIN';
     if(newSnap.exists)return 'USERNAME_TAKEN';
     const history=records.slice(0,userCollections.length);
@@ -1017,8 +1179,12 @@ router.post("/admin/users/rename", requireAdmin, async (req, res) => {
     if(named.some((doc,index)=>index%2===1 && doc.exists))return 'USERNAME_TAKEN';
     const searches=records.at(-1);
     const requests=await Promise.all(searches.docs.map(search=>tx.get(search.ref.collection('requests').where('requesterUser','==',oldUsername))));
+    const [blocksSnap,reportsSnap] = await Promise.all([tx.get(db.collection('communityBlocks')),tx.get(db.collection('communityReports'))]);
+    const blocks = blocksSnap.docs.filter(doc=>[doc.data().firstUser,doc.data().secondUser].includes(oldUsername));
+    const reports = reportsSnap.docs.filter(doc=>[doc.data().reporterUser,doc.data().reportedUser].includes(oldUsername));
+    if(reports.some(doc=>doc.data().reporterUser===oldUsername && reportsSnap.docs.some(other=>other.id!==doc.id && other.id===communityReportId(doc.data().searchId,doc.data().requestId,newUsername))))return 'USERNAME_TAKEN';
     const owned=searches.docs.filter(search=>search.data().ownerUser===oldUsername);
-    const writes=2+history.reduce((sum,snap)=>sum+snap.size,0)+named.filter((snap,index)=>index%2===0 && snap.exists).length*2+owned.length+requests.reduce((sum,snap)=>sum+snap.size,0);
+    const writes=2+history.reduce((sum,snap)=>sum+snap.size,0)+named.filter((snap,index)=>index%2===0 && snap.exists).length*2+owned.length+requests.reduce((sum,snap)=>sum+snap.size,0)+blocks.length*2+reports.length*2;
     if(writes>490)return 'TOO_MANY_RESERVATIONS';
     tx.set(newRef,{...oldSnap.data(),sessionVersion:Number(oldSnap.data().sessionVersion || 0)+1});
     tx.delete(oldRef);
@@ -1030,6 +1196,18 @@ router.post("/admin/users/rename", requireAdmin, async (req, res) => {
     });
     owned.forEach(doc=>tx.update(doc.ref,{ownerUser:newUsername}));
     requests.forEach(snap=>snap.docs.forEach(doc=>tx.update(doc.ref,{requesterUser:newUsername})));
+    const renamed = value=>value === oldUsername ? newUsername : value;
+    blocks.forEach(doc=>{
+      const data=doc.data(),pair=communityPair(renamed(data.firstUser),renamed(data.secondUser));
+      tx.delete(doc.ref);
+      tx.set(db.collection('communityBlocks').doc(pair.id),{...data,firstUser:pair.firstUser,secondUser:pair.secondUser,blockedBy:(data.blockedBy || []).map(renamed)});
+    });
+    reports.forEach(doc=>{
+      const value={...doc.data(),reporterUser:renamed(doc.data().reporterUser),reportedUser:renamed(doc.data().reportedUser)};
+      const nextId=communityReportId(value.searchId,value.requestId,value.reporterUser);
+      if(nextId!==doc.id){tx.delete(doc.ref);tx.set(db.collection('communityReports').doc(nextId),value);}
+      else tx.update(doc.ref,{reporterUser:value.reporterUser,reportedUser:value.reportedUser});
+    });
     return null;
   });
   if(error)return res.status(error==='USER_NOT_FOUND'?404:409).json({error});
@@ -1092,6 +1270,8 @@ router.post('/waitlist', requireAuth, requirePersonalAccount, async (req,res) =>
   const result = await db.runTransaction(async tx => {
     const reservation = await tx.get(db.collection('reservations').doc(reservationId));
     const cfg = await tx.get(db.collection('admin').doc('config'));
+    const actor = await tx.get(db.collection('users').doc(username));
+    if (!actor.exists || actor.data().disabled || actor.data().deletionPending) return 'ACCOUNT_CHANGED';
     if (!reservation.exists) return 'SLOT_FREE';
     const r = reservation.data();
     if (r.user === username) return 'OWN_RESERVATION';
@@ -1181,7 +1361,7 @@ router.post("/admin/users", requireAdmin, async (req,res) => {
   const ref=db.collection("users").doc(username);
   const created=await db.runTransaction(async tx=>{
     if ((await tx.get(ref)).exists) return false;
-    tx.set(ref,{passwordHash,credits,role,platformAdmin:false,disabled:false,sessionVersion:0});
+    tx.set(ref,{passwordHash,credits,role,platformAdmin:false,disabled:false,sessionVersion:randomInt(1,2**48-1)});
     if(credits) tx.set(db.collection("creditLedger").doc(),{user:username,delta:credits,reason:"Crediti iniziali",actor:req.actorId || req.session.user.username,createdAt:FieldValue.serverTimestamp()});
     return true;
   });
@@ -1197,6 +1377,7 @@ router.put('/admin/users/role',requireAdmin,async(req,res)=>{
   const error=await db.runTransaction(async tx=>{
     const user=await tx.get(ref);
     if(!user.exists)return 'USER_NOT_FOUND';
+    if(user.data().deletionPending)return 'ACCOUNT_CHANGED';
     if(tenantId()==='tommi38' && user.data().platformAdmin)return 'PROTECTED_ACCOUNT';
     tx.update(ref,{role:parsed.data.role,sessionVersion:FieldValue.increment(1)});
     tx.set(db.collection('adminAudit').doc(),{action:'user_role_changed',user:parsed.data.username,role:parsed.data.role,actor:req.actorId || req.session.user.username,createdAt:FieldValue.serverTimestamp()});
