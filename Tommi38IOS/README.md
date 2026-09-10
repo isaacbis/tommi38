@@ -1,4 +1,4 @@
-# Tommi38 per iOS
+# CampoPronto per iOS
 
 Aprire `Tommi38IOS.xcodeproj`, schema `Tommi38IOS`, e selezionare un iPhone, iPad o simulatore. Il target richiede iOS 16 o successivo e usa SwiftUI, UIKit, WKWebView, UserNotifications e CryptoKit, senza SDK esterni.
 
@@ -6,7 +6,7 @@ La firma automatica è configurata per il team Apple Developer del proprietario.
 
 ## Funzioni native
 
-La webview carica [Tommi38](https://tommi38.onrender.com/) con cookie persistenti, pull-to-refresh, pagina di recupero connessione e gestione dei dialoghi JavaScript dell’area amministratore. La tastiera conserva la propria area sicura; l’interfaccia web gestisce le aree di schermo riservate al dispositivo.
+La webview carica [CampoPronto](https://tommi38.onrender.com/) con cookie persistenti, pull-to-refresh, pagina di recupero connessione e gestione dei dialoghi JavaScript dell’area amministratore. La tastiera conserva la propria area sicura; l’interfaccia web gestisce le aree di schermo riservate al dispositivo.
 
 La navigazione interna e il bridge sono limitati al dominio di produzione in HTTPS sulla porta predefinita o 443. Il bridge accetta messaggi soltanto dal frame principale. I link esterni, comprese le nuove finestre, possono aprire soltanto gli schemi `http`, `https`, `tel`, `mailto` e `sms`.
 
@@ -20,7 +20,7 @@ All’avvio della pagina il contenitore espone `window.tommi38Native.notificatio
 - `syncBookings`: riconcilia l’elenco completo `items` delle prenotazioni personali.
 - `clearBookings`: rimuove i promemoria del contesto all’uscita o all’eliminazione dell’account.
 
-Tutti i messaggi includono account e stabilimento. Gli identificativi nativi incorporano un hash di entrambi, così prenotazioni con lo stesso ID restano distinte. Il cambio di account ritira i precedenti promemoria Tommi38; uscita e cancellazione restano valide anche se una programmazione asincrona è ancora in corso. Non vengono eliminate notifiche estranee al prefisso dell’app.
+Tutti i messaggi includono account e stabilimento. Gli identificativi nativi incorporano un hash di entrambi, così prenotazioni con lo stesso ID restano distinte. Il cambio di account ritira i precedenti promemoria dell’app; uscita e cancellazione restano valide anche se una programmazione asincrona è ancora in corso. Non vengono eliminate notifiche estranee al prefisso dell’app.
 
 Il permesso viene richiesto quando occorre programmare il primo promemoria. Gli orari usano Europe/Rome e vengono validate anche date e ore. Si programmano al massimo le 64 prenotazioni più vicine. Un nuovo appuntamento imminente può generare un avviso dopo pochi secondi; la sincronizzazione non ripete avvisi già trascorsi. I banner sono abilitati anche in primo piano.
 

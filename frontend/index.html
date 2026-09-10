@@ -3,17 +3,18 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="description" content="Prenota i campi di Tommi38, gestisci le tue partite e consulta gli avvisi dal tuo cellulare.">
+  <meta name="description" content="Con CampoPronto prenoti i campi del tuo stabilimento, organizzi le tue partite e trovi altri giocatori.">
   <meta name="theme-color" content="#061525">
-  <title>Tommi38 – Prenotazione campi</title>
+  <title>CampoPronto · Prenota campi</title>
 
   <link rel="stylesheet" href="/style.css">
   <link rel="manifest" href="/manifest.json">
-  <link rel="apple-touch-icon" href="/icon-192.png">
+  <link rel="apple-touch-icon" href="/icons/apple-touch-icon-v3.png">
+  <link rel="icon" type="image/png" href="/icon-192.png">
 
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="Tommi38">
+  <meta name="apple-mobile-web-app-title" content="CampoPronto">
 </head>
 <body>
   <div id="connectionStatus" class="connection-status hidden" role="status">Connessione assente. Riconnettiti per aggiornare le disponibilità.</div>
@@ -21,11 +22,14 @@
   <div id="appLoader" class="app-loader" aria-live="polite">
     <img src="/icon-192.png" alt="" class="loader-logo">
     <div class="loader-ring" aria-hidden="true"></div>
-    <div class="loader-text">Tommi38</div>
+    <div class="loader-text">CampoPronto</div>
   </div>
 
   <main class="app-shell">
-    <section id="establishmentPicker" class="login-screen hidden"><p class="eyebrow">Campi e partite</p><h1>Scegli il tuo stabilimento</h1><p class="muted">Accedi con le credenziali del tuo stabilimento.</p><div id="establishmentList" class="form-stack"></div><nav class="legal-links" aria-label="Informazioni"><a href="/privacy.html" target="_blank" rel="noopener">Privacy</a><a href="/support.html" target="_blank" rel="noopener">Assistenza</a></nav></section>
+    <section id="establishmentPicker" class="login-screen hidden">
+      <div class="picker-brand"><img src="/icon-192.png" alt="" width="48" height="48"><div><strong>CampoPronto</strong><p>Prenota campi, trova giocatori.</p></div></div>
+      <h1>Scegli il tuo stabilimento</h1><p class="muted">Accedi con le credenziali del tuo stabilimento.</p><div id="establishmentList" class="form-stack"></div><nav class="legal-links" aria-label="Informazioni"><a href="/privacy.html" target="_blank" rel="noopener">Privacy</a><a href="/support.html" target="_blank" rel="noopener">Assistenza</a></nav>
+    </section>
     <!-- LOGIN -->
     <section id="loginBox" class="login-screen hidden">
       <div class="login-topline">
@@ -33,9 +37,9 @@
       </div>
 
       <div class="login-hero">
-        <img src="/icon-512.png" alt="Tommi38" class="login-logo">
-        <h1>Accedi a<br><span data-establishment-name>Tommi38</span></h1>
-        <p>Accedi per prenotare il tuo campo.</p>
+        <img src="/icon-512.png" alt="" class="login-logo">
+        <h1>CampoPronto</h1>
+        <p>Prenota campi, trova giocatori.</p>
       </div>
 
       <section class="glass-card login-panel">
@@ -78,8 +82,8 @@
     <section id="app" class="main-app hidden">
       <header class="native-header">
         <div class="header-brand">
-          <img src="/icon-192.png" alt="Tommi38" class="header-logo">
-          <div class="header-brand-copy"><strong data-establishment-name>Tommi38</strong><span id="headerRole" class="header-role hidden"></span></div>
+          <img src="/icon-192.png" alt="CampoPronto" class="header-logo">
+          <div class="header-brand-copy"><span class="header-platform" aria-hidden="true">CampoPronto</span><strong data-establishment-name>Tommi38</strong><span id="headerRole" class="header-role hidden"></span></div>
         </div>
         <div class="header-actions">
           <button id="switchBathBtn" class="change-btn" type="button">Cambia ›</button>
@@ -179,7 +183,7 @@
       <section id="viewAlerts" class="app-view hidden">
         <div class="page-title-row">
           <div>
-            <p class="eyebrow">Tommi38</p>
+            <p class="eyebrow">CampoPronto</p>
             <h1>Avvisi</h1>
           </div>
         </div>
@@ -235,7 +239,7 @@
         </section>
 
         <section id="adminEstablishments" class="glass-card admin-section hidden">
-          <div class="platform-intro"><p>Gestisci tutti gli stabilimenti e i loro gestori.</p></div>
+          <div class="platform-intro"><p>Gestisci gli stabilimenti di CampoPronto e i loro gestori.</p></div>
           <details class="management-details create-establishment"><summary>＋ Crea stabilimento</summary>
             <form id="establishmentCreateForm" class="form-stack">
               <label class="field-label" for="establishmentName">Nome dello stabilimento</label><input id="establishmentName" class="admin-input" required maxlength="80" placeholder="Es. Bagni Claudia">
@@ -365,7 +369,7 @@
   <dialog id="confirmDialog" class="confirm-dialog" aria-labelledby="confirmTitle" aria-describedby="confirmDetails">
     <form method="dialog">
       <div class="sheet-handle" aria-hidden="true"></div>
-      <p class="eyebrow">Tommi38</p>
+      <p class="eyebrow">CampoPronto</p>
       <h2 id="confirmTitle">Conferma prenotazione</h2>
       <p id="confirmDetails"></p>
       <div class="dialog-actions">
@@ -374,7 +378,7 @@
       </div>
     </form>
   </dialog>
-  <noscript><p class="empty-state">Attiva JavaScript nel browser per utilizzare Tommi38.</p></noscript>
+  <noscript><p class="empty-state">Attiva JavaScript nel browser per utilizzare CampoPronto.</p></noscript>
   <script src="/script.js" defer></script>
   <script src="/community.js" defer></script>
   <script src="/account.js" defer></script>

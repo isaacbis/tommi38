@@ -1,4 +1,4 @@
-const CACHE_NAME = "tommi38-pwa-v17";
+const CACHE_NAME = "tommi38-pwa-v18";
 const ASSETS = [
   "/",
   "/index.html",
@@ -12,7 +12,8 @@ const ASSETS = [
   "/legal.css",
   "/manifest.json",
   "/icon-192.png",
-  "/icon-512.png"
+  "/icon-512.png",
+  "/icons/apple-touch-icon-v3.png"
 ];
 
 self.addEventListener("install", event => {

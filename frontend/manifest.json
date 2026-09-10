@@ -1,6 +1,6 @@
 {
-  "name": "Tommi38",
-  "short_name": "Tommi38",
+  "name": "CampoPronto: prenota campi",
+  "short_name": "CampoPronto",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#061525",
@@ -16,5 +16,6 @@
       "sizes": "512x512",
       "type": "image/png"
     }
-  ]
+  ],
+  "description": "Prenota campi, organizza le tue partite e trova giocatori nel tuo stabilimento."
 }
