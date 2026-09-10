@@ -40,10 +40,17 @@ const listPages = new Map();
 function paginateList(id, options = {}) {
   const list = qs(id);
   if (!list) return;
+  // Time choices form one complete day. Only unusually dense schedules scroll internally.
+  if (id === 'timeGrid') {
+    const previous = listPages.get(id);
+    if (previous) { previous.nav.remove(); listPages.delete(id); }
+    list.classList.remove('paged-list');
+    Array.from(list.children).forEach(item => item.classList.remove('page-hidden'));
+    return;
+  }
   const compact = window.innerWidth <= 760;
   const tall = window.innerHeight >= 760;
-  const defaultSize = id === 'timeGrid' ? (compact ? (tall ? 9 : 6) : 15)
-    : id === 'fieldButtons' ? (compact ? 2 : 5)
+  const defaultSize = id === 'fieldButtons' ? (compact ? 2 : 5)
     : id === 'establishmentList' ? (compact ? 4 : 8)
     : id === 'creditHistory' ? (compact ? 3 : 8)
     : compact ? (tall ? 2 : 1) : 5;
@@ -52,13 +59,12 @@ function paginateList(id, options = {}) {
   let state = listPages.get(id);
   if (!items.length && state) { state.nav.classList.add('hidden'); return; }
   const scope = [typeof selectedEstablishment === 'undefined' ? '' : selectedEstablishment,STATE.me?.username,
-    id === 'timeGrid' ? qs('datePick')?.value + ':' + qs('fieldSelect')?.value : '',
     id === 'agendaList' ? qs('agendaDate')?.value + ':' + qs('agendaField')?.value : ''].join(':');
   const signature = scope + '|' + items.map(item => item.dataset.time || item.dataset.id || item.textContent).join('\u001f');
   if (!state) {
     const nav = document.createElement('nav');
     nav.className = 'list-pager';
-    nav.setAttribute('aria-label', 'Pagine ' + ({timeGrid:'orari',fieldButtons:'campi',usersList:'utenti',agendaList:'prenotazioni',platformEstablishmentList:'stabilimenti'}[id] || 'elenco'));
+    nav.setAttribute('aria-label', 'Pagine ' + ({fieldButtons:'campi',usersList:'utenti',agendaList:'prenotazioni',platformEstablishmentList:'stabilimenti'}[id] || 'elenco'));
     const previous = document.createElement('button');
     previous.type = 'button'; previous.className = 'secondary-btn pager-previous'; previous.textContent = '‹'; previous.setAttribute('aria-label','Pagina precedente');
     const status = document.createElement('span'); status.className = 'pager-status'; status.setAttribute('role','status');
@@ -560,6 +566,8 @@ async function loadReservations() {
 function renderTimeGrid() {
   const box = qs("timeGrid");
   if (!box) return;
+  box.classList.remove('few-times', 'many-times', 'extended-times');
+  box.removeAttribute('tabindex');
 
   const fieldId = qs("fieldSelect").value;
   const date = qs("datePick").value;
@@ -601,10 +609,13 @@ function renderTimeGrid() {
 
     const button = document.createElement("button");
     button.type = "button";
-    button.className = `time-slot ${busy ? "busy" : past ? "past" : "free"}`;
+    button.className = `time-slot ${closure ? "closed" : busy ? "busy" : past ? "past" : "free"}`;
     button.disabled = past || Boolean(closure);
     button.dataset.time = time;
-    button.innerHTML = `<strong>${escapeHTML(time)}</strong><small>${closure ? "Chiuso" : busy ? "Lista attesa" : past ? "Passato" : "Libero"}</small>`;
+    const stateLabel = closure ? 'Chiuso' : busy ? 'Occupato. Tocca per la lista d’attesa' : 'Libero';
+    button.dataset.label = `${time}–${timeStr(m + slot)} · ${fieldName(fieldId)} · ${stateLabel}${closure?.reason ? ': ' + closure.reason : ''}`;
+    button.setAttribute('aria-label', button.dataset.label);
+    button.innerHTML = `<strong>${escapeHTML(time)}</strong><span class="slot-state-mark" aria-hidden="true">${closure ? '×' : busy ? '◌' : '•'}</span>`;
 
     if (closure) button.title = closure.reason;
     if (busy && !closure) button.addEventListener("click",()=>joinWaitlist(STATE.dayReservationsAll.find(r=>r.fieldId===fieldId && r.time===time)));
@@ -628,9 +639,16 @@ function renderTimeGrid() {
   if (STATE.selectedTime) qs("timeSelect").value = STATE.selectedTime;
   renderTimeSelectionState();
 
-  qs("availabilityStatus").textContent = available.length
-    ? `${available.length} ${available.length === 1 ? "orario disponibile" : "orari disponibili"} · ${fieldName(fieldId)}`
-    : "Nessun orario libero. Prova un altro campo o un’altra data.";
+  const slotCount = box.children.length;
+  box.classList.toggle('few-times', slotCount <= 12);
+  box.classList.toggle('many-times', slotCount > 16);
+  box.classList.toggle('extended-times', slotCount > 24);
+  box.dataset.slotCount = String(slotCount);
+  box.setAttribute('aria-label', `${slotCount} orari di ${fieldName(fieldId)}${slotCount > 24 ? '. Scorri la griglia per vedere tutti gli orari.' : ''}`);
+  if (slotCount > 24) box.tabIndex = 0; else box.removeAttribute('tabindex');
+  const availability = qs('availabilityStatus');
+  availability.setAttribute('aria-label', `${available.length} orari liberi su ${slotCount}. ${slotCount > 24 ? 'Scorri la griglia per tutti gli orari.' : 'Tutti gli orari sono mostrati.'}`);
+  availability.innerHTML = `<span class="availability-count">${available.length}/${slotCount} liberi${slotCount > 24 ? ' · scorri ↓' : ''}</span><span class="slot-legend" aria-hidden="true"><span><i class="free">•</i> Libero</span><span><i class="busy">◌</i> Attesa</span><span><i class="closed">×</i> Chiuso</span></span>`;
   if (!box.children.length) box.innerHTML = '<div class="empty-state">Non ci sono orari programmati.</div>';
 }
 
@@ -639,9 +657,9 @@ function renderTimeSelectionState() {
     const selected = button.dataset.time === STATE.selectedTime && !button.disabled;
     button.classList.toggle("selected", selected);
     button.setAttribute("aria-pressed", String(selected));
-    const small = button.querySelector("small");
-    if (selected && small) small.textContent = "Selezionato";
-    else if (small && button.classList.contains("free")) small.textContent = "Libero";
+    const marker = button.querySelector('.slot-state-mark');
+    if (marker && button.classList.contains('free')) marker.textContent = selected ? '✓' : '•';
+    if (button.dataset.label) button.setAttribute('aria-label', button.dataset.label + (selected ? ' · Selezionato' : ''));
   });
 }
 
