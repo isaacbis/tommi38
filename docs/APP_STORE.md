@@ -1,32 +1,42 @@
-# Tommi38 — preparazione App Store
+# CampoPronto — release App Store
 
-Bozza italiana aggiornata il **10 settembre 2026**. I testi descrivono le funzioni dell’applicazione; le verifiche native, gli screenshot e le dichiarazioni del titolare devono corrispondere alla build effettivamente inviata. Questo documento non attesta una pubblicazione o un’approvazione Apple.
+Stato aggiornato il **10 settembre 2026**. CampoPronto è il nuovo nome dell’app; **Tommi38 resta il nome dello stabilimento**. Il cambio di nome e icona mantiene la stessa scheda Apple, gli account e le prenotazioni.
 
-## Dati ricevuti dal titolare
+## Stato della pubblicazione
 
-| Campo | Valore comunicato | Stato |
-| --- | --- | --- |
-| Nome app | Tommi38 | Proposto per la scheda |
-| Lingua principale | Italiano | Scelta comunicata |
-| Titolare | Isaac Morganti | Confermato dal titolare |
-| Assistenza e privacy: email pubblica | isaacmorg93@virgilio.it | Confermata dal titolare |
-| Natura del progetto | Personale, non commerciale | Dichiarazione del titolare |
-| Bundle ID | `isaacmorganti.Tommi38IOS` | Da confrontare con scheda e build finali |
-| SKU | `tommi38-ios` | Scelta comunicata per la nuova scheda |
-| Apple ID della scheda | `6810684742` | Creazione confermata nel lavoro principale |
-| Versione App Store | `1.0` | Scheda preparata; build finale da associare |
-| Prezzo e disponibilità | Gratuita, Italia | Impostazioni confermate nel lavoro principale |
+La versione **1.0, build 1**, con il nome Tommi38, è stata caricata e inviata ad Apple il **10 settembre 2026 alle 16:52, Europe/Rome**. L’invio `a527ec0d-ac78-4a02-8660-ba4cd2da9a99` è stato successivamente ritirato per sostituire nome e icona.
 
-## Metadata italiani pronti come bozza
+La versione **1.0, build 2**, con il nome CampoPronto e l’icona blu scelta dal titolare, è stata archiviata, validata e **caricata con successo il 10 settembre 2026 alle 17:17, Europe/Rome**. Il nome pubblico **CampoPronto: prenota campi** è già salvato nella scheda. Dopo il ritiro, la versione 1.0 risulta `developerRejected`; **il nuovo invio per la revisione non è ancora stato effettuato**. L’app non viene quindi dichiarata approvata o disponibile al pubblico.
+
+| Campo | Valore |
+| --- | --- |
+| Nome nella scheda | CampoPronto: prenota campi |
+| Nome sul dispositivo | CampoPronto |
+| Lingua e categoria | Italiano; Sport / Sports |
+| App Store Connect app ID | `6810684742` |
+| Bundle ID invariato | `isaacmorganti.Tommi38IOS` |
+| Team Apple | `82M5KZ26B2` |
+| SKU invariato | `tommi38-ios` |
+| Versione caricata | `1.0`, build `2`; nuovo invio in preparazione |
+| Prezzo e disponibilità | Gratuita, Italia |
+| Pubblicazione | Automatica dopo l’approvazione Apple |
+| Dispositivi | iPhone e iPad; disponibilità Mac e Apple Vision Pro disattivata |
+| Titolare e copyright | Isaac Morganti; © 2026 Isaac Morganti |
+| Email pubblica di assistenza e privacy | isaacmorg93@virgilio.it |
+
+Scheda: [App Store Connect](https://appstoreconnect.apple.com/apps/6810684742/distribution/ios/version/inflight).
+
+Le pagine [privacy](https://tommi38.onrender.com/privacy.html), [assistenza](https://tommi38.onrender.com/support.html) e [regole della community](https://tommi38.onrender.com/community-rules.html) sono state verificate pubblicamente nella release precedente. Il deploy web con il nuovo marchio CampoPronto è ancora da completare; gli URL restano invariati.
+
+## Testi della scheda italiana
 
 | Campo | Testo | Lunghezza |
 | --- | --- | --- |
-| Nome | Tommi38 | 7 caratteri |
+| Nome | CampoPronto: prenota campi | 26 caratteri |
 | Sottotitolo | Prenota campi, trova giocatori | 30 caratteri |
-| Categoria principale proposta | Sport / Sports | Da confermare nella scheda |
 | Parole chiave | sport,tennis,beach volley,disponibilità,agenda,organizzazione,crediti,gruppi,attesa | 84 byte UTF-8 |
 
-Nome e sottotitolo ammettono al massimo 30 caratteri. [Apple: informazioni dell’app](https://developer.apple.com/help/app-store-connect/reference/app-information/app-information).
+Nome e sottotitolo rispettano il limite di 30 caratteri. Il testo promozionale seguente occupa 131 caratteri su 170 disponibili; le parole chiave restano entro 100 byte. Per la prima versione non si compila “Novità”. [Informazioni dell’app](https://developer.apple.com/help/app-store-connect/reference/app-information/app-information), [proprietà della versione](https://developer.apple.com/help/app-store-connect/reference/app-information/platform-version-information/).
 
 ### Testo promozionale
 
@@ -34,13 +44,12 @@ Scegli lo stabilimento, prenota il tuo campo e organizza la partita. Controlla c
 
 ### Descrizione
 
-Tommi38 ti aiuta a organizzare le partite e a prenotare i campi sportivi degli stabilimenti che usano il servizio.
+CampoPronto ti aiuta a organizzare le partite e a prenotare i campi sportivi degli stabilimenti che usano il servizio.
 
 Scegli il tuo stabilimento e accedi con il relativo account. Consulta i campi e gli orari disponibili, seleziona la fascia che preferisci e conferma la prenotazione. Ritrovi le tue partite e lo storico nell’app e puoi annullare una prenotazione secondo le regole dello stabilimento.
 
 CERCA GIOCATORI
-Apri una ricerca per la tua partita, consulta quelle disponibili e invia una richiesta di partecipazione. Gestisci le tue ricerche e le richieste ricevute dalle sezioni dedicate.
-Puoi segnalare contenuti al gestore e bloccare altri account nello stabilimento. Il blocco nasconde reciprocamente ricerche e contatti e impedisce nuove interazioni.
+Apri una ricerca per la tua partita, consulta quelle disponibili e invia una richiesta di partecipazione. Gestisci le tue ricerche e le richieste ricevute dalle sezioni dedicate. Puoi segnalare contenuti al gestore e bloccare altri account nello stabilimento. Il blocco nasconde reciprocamente ricerche e contatti e impedisce nuove interazioni.
 
 CREDITI E LISTA D’ATTESA
 Controlla il saldo e i movimenti dei crediti e invia al gestore una richiesta di ricarica. I crediti servono alle prenotazioni di campi fisici presso lo stabilimento: non sbloccano contenuti digitali. L’app non effettua pagamenti online.
@@ -54,90 +63,55 @@ Gli account abilitati alla gestione dispongono di agenda, gestione degli utenti 
 
 Per usare il servizio occorrono una connessione internet e un account attivo nello stabilimento scelto. La registrazione è disponibile quando il gestore la abilita e può richiedere la sua approvazione. Disponibilità, accesso e condizioni delle prenotazioni dipendono dallo stabilimento.
 
-### Limiti e campi da completare
+## Schermate e accesso per App Review
 
-Il testo promozionale ha 131 caratteri; il limite è 170. La descrizione deve rimanere testo semplice entro 4.000 caratteri; le parole chiave hanno un limite di 100 byte. Per la prima versione non si compila “Novità”; negli aggiornamenti il testo dovrà descrivere i cambiamenti effettivi. L’URL di assistenza deve mostrare recapiti reali: l’email da sola non sostituisce il campo URL. [Apple: proprietà della versione](https://developer.apple.com/help/app-store-connect/reference/app-information/platform-version-information/).
+La build precedente dispone di **tre screenshot iPhone a 1320 × 2868 pixel** (Prenota, Home, Cerca giocatori) e **due screenshot iPad a 2064 × 2752 pixel** (Prenota, Home), acquisiti nei simulatori e già caricati nelle classi iPhone 6,9″ e iPad 13″. La sostituzione con schermate CampoPronto è ancora da completare. Usare schermate reali, coerenti con la build e senza dati dei clienti; le verifiche web a dimensioni ridotte non sostituiscono gli screenshot App Store. [Specifiche Apple](https://developer.apple.com/help/app-store-connect/reference/app-information/screenshot-specifications/).
 
-Le pagine di assistenza e privacy sono preparate nella release ai percorsi `/support.html` e `/privacy.html`. Dopo averne verificato la pubblicazione, i relativi URL per la scheda sono `https://tommi38.onrender.com/support.html` e `https://tommi38.onrender.com/privacy.html`. Build, screenshot, categorie, dichiarazioni e copyright definitivo restano da completare. Non sono stati inventati numeri di telefono.
+L’accesso dimostrativo nello stabilimento **Tommi38** è stato provato su iPhone e iPad. Credenziali e contatti riservati per la revisione sono già salvati nei campi privati di App Store Connect: **non inserirli nel repository**. L’account deve restare disponibile durante la revisione, con crediti sufficienti e senza dipendere da una nuova approvazione del gestore. [Informazioni per App Review](https://developer.apple.com/help/app-store-connect/reference/app-information/platform-version-information/).
 
-## Screenshot da produrre
+### Note per la revisione
 
-Apple richiede da 1 a 10 screenshot JPEG/JPG/PNG, senza trasparenza. Per iPhone 6,9″ sono accettati, in verticale, **1320 × 2868**, **1290 × 2796** oppure **1260 × 2736** pixel; si può preparare un insieme coerente a una di queste dimensioni. Se non si fornisce la classe 6,9″, la tabella Apple prevede la classe 6,5″. Se la build supporta iPad, servono anche screenshot iPad 13″: **2064 × 2752** oppure **2048 × 2732** pixel. Le dimensioni orizzontali sono invertite. [Apple: specifiche screenshot](https://developer.apple.com/help/app-store-connect/reference/app-information/screenshot-specifications/).
-
-Proposta editoriale, da acquisire nella build iOS con dati sintetici:
-
-| Ordine | Schermata reale | Didascalia proposta |
-| --- | --- | --- |
-| 1 | Campo, data e griglia completa degli orari | Il tuo prossimo campo, a portata di mano |
-| 2 | Le proprie prenotazioni con una partita futura | Le tue partite sempre in ordine |
-| 3 | Cerca giocatori, elenco con ricerche dimostrative | Trova giocatori per la tua partita |
-| 4 | Home, scheda Crediti con movimenti sintetici | Controlla il saldo e le richieste |
-| 5 | Home, scheda Attesa | Segui gli orari che ti interessano |
-| 6 | Selezione dello stabilimento | Scegli dove giocare |
-
-Un’eventuale schermata della gestione va indicata come riservata ai gestori. Le immagini finali devono mostrare funzioni disponibili nella build, senza credenziali, contatti o prenotazioni di persone reali. Acquisire alla risoluzione richiesta; le precedenti verifiche web a 320 px non costituiscono screenshot App Store. Nessun file screenshot viene dichiarato pronto da questo documento.
-
-## Accesso e note per App Review
-
-Occorre preparare un account dimostrativo attivo, con dati sintetici, crediti sufficienti e almeno un campo prenotabile, senza dipendere dall’approvazione manuale di una registrazione. Apple richiede credenziali dimostrative che non scadano quando l’app necessita dell’accesso; eventuali account aggiuntivi si descrivono nelle note. Servono anche nome, email e telefono del referente per la revisione. [Apple: informazioni per App Review](https://developer.apple.com/help/app-store-connect/reference/app-information/platform-version-information/).
-
-Il lavoro principale conferma l’inserimento di un account di revisione e dei contatti in App Store Connect. Le credenziali restano nei campi riservati e non vengono riportate nel repository. Resta da verificare il percorso completo con l’account scelto e da completare le istruzioni senza segnaposto. La fixture locale `127.0.0.1` usata per i test non è raggiungibile da Apple: le prove della revisione richiedono dati accessibili dalla build e non devono occupare campi reali. Un eventuale accesso gestore va limitato ai dati dimostrativi.
-
-Bozza delle note, da completare dopo aver provato il percorso:
-
-> Tommi38 consente di prenotare campi sportivi fisici presso gli stabilimenti presenti nel servizio. All’apertura selezionare [STABILIMENTO DIMOSTRATIVO DA PREPARARE] e usare le credenziali inserite nei campi di accesso per la revisione.
+> CampoPronto consente di prenotare campi sportivi fisici presso gli stabilimenti presenti nel servizio. All’apertura selezionare Tommi38 e usare le credenziali inserite nei campi di accesso per la revisione.
 >
-> Per verificare una prenotazione: aprire Prenota, scegliere [CAMPO DIMOSTRATIVO], una data disponibile e un orario, quindi confermare. L’account dispone di crediti dimostrativi. È possibile consultare le proprie prenotazioni, cercare giocatori e utilizzare la lista d’attesa con i dati di prova predisposti.
+> Per verificare una prenotazione, aprire Prenota, scegliere uno dei campi disponibili, una data e un orario libero, quindi confermare. L’account dispone di crediti dimostrativi. Le proprie prenotazioni sono consultabili in Le mie partite. Da una prenotazione è possibile aprire una ricerca giocatori; gli orari occupati possono essere seguiti nella lista d’attesa.
 >
 > I crediti sono utilizzati esclusivamente per prenotazioni di servizi sportivi svolti fisicamente presso lo stabilimento. L’app non vende contenuti digitali e non contiene pagamenti online; le richieste di ricarica sono gestite dallo stabilimento.
 >
 > Su iPhone i promemoria delle prenotazioni sono notifiche locali autorizzate dall’utente. Non è presente un servizio server di notifiche push per la lista d’attesa.
 >
 > Privacy, assistenza e regole sono raggiungibili dai collegamenti dell’app. L’area account permette di avviare “Elimina il tuo account”, confermando username, password attuale e cancellazione definitiva. In Cerca giocatori, “Segnala / blocca” apre le azioni sul contenuto; “Sicurezza” permette di gestire i propri blocchi. I gestori trovano “Segnalazioni” nel menu di amministrazione.
+>
+> La build 2 aggiorna il nome da Tommi38 a CampoPronto e l’icona dell’app. Tommi38 resta il nome dello stabilimento dimostrativo; il servizio e gli account appartengono alla stessa app.
 
-## Privacy: inventario da validare
+## Dichiarazioni completate
 
-Sono necessari un URL pubblico dell’informativa e le risposte “Privacy dell’app” in App Store Connect, comprensive dei soggetti terzi coinvolti. [Apple: gestione privacy](https://developer.apple.com/help/app-store-connect/manage-app-information/manage-app-privacy).
+- **Privacy dell’app pubblicata:** otto categorie, tutte collegate all’utente, finalità `AppFunctionality`, nessun tracking: `Name`, `PhoneNumber`, `UserID`, `OtherUserContent`, `CustomerSupport`, `PurchaseHistory`, `ProductInteraction`, `PhotosOrVideos`. Il manifest nativo `PrivacyInfo.xcprivacy` dichiara le stesse categorie; il cambio di marchio non introduce nuove raccolte.
+- **Classificazione per età:** 13+, calcolata dal questionario compilato per i contenuti e le interazioni presenti.
+- **Distribuzione UE:** stato DSA di non operatore commerciale salvato e attivo, sulla dichiarazione del titolare di progetto personale non commerciale.
+- **Diritti sui contenuti:** il titolare ha confermato i diritti o il permesso per logo e fotografie; dichiarazione salvata nella scheda.
+- **Crittografia:** uso della crittografia HTTPS fornita dal sistema; `ITSAppUsesNonExemptEncryption = NO` nella build. Non equivale a dichiarare assente ogni forma di crittografia.
+- **Contratti e prezzo:** contratto per app gratuite attivo, prezzo €0 e Italia selezionata. Non sono previsti acquisti in-app o pagamenti online.
 
-I dati inviati al backend e conservati rientrano nell’analisi: l’inclusione delle schermate in una webview non li esclude dalle dichiarazioni Apple. Anche l’assenza di pubblicità non equivale all’assenza di raccolta dati. [Apple: dettagli privacy](https://developer.apple.com/app-store/app-privacy-details/).
+Riferimenti: [privacy Apple](https://developer.apple.com/app-store/app-privacy-details/), [classificazione per età](https://developer.apple.com/help/app-store-connect/manage-app-information/set-an-app-age-rating/), [requisiti DSA](https://developer.apple.com/help/app-store-connect/manage-compliance-information/manage-european-union-digital-services-act-trader-requirements/), [esportazione](https://developer.apple.com/help/app-store-connect/manage-app-information/overview-of-export-compliance).
 
-| Dati presenti o da verificare | Uso dell’app | Stato per la dichiarazione |
-| --- | --- | --- |
-| Username, hash della password, appartenenza allo stabilimento, ruolo e stato account | Accesso e autorizzazioni | Identificativo utente collegato all’account; validare categoria e finalità |
-| Nomi, telefono e note inseriti nelle richieste di partecipazione | Organizzazione delle partite | Verificare dati di contatto e contenuti degli utenti, destinatari e visibilità |
-| Prenotazioni, cronologia, crediti e richieste di ricarica | Erogazione del servizio e gestione del saldo | Definire categorie Apple e conservazione; non equivalgono a dati di pagamento con carta |
-| Richieste di recupero accesso o assistenza | Supporto gestito dallo stabilimento | Verificare contenuto, accesso e tempi di conservazione |
-| Segnalazioni, testo contestato, blocchi e attribuzione della moderazione | Sicurezza della community | Dati collegati agli account; il report non duplica il telefono della partecipazione |
-| Sessioni, registrazioni tecniche, eventuali IP e servizi esterni | Funzionamento e sicurezza | Completare l’audit di server, hosting, database e codice nativo |
-| Preferenze e promemoria locali | Funzioni del dispositivo | Distinguere dati solo sul dispositivo da dati delle prenotazioni presenti sul server |
+## Implementazione e verifiche della release
 
-L’audit del codice ha rilevato Render e Google Firebase/Firestore, immagini esterne da URL impostati dai gestori e collegamenti telefono/WhatsApp aperti su azione dell’utente. Il meteo usa coordinate fisse tramite il server, senza acquisire la posizione del dispositivo. Non sono stati rilevati SDK pubblicitari, analytics o IDFA. La sessione scade dopo otto ore di inattività; questo non dimostra l’eliminazione fisica immediata di ogni record scaduto. Non sono codificati termini automatici di conservazione per ogni storico o lista d’attesa scaduta.
+L’app usa Render e Google Firebase/Firestore. Le immagini esterne sono caricate dagli URL configurati dai gestori; telefono e WhatsApp si aprono su azione dell’utente. Il meteo usa le coordinate dello stabilimento, senza acquisire la posizione del dispositivo. Non sono presenti SDK pubblicitari, analytics o IDFA. La sessione scade dopo otto ore di inattività; non sono implementati termini automatici di cancellazione per ogni storico o lista d’attesa scaduta. L’informativa deve restare coerente con la conservazione effettiva.
 
-Il manifest nativo preparato nell’audit elenca Name, PhoneNumber, UserID, OtherUserContent, CustomerSupport, PurchaseHistory, ProductInteraction e PhotosOrVideos, collegati all’utente per AppFunctionality, senza tracking. Le dichiarazioni App Store Connect vanno completate e confrontate con la build finale, includendo la componente web. I promemoria sono locali e si riallineano quando l’app si sincronizza; non garantiscono aggiornamenti istantanei per modifiche effettuate altrove mentre l’app è chiusa.
+L’eliminazione dell’account richiede la password attuale, invalida le sessioni e rimuove i dati dello stabilimento con una procedura riprendibile dopo errori. Per l’amministratore globale e l’ultimo gestore viene registrata una richiesta di trasferimento della gestione prima della cancellazione. La community dispone di filtro di base, segnalazioni, blocchi reciproci, oscuramento dei contenuti e sospensione degli account. La presa in carico delle segnalazioni e dei trasferimenti di gestione resta un’attività del titolare e dei gestori. [Eliminazione account](https://developer.apple.com/support/offering-account-deletion-in-your-app/), [contenuti degli utenti](https://developer.apple.com/app-store/review/guidelines/#user-generated-content).
 
-Questa tabella è un inventario operativo, non una dichiarazione privacy già approvata da Apple. Il titolare è **Isaac Morganti**, contattabile per assistenza e privacy a **isaacmorg93@virgilio.it**; l’informativa preparata deve restare coerente con i fornitori, la gestione degli stabilimenti e la conservazione effettiva. Non selezionare “Dati non raccolti” sulla sola base del funzionamento della parte nativa.
+I crediti prenotano servizi sportivi consumati fisicamente presso lo stabilimento. I promemoria sono locali, con autorizzazione facoltativa, isolamento per account e stabilimento e riallineamento quando l’app recupera le prenotazioni; non garantiscono aggiornamenti istantanei a app chiusa per modifiche effettuate altrove. La lista d’attesa non prenota automaticamente e non invia push dal server. [Servizi fisici](https://developer.apple.com/app-store/review/guidelines/#other-purchase-methods).
 
-## Verifiche richieste prima dell’invio
+La release CampoPronto ha superato **127 test JavaScript** e **8 scenari dei promemoria nativi**. La suite comprende 17 test UGC; i controlli di sintassi dei 17 JavaScript applicativi erano già validi nella release precedente. La verifica visiva di scelta stabilimento, accesso e Home a **320 × 568 pixel** non ha rilevato overflow (`scrollWidth: 320`, `scrollHeight: 568`). Sono stati verificati nel browser i percorsi di cancellazione account e segnalazione/blocco con dati sintetici; login e schermate principali sono stati provati nei simulatori iPhone e iPad. Le prove di concorrenza usano transazioni serializzate nel database simulato e non riproducono i tentativi automatici di Firestore. Il solo cambio di marchio mantiene invariati API, identificatori del database, storage locale e bridge nativo.
 
-| Area | Verifica da chiudere |
-| --- | --- |
-| Eliminazione account | Implementata l’iniziativa nell’app e la rimozione dei dati dello stabilimento, con procedura riprendibile dopo errori. Per proprietario globale e ultimo gestore viene registrata una richiesta di passaggio di gestione prima della cancellazione: verificare la gestione operativa di questi casi e il percorso nella build. La sola disattivazione non soddisfa il requisito. [Apple: eliminazione account](https://developer.apple.com/support/offering-account-deletion-in-your-app/) |
-| Contenuti degli utenti | Implementati filtro di base su note e nomi, segnalazioni con motivi predefiniti, blocchi reciproci e coda gestore con oscuramento ricerca, disabilitazione account e archiviazione. Le pagine pubbliche indicano regole e contatto. Il titolare deve assicurare la presa in carico tempestiva; i test software non dimostrano il servizio umano di moderazione. [Linee guida Apple, 1.2](https://developer.apple.com/app-store/review/guidelines/#user-generated-content) |
-| Crediti per campi fisici | Il modello descritto riguarda servizi consumati fuori dall’app: documentare questa destinazione nelle note per Apple e mantenere coerente il flusso. [Linee guida Apple, 3.1.3(e)](https://developer.apple.com/app-store/review/guidelines/#other-purchase-methods) |
-| Utilità dell’app nativa | Verificare esperienza completa, qualità e valore d’uso della build iOS; l’approvazione non è garantita dal solo inserimento di un sito in una webview. [Linee guida Apple, 4.2](https://developer.apple.com/app-store/review/guidelines/#minimum-functionality) |
-| Classificazione per età | Compilare il questionario con le interazioni e i contenuti effettivi; non assegnare automaticamente una fascia o la categoria Bambini. [Apple: classificazione per età](https://developer.apple.com/help/app-store-connect/manage-app-information/set-an-app-age-rating/) |
-| Crittografia | Completare il questionario di esportazione in base alla build, incluso l’uso della crittografia del sistema. Stabilire l’eventuale esenzione prima di impostare la relativa dichiarazione; HTTPS non giustifica una risposta “nessuna crittografia”. [Apple: conformità delle esportazioni](https://developer.apple.com/help/app-store-connect/manage-app-information/overview-of-export-compliance) |
-| Distribuzione UE | Il titolare dichiara un progetto personale non commerciale. Confermare la dichiarazione DSA appropriata in App Store Connect; per chi opera come trader sono richiesti recapiti verificati e pubblicati nella scheda UE. [Apple: requisiti DSA](https://developer.apple.com/help/app-store-connect/manage-compliance-information/manage-european-union-digital-services-act-trader-requirements/) |
-| Build e firma | Dal 28 aprile 2026 Apple richiede Xcode 26 o successivo con SDK iOS 26 o successivo per gli upload. Verificare toolchain, firma, identificativi, icona, dispositivi supportati e build archiviata. Il requisito SDK non impone lo stesso valore come versione minima di iOS supportata. [Apple: requisiti in vigore](https://developer.apple.com/news/upcoming-requirements/) |
+La build utilizza **Xcode 26.6 e SDK iOS 26.5**, con iOS minimo **16**. La firma è automatica per il team indicato; gli identificatori della scheda e del progetto devono rimanere invariati negli aggiornamenti. L’icona App Store è quadrata, opaca, a 1024 × 1024 pixel. Per ricreare e caricare l’archivio seguire il [README iOS](../Tommi38IOS/README.md). [Requisiti Apple per gli upload](https://developer.apple.com/news/upcoming-requirements/).
 
-## Materiale ancora da completare
+## Passaggi rimanenti per la build 2
 
-- Verifica pubblica delle pagine di assistenza, privacy e regole e inserimento degli URL nella scheda.
-- Verifica dell’account di revisione già inserito e istruzioni complete senza segnaposto; contatti riservati mantenuti in App Store Connect.
-- Risposte privacy, età, esportazione e DSA; categoria e copyright confermati. Prezzo gratuito e distribuzione Italia risultano già impostati.
-- Screenshot nativi nelle classi richieste dai dispositivi supportati, icona e build firmata associata alla versione corretta.
-- Esiti verificati dei percorsi di eliminazione account e moderazione, insieme alla prova delle funzioni principali nella build iOS.
+1. Completare e verificare il deploy web CampoPronto mantenendo gli URL esistenti.
+2. Verificare che Apple abbia elaborato la build 2 e associarla alla versione 1.0.
+3. Aggiornare i testi della scheda e sostituire le schermate iPhone e iPad con acquisizioni del nuovo marchio.
+4. Ricontrollare l’accesso dimostrativo e le dichiarazioni già salvate, senza riportare credenziali nei file.
+5. Usare **Aggiungi per la verifica** e poi **Invia per la verifica**; registrare qui il nuovo identificativo di invio e lo stato effettivamente confermato.
 
-La suite della release ha superato **127 test su 127**, senza fallimenti, test saltati o annullati. Sono inclusi **17 test UGC** su blocchi reciproci, isolamento degli stabilimenti, visibilità dei contatti, segnalazioni, moderazione, rinomina e riutilizzo degli username, oltre alle interazioni con la cancellazione concorrente. La sintassi dei **17 JavaScript applicativi** e il controllo delle differenze sono validi. I test di concorrenza usano transazioni serializzate nel database simulato; non riproducono i tentativi automatici di Firestore. Gli esiti visuali e l’avvenuto upload della build vengono confermati separatamente nel lavoro di pubblicazione: non sono impliciti nella presenza di questo documento.
-
-In App Store Connect si completa la versione con i metadata richiesti e la build corretta, poi si usa **Add for Review** e infine **Submit for Review**: il primo passaggio prepara la bozza, il secondo la invia. Questo documento non esegue tali operazioni. [Apple: inviare un’app](https://developer.apple.com/help/app-store-connect/manage-submissions-to-app-review/submit-an-app).
+Il primo pulsante prepara la bozza di invio; solo il secondo la trasmette ad Apple. La disponibilità pubblica richiede la successiva approvazione. [Inviare un’app](https://developer.apple.com/help/app-store-connect/manage-submissions-to-app-review/submit-an-app).

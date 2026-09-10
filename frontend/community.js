@@ -39,6 +39,7 @@ async function chooseEstablishment() {
     return;
   }
   hide(qs('loginBox'));
+  document.title = 'CampoPronto · Prenota campi';
   show(qs('establishmentPicker'));
   const list = qs('establishmentList');
   list.textContent = 'Caricamento…';
@@ -69,7 +70,7 @@ async function chooseEstablishment() {
 }
 function applyEstablishmentName(name) {
   document.querySelectorAll('[data-establishment-name]').forEach(el=>el.textContent=name);
-  document.title = name + ' · Campi e partite';
+  document.title = 'CampoPronto · ' + name;
 }
 async function initializeCommunity() {
   // The server owns the active management scope. Local storage is only a login preference.

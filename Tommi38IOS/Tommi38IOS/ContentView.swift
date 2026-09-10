@@ -23,7 +23,7 @@ struct TommiWebView: UIViewRepresentable {
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = .default()
         configuration.defaultWebpagePreferences.allowsContentJavaScript = true
-        configuration.applicationNameForUserAgent = "Tommi38-iOS-App/1.0"
+        configuration.applicationNameForUserAgent = "CampoPronto-iOS-App/1.0"
         configuration.userContentController.add(context.coordinator, name: "tommi38Notifications")
         configuration.userContentController.addUserScript(WKUserScript(
             source: "window.tommi38Native = Object.freeze({notificationsVersion: 2});",
@@ -182,7 +182,7 @@ struct TommiWebView: UIViewRepresentable {
             guard let presenter = dialogPresenter(for: webView, frame: frame) else {
                 completionHandler(); return
             }
-            let alert = UIAlertController(title: "Tommi38", message: message, preferredStyle: .alert)
+            let alert = UIAlertController(title: "CampoPronto", message: message, preferredStyle: .alert)
             alert.addAction(UIAlertAction(title: "OK", style: .default) { _ in completionHandler() })
             presenter.present(alert, animated: true)
         }
@@ -192,7 +192,7 @@ struct TommiWebView: UIViewRepresentable {
             guard let presenter = dialogPresenter(for: webView, frame: frame) else {
                 completionHandler(false); return
             }
-            let alert = UIAlertController(title: "Tommi38", message: message, preferredStyle: .alert)
+            let alert = UIAlertController(title: "CampoPronto", message: message, preferredStyle: .alert)
             alert.addAction(UIAlertAction(title: "Annulla", style: .cancel) { _ in completionHandler(false) })
             alert.addAction(UIAlertAction(title: "Conferma", style: .default) { _ in completionHandler(true) })
             presenter.present(alert, animated: true)
@@ -204,7 +204,7 @@ struct TommiWebView: UIViewRepresentable {
             guard let presenter = dialogPresenter(for: webView, frame: frame) else {
                 completionHandler(nil); return
             }
-            let alert = UIAlertController(title: "Tommi38", message: prompt, preferredStyle: .alert)
+            let alert = UIAlertController(title: "CampoPronto", message: prompt, preferredStyle: .alert)
             alert.addTextField { field in
                 field.text = defaultText
                 field.autocapitalizationType = .none
@@ -426,7 +426,7 @@ final class BookingReminderStore {
             fireDate = Date().addingTimeInterval(5)
         }
         let content = UNMutableNotificationContent()
-        content.title = "Tommi38"
+        content.title = "CampoPronto"
         content.body = "La tua prenotazione di \(item.field) inizia alle \(item.time)."
         content.sound = .default
         content.userInfo = ["reservationId": item.id, "tommi38Scope": scope]

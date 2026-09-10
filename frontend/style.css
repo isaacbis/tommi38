@@ -1760,3 +1760,11 @@ button:focus-visible, summary:focus-visible, input:focus-visible, select:focus-v
   #viewBook .step-label { margin-top: 5px; }
   #viewBook .slot-heading { margin-top: 4px; }
 }
+
+/* Keep the app brand distinct from the selected venue on small screens. */
+.picker-brand { display: flex; align-items: center; gap: 12px; margin: 12px 0 18px; }
+.picker-brand img { flex-shrink: 0; width: 48px; height: 48px; border-radius: 13px; }
+.picker-brand strong { font-size: 23px; line-height: 1.15; letter-spacing: -.03em; }
+.picker-brand p { margin: 4px 0 0; font-size: 12px; color: var(--muted); }
+.header-platform { display: block; color: #bdccda; font-size: 10px; line-height: 1.2; margin-bottom: 2px; }
+.selected-establishment .mini-label { display: block; font-size: 10px; line-height: 1.2; margin-bottom: 2px; }
