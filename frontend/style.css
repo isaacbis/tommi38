@@ -1705,3 +1705,56 @@ button:focus-visible, summary:focus-visible, input:focus-visible, select:focus-v
   .main-app > .app-view { padding-left: 20px; padding-right: 20px; }
   #platformEstablishmentList { grid-template-columns: 1fr; }
 }
+
+/* All ordinary day slots remain visible together, with state available without relying on colour. */
+#viewBook { position: relative; }
+#viewBook > .user-card { position: absolute; top: 6px; right: 12px; min-height: 0; padding: 0; width: auto; z-index: 1; }
+#viewBook > .user-card .role-badge { display: none; }
+#viewBook .booking-heading h1 { padding-right: 78px; }
+#timeGrid { grid-template-columns: repeat(4,minmax(0,1fr)); grid-auto-rows: 36px; gap: 4px; }
+#timeGrid.many-times { grid-template-columns: repeat(5,minmax(0,1fr)); }
+#timeGrid.few-times { grid-template-columns: repeat(3,minmax(0,1fr)); }
+#timeGrid .time-slot { min-width: 0; min-height: 36px; height: 36px; flex-direction: row; gap: 4px; padding: 3px; border-radius: 8px; }
+#timeGrid .time-slot strong { font-size: 15px; line-height: 1; font-variant-numeric: tabular-nums; }
+#timeGrid.few-times .time-slot strong { font-size: 16px; }
+.slot-state-mark { font-size: 12px; line-height: 1; min-width: 7px; }
+#timeGrid .time-slot.free .slot-state-mark { color: #8ae3ba; }
+#timeGrid .time-slot.busy { color: #d8dfeb; border-color: #796842; background: #302d28; }
+#timeGrid .time-slot.busy .slot-state-mark { color: #ffc77b; }
+#timeGrid .time-slot.closed { color: #aebac7; border-color: #4c5761; background: #25313c; }
+#timeGrid .time-slot.closed .slot-state-mark { color: #c7cbd1; }
+#timeGrid .time-slot.selected, #timeGrid .time-slot.selected .slot-state-mark { color: #132435; border-color: #ffbb50; background: #ffb647; }
+#timeGrid.extended-times { max-height: 160px; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; padding-right: 3px; }
+#timeGrid:focus-visible { outline: 2px solid var(--orange); outline-offset: 2px; }
+#timeGrid > .empty-state { grid-column: 1/-1; grid-row: auto; min-height: 44px; }
+#timeGrid + .list-pager { display: none; }
+#availabilityStatus { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 3px 7px; min-height: 16px; margin: 2px 0 5px; font-size: 10px; line-height: 1.3; }
+.availability-count { white-space: nowrap; }
+.slot-legend { display: inline-flex; align-items: center; gap: 6px; }
+.slot-legend > span { white-space: nowrap; }
+.slot-legend i { font-style: normal; font-size: 12px; }
+.slot-legend .free { color: #8ae3ba; }
+.slot-legend .busy { color: #ffc77b; }
+.slot-legend .closed { color: #c7cbd1; }
+#closureForm .closure-date-row { display: grid; grid-template-columns: 54px minmax(0,1fr); align-items: center; gap: 8px; margin: 3px 0; font-size: 12px; }
+#closureForm .closure-date-row input { width: 100%; min-width: 0; height: 44px; min-height: 44px; font-size: 16px; margin: 0; padding: 6px 8px; }
+#closureForm .closure-all-day { display: flex; align-items: center; min-height: 36px; gap: 8px; margin: 4px 0; font-size: 13px; }
+#closureForm .closure-all-day input[type="checkbox"] { flex: 0 0 20px; width: 20px; height: 20px; min-height: 20px; padding: 0; margin: 0; }
+#closureForm #closureTimes { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 8px; }
+#closureForm .closure-hint { margin: 4px 0; padding: 0; font-size: 11px; line-height: 1.35; }
+@media(max-width:359px) {
+  #timeGrid .time-slot strong { font-size: 14px; }
+  #timeGrid .slot-state-mark { font-size: 11px; }
+  #timeGrid.many-times .time-slot { gap: 2px; padding: 2px; }
+}
+@media(min-width:380px) {
+  #timeGrid { grid-template-columns: repeat(5,minmax(0,1fr)); grid-auto-rows: 40px; }
+  #timeGrid .time-slot { height: 40px; min-height: 40px; }
+  #timeGrid.extended-times { max-height: 216px; }
+}
+@media(max-height:700px) {
+  #viewBook .booking-section { padding-top: 0; }
+  #viewBook .booking-heading h1 { margin-bottom: 3px; }
+  #viewBook .step-label { margin-top: 5px; }
+  #viewBook .slot-heading { margin-top: 4px; }
+}

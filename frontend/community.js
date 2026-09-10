@@ -140,9 +140,11 @@ async function loadOperations(activePanel = 'statistics') {
       <section id="operationsStatisticsPanel" role="tabpanel"><div class="summary-grid"><div><strong>${data.users}</strong><span>Utenti</span></div><div><strong>${data.upcoming}</strong><span>Prenotazioni</span></div><div><strong>${data.credits}</strong><span>Crediti totali</span></div></div>
       <p class="helper-text">Prenotazioni da oggi, divise per campo.</p><div id="operationsFieldList">${Object.entries(data.byField).map(([f,n])=>`<div class="ledger-row"><span>${escapeHTML(fieldName(f))}</span><strong>${Number(n)}</strong></div>`).join('') || '<p class="muted">Nessuna prenotazione in programma.</p>'}</div></section>
       <section id="operationsCreatePanel" role="tabpanel" hidden><form id="closureForm" class="form-stack"><label>Campo<select class="admin-input" id="closureField">${STATE.fields.map(f=>`<option value="${escapeHTML(f.id)}">${escapeHTML(f.name)}</option>`).join('')}</select></label>
-      <label>Data<input class="admin-input" id="closureDate" type="date" min="${localISODate()}" required></label>
-      <div class="admin-two-cols"><label>Dalle<input class="admin-input" id="closureStart" type="time" required></label><label>Alle<input class="admin-input" id="closureEnd" type="time" required></label></div>
-      <label>Motivo<input class="admin-input" id="closureReason" maxlength="120" required placeholder="Es. manutenzione o torneo"></label><p class="helper-text">La fascia deve essere libera da prenotazioni.</p><button class="primary-btn" type="submit">Salva chiusura</button><p id="closureError" role="status"></p></form></section>
+      <label class="closure-date-row"><span>Dal</span><input class="admin-input" id="closureStartDate" aria-label="Data iniziale" type="date" min="${localISODate()}" value="${localISODate()}" required></label>
+      <label class="closure-date-row"><span>Al</span><input class="admin-input" id="closureEndDate" aria-label="Data finale" type="date" min="${localISODate()}" value="${localISODate()}" required></label>
+      <label class="checkbox-label closure-all-day"><input id="closureAllDay" type="checkbox" checked>Intera giornata</label>
+      <div id="closureTimes" class="admin-two-cols hidden"><label>Dalle<input class="admin-input" id="closureStart" type="time" value="${escapeHTML(STATE.config.dayStart || '09:00')}" required disabled></label><label>Alle<input class="admin-input" id="closureEnd" type="time" value="${escapeHTML(STATE.config.dayEnd || '20:00')}" required disabled></label></div>
+      <label>Motivo<input class="admin-input" id="closureReason" maxlength="120" required placeholder="Es. manutenzione o torneo"></label><p class="closure-hint">Date comprese. La fascia si ripete ogni giorno e deve essere libera da prenotazioni.</p><button class="primary-btn" type="submit">Blocca periodo</button><p id="closureError" role="status"></p></form></section>
       <section id="operationsPlannedPanel" role="tabpanel" hidden><div id="closureList"></div></section>`;
     const panelIds={statistics:'operationsStatisticsPanel',create:'operationsCreatePanel',planned:'operationsPlannedPanel'};
     const selectPanel=name=>{
@@ -154,13 +156,19 @@ async function loadOperations(activePanel = 'statistics') {
     };
     qs('appModalBody').querySelectorAll('[data-operations-panel]').forEach(button=>{button.onclick=()=>selectPanel(button.dataset.operationsPanel);});
     const list=qs('closureList');
-    const closures=data.closures.filter(c=>c.date>=localISODate());
+    const closures=data.closures.filter(c=>(c.endDate || c.date)>=localISODate())
+      .sort((a,b)=>(a.startDate || a.date).localeCompare(b.startDate || b.date) || a.start.localeCompare(b.start));
     if(!closures.length)list.innerHTML='<p class="empty-state">Nessuna chiusura programmata.</p>';
     closures.forEach(c=>{
       const row=document.createElement('div');row.className='wait-row';
-      row.innerHTML=`<strong>${escapeHTML(fieldName(c.fieldId))}</strong><p>${escapeHTML(compactCommunityDate(c.date))} · ${escapeHTML(c.start)}–${escapeHTML(c.end)}</p><p class="muted">${escapeHTML(c.reason)}</p>`;
-      const button=document.createElement('button');button.className='secondary-btn';button.textContent='Riapri fascia';button.onclick=async()=>{
+      const startDate=c.startDate || c.date, endDate=c.endDate || c.date;
+      const dateLabel=startDate===endDate ? formatLongDate(startDate) : `Dal ${startDate.split('-').reverse().join('/')} al ${endDate.split('-').reverse().join('/')}`;
+      const timeLabel=c.start==='00:00' && c.end==='23:59' ? 'Intera giornata' : `${c.start}–${c.end} ogni giorno`;
+      row.innerHTML=`<strong>${escapeHTML(fieldName(c.fieldId))}</strong><p>${escapeHTML(dateLabel)}</p><p>${escapeHTML(timeLabel)}</p><p class="muted">${escapeHTML(c.reason)}</p>`;
+      const button=document.createElement('button');button.className='secondary-btn';button.textContent='Riapri periodo';button.onclick=async()=>{
         if(epoch!==managementContextEpoch)return;
+        if(!await confirmAction('Riapri questo periodo?',`${fieldName(c.fieldId)} · ${dateLabel}. La chiusura verrà rimossa per tutte le date indicate.`,'Riapri periodo'))return;
+        if(epoch!==managementContextEpoch || !button.isConnected)return;
         button.disabled=true;
         try{await api('/admin/closures/'+encodeURIComponent(c.id),{method:'DELETE'});if(epoch===managementContextEpoch)await loadOperations('planned');}
         catch(e){button.disabled=false;if(epoch===managementContextEpoch)alert(errorMessage(e));}
@@ -170,11 +178,27 @@ async function loadOperations(activePanel = 'statistics') {
     paginateCommunityList('operationsFieldList');
     paginateCommunityList('closureList');
     selectPanel(activePanel);
+    qs('closureStartDate').onchange=()=>{
+      const start=qs('closureStartDate').value;
+      qs('closureEndDate').min=start || localISODate();
+      if(start && qs('closureEndDate').value<start)qs('closureEndDate').value=start;
+    };
+    qs('closureAllDay').onchange=()=>{
+      const allDay=qs('closureAllDay').checked;
+      qs('closureTimes').classList.toggle('hidden',allDay);
+      [qs('closureStart'),qs('closureEnd')].forEach(input=>{input.disabled=allDay;});
+    };
     qs('closureForm').onsubmit=async e=>{
       e.preventDefault();if(epoch!==managementContextEpoch)return;
+      const form=e.currentTarget;
+      const current=()=>epoch===managementContextEpoch && form.isConnected && qs('appModal').open;
+      const startDate=qs('closureStartDate').value,endDate=qs('closureEndDate').value;
+      const allDay=qs('closureAllDay').checked;
+      const start=allDay?'00:00':qs('closureStart').value,end=allDay?'23:59':qs('closureEnd').value;
+      if(!startDate || !endDate || endDate<startDate || start>=end){qs('closureError').textContent='Controlla il periodo e gli orari: la fine deve seguire l’inizio.';return;}
       const button=e.currentTarget.querySelector('button');button.disabled=true;
-      try {await api('/admin/closures',{method:'POST',body:JSON.stringify({fieldId:qs('closureField').value,date:qs('closureDate').value,start:qs('closureStart').value,end:qs('closureEnd').value,reason:qs('closureReason').value})});if(epoch===managementContextEpoch)await loadOperations('planned');}
-      catch(error){if(epoch===managementContextEpoch && qs('closureError'))qs('closureError').textContent=error.error==='EXISTING_RESERVATIONS'?'Ci sono prenotazioni nella fascia. Gestiscile prima di chiudere il campo.':'Chiusura non salvata. Verifica data, orari e connessione.';button.disabled=false;}
+      try {await api('/admin/closures',{method:'POST',body:JSON.stringify({fieldId:qs('closureField').value,startDate,endDate,start,end,reason:qs('closureReason').value})});if(current())await loadOperations('planned');}
+      catch(error){if(current())qs('closureError').textContent=error.error==='EXISTING_RESERVATIONS'?'Esistono prenotazioni in questo periodo. Nessuna chiusura è stata applicata: scegli altre date o gestisci prima le prenotazioni.':'Chiusura non salvata. Verifica date, orari e connessione.';button.disabled=false;}
     };
   } catch(e){if(epoch===managementContextEpoch && qs('appModal').open && loading.isConnected)qs('appModalBody').textContent=errorMessage(e);}
 }

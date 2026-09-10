@@ -50,11 +50,23 @@ Per creare una prenotazione dall’agenda, scegli un utente attivo dello stabili
 
 Su una prenotazione confermata, **Annulla** apre la conferma dell’annullamento, libera il campo e conserva la prenotazione nello storico con l’autore dell’annullamento. **L’annullamento dalla gestione non rimborsa crediti automaticamente**, anche quando la prenotazione era stata pagata dall’utente. L’eventuale rettifica si esegue da **Utenti → Crediti** ed è registrata nello storico dei crediti.
 
+## Chiusure per un periodo
+
+Apri **Statistiche e chiusure → Nuova chiusura**, scegli il campo e indica le date **Dal** e **Al**, entrambe comprese. Per chiudere un solo giorno, usa la stessa data nei due campi. La data iniziale può essere oggi o una data futura e quella finale deve essere uguale o successiva.
+
+**Intera giornata** blocca tutti gli orari del campo in ciascuna data del periodo. Disattivala per indicare una fascia **Dalle–Alle** che si ripete ogni giorno: per esempio, dal 17 al 19 settembre, dalle 14:00 alle 16:00, chiude quella fascia il 17, il 18 e il 19. L’ora finale deve seguire quella iniziale. Le prenotazioni che terminano esattamente all’inizio della chiusura o iniziano esattamente alla sua fine rimangono consentite.
+
+Inserisci il motivo e premi **Blocca periodo**. Se una prenotazione esistente del campo si sovrappone alla fascia anche in un solo giorno, l’intero inserimento viene rifiutato: nessuna parte della chiusura viene applicata. Le prenotazioni personali e quelle create dalla gestione rispettano entrambe il periodo bloccato; anche la lista d’attesa tiene conto delle chiusure.
+
+La scheda **Programmate** mostra date, fascia giornaliera e motivo. **Riapri periodo** chiede conferma e rimuove quella chiusura da tutte le date indicate. Le chiusure a giorno singolo già esistenti restano valide, visibili e rimovibili. Un periodo già iniziato rimane elencato fino alla sua data finale.
+
 ## Utilizzo da telefono
 
 La gestione usa schede e moduli adattabili allo schermo. La barra inferiore dà accesso a **Riepilogo**, **Agenda** e **Utenti**; il gestore trova anche **Gioca**, mentre l’amministratore globale dispone del collegamento **Orari**. Il nome dello stabilimento e il banner del contesto restano il riferimento prima di una modifica.
 
-Gli elenchi sono suddivisi in pagine con **Indietro**, indicatore della pagina corrente e **Avanti**. Il numero di elementi visibili si adatta allo spazio disponibile. La paginazione riguarda stabilimenti, utenti, agenda, partite, ricerche di giocatori, attesa, movimenti dei crediti e gli altri elenchi di gestione; anche gli orari di prenotazione sono distribuiti su più pagine. Quando l’aggiornamento restituisce lo stesso elenco, la pagina scelta viene conservata. Cambiare stabilimento o i filtri di giorno e campo apre il relativo elenco dall’inizio.
+Gli elenchi sono suddivisi in pagine con **Indietro**, indicatore della pagina corrente e **Avanti**. Il numero di elementi visibili si adatta allo spazio disponibile. La paginazione riguarda stabilimenti, utenti, agenda, partite, ricerche di giocatori, attesa, movimenti dei crediti e gli altri elenchi di gestione. Quando l’aggiornamento restituisce lo stesso elenco, la pagina scelta viene conservata. Cambiare stabilimento o i filtri di giorno e campo apre il relativo elenco dall’inizio.
+
+Gli orari di prenotazione usano una griglia completa senza comandi di paginazione. Se la configurazione genera molti orari, la griglia dispone di uno scorrimento interno per raggiungerli tutti.
 
 La **Home** ha quattro schede:
 
@@ -65,7 +77,7 @@ La **Home** ha quattro schede:
 
 In **Cerca giocatori**, le tre schede **Aperte**, **Le tue** e **Richieste** separano le partite a cui partecipare, le proprie ricerche da gestire e le richieste di partecipazione inviate. Ogni elenco mantiene i propri comandi e la propria paginazione.
 
-**Statistiche e chiusure** apre tre schede: **Statistiche** mostra utenti, crediti e prenotazioni per campo; **Nuova chiusura** contiene il modulo per campo, giorno, orari e motivo; **Programmate** elenca le chiusure e permette di riaprire una fascia. Dopo aver salvato una chiusura si apre la scheda **Programmate**.
+**Statistiche e chiusure** apre tre schede: **Statistiche** mostra utenti, crediti e prenotazioni per campo; **Nuova chiusura** contiene il modulo per campo, periodo, intera giornata o fascia oraria e motivo; **Programmate** elenca le chiusure e permette di rimuoverle. Dopo aver bloccato un periodo si apre la scheda **Programmate**.
 
 Creazione utenti, modifica dei ruoli, crediti, prenotazioni e conferme si svolgono in finestre dell’app. Le password possono essere mostrate o nascoste dai controlli dedicati. Durante un cambio di stabilimento i dati e i moduli precedenti vengono svuotati; le risposte tardive non devono ripopolare la gestione appena aperta.
 
@@ -85,16 +97,18 @@ Repository: `isaacbis/tommi38`, ramo predefinito `main`; servizio esistente Rend
 
 Eseguire dalla radice: `node --test tests/*.test.cjs`. I test usano dati sintetici e un database simulato, con verifiche HTTP del server e delle sessioni; non modificano Firestore di produzione. La suite comprende cambio di contesto globale, isolamento degli account omonimi, revoche, ruoli locali, prenotazioni amministrative, rimborsi e protezioni dalle risposte tardive.
 
-La release del layout compatto ha superato **75 test**, senza fallimenti, test saltati o annullati. La sintassi dei **17 file JavaScript applicativi** e il controllo delle differenze sono validi.
+La release con chiusure per periodo e griglia completa ha superato **90 test**, senza fallimenti, test saltati o annullati. La sintassi dei **17 file JavaScript applicativi** e il controllo delle differenze sono validi. I 15 nuovi test dei periodi coprono date comprese, fasce giornaliere, giornata intera, chiusure precedenti, conflitti, isolamento, concorrenza nel database simulato e annullamento delle scritture in caso di errore.
 
-La verifica nel browser è completata per queste schermate e operazioni:
+Nel browser a **320 × 568 px**, con dati sintetici, sono state verificate queste schermate e operazioni della nuova release:
 
-- A **320 × 568 px**: login, Home, prenotazione con selezione e conferma, menu del gestore e dell’amministratore globale, agenda, utenti e orari dello stabilimento gestito dall’amministratore globale. Le schermate controllate rientrano nello spazio disponibile senza scorrimento della pagina; il pulsante di prenotazione rimane visibile dopo la selezione.
-- A **320 × 568 px**: il modulo **Nuova chiusura** rientra nel dialogo e mantiene visibile **Salva chiusura**.
-- A **390 × 844 px**: agenda; a **430 × 932 px**: menu di gestione, senza contenuti eccedenti lo spazio disponibile.
-- Con dati sintetici: una prenotazione personale ha portato il saldo da **12 a 11 crediti**; la seconda pagina dell’agenda è rimasta selezionata dopo l’aggiornamento.
+- Il modulo con **Intera giornata**, date **Dal–Al**, motivo e pulsante **Blocca periodo** interamente visibile.
+- Una sola chiusura del campo Tennis dal **12 al 14 settembre**: tutti i **15 orari** risultano bloccati sia il primo sia l’ultimo giorno; il **15 settembre** risultano nuovamente liberi.
+- La griglia completa di **15 orari**, senza paginazione o elementi nascosti: selezionando l’ultimo orario, **19:30**, rimangono visibili conferma e navigazione. La pagina non presenta contenuti eccedenti il viewport né richiede scorrimento.
+- Il tentativo di chiudere Volley dal **10 al 12 settembre**, con una prenotazione l’**11 settembre**, viene rifiutato con un messaggio di conflitto comprensibile e nessuna chiusura parziale.
+- Impostando dal modulo dell’app partite di **40 minuti**, dalle **14:00 alle 20:00**, tutti i **9 orari** sono visibili in una griglia di tre colonne, senza elementi nascosti o paginazione. Dopo aver selezionato l’ultimo orario, **19:20**, il pulsante **Prenota** e la navigazione rimangono nel viewport di 320 × 568 px.
+- **Riapri periodo** mostra la conferma riferita a tutte le date; dopo la conferma la chiusura scompare e l’elenco mostra **Nessuna chiusura programmata**.
 
-Nessun errore nella console durante queste verifiche.
+Nessun errore nella console nelle verifiche finali.
 
 Per verificare l’interfaccia con dati sintetici, avviare `node tests/preview-server.cjs 4173` e aprire `http://127.0.0.1:4173/__preview/session?persona=root`. Le altre sessioni disponibili sono `manager-a`, `manager-b` e `user-a`. Il passaggio prepara anche la scelta dello stabilimento nel browser. Il server ascolta soltanto sul computer locale, usa Express e l’applicazione reali con sessioni e database in memoria, simula il meteo e non carica Firebase o credenziali di produzione. Il riavvio ripristina i dati dimostrativi. Verificare a 320 px almeno panoramica globale, gestione A → B → panoramica, agenda, utenti e finestre di conferma.
 

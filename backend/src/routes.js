@@ -28,6 +28,17 @@ function timeToMinutes(t) {
   const [h, m] = t.split(":").map(Number);
   return h * 60 + m;
 }
+function closureEndDate(closure) {
+  return closure.endDate || closure.date || closure.startDate;
+}
+function closureAppliesToDate(closure, date) {
+  const startDate = closure.startDate || closure.date;
+  return startDate <= date && closureEndDate(closure) >= date;
+}
+function closureBlocksSlot(closure, date, fieldId, startMinutes, endMinutes) {
+  return closure.fieldId === fieldId && closureAppliesToDate(closure, date) &&
+    startMinutes < timeToMinutes(closure.end) && endMinutes > timeToMinutes(closure.start);
+}
 function romeDateParts(date = new Date()) {
   const parts = new Intl.DateTimeFormat("en-GB", {
     timeZone: "Europe/Rome",
@@ -225,7 +236,8 @@ router.get("/reservations", requireAuth, async (req, res) => {
     items.push({id:d.id, fieldId:r.fieldId, date:r.date, time:r.time, user:req.session.user.role === "admin" || r.user === req.session.user.username ? r.user : ""});
   });
   const closed = await db.collection("admin").doc("closures").get();
-  res.json({ items, closures: closed.exists ? (closed.data().items || []).filter(c => c.date === date) : [] });
+  res.json({ items, closures: closed.exists ? (closed.data().items || [])
+    .filter(c => closureAppliesToDate(c, date)).map(c => ({...c, date})) : [] });
 });
 
 
@@ -368,7 +380,7 @@ async function createReservation(req, res) {
       }
       const closureSnap = await transaction.get(db.collection("admin").doc("closures"));
       const closures = closureSnap.exists ? closureSnap.data().items || [] : [];
-      if (closures.some(c => c.date === date && c.fieldId === fieldId && time < c.end && timeToMinutes(time) + slotMinutes > timeToMinutes(c.start))) {
+      if (closures.some(c => closureBlocksSlot(c, date, fieldId, requestedMinutes, requestedMinutes + slotMinutes))) {
         throw Object.assign(new Error("FIELD_CLOSED"), {code:"FIELD_CLOSED"});
       }
       if (reservationSnap.exists) {
@@ -1062,7 +1074,7 @@ router.get('/waitlist', requireAuth, requirePersonalAccount, async (req,res) => 
     const value = doc.data();
     if (value.date < localISODate() || (value.date === localISODate() && value.time <= `${romeDateParts().hour}:${romeDateParts().minute}`)) continue;
     const booked = await db.collection('reservations').doc(value.reservationId).get();
-    const blocked = (closures.data()?.items || []).some(c => c.date === value.date && c.fieldId === value.fieldId && value.time < c.end && value.end > c.start);
+    const blocked = (closures.data()?.items || []).some(c => closureBlocksSlot(c, value.date, value.fieldId, timeToMinutes(value.time), timeToMinutes(value.end || value.time)));
     items.push({id:doc.id, fieldId:value.fieldId, date:value.date, time:value.time, available:!booked.exists && !blocked});
   }
   items.sort((a,b)=>`${a.date} ${a.time}`.localeCompare(`${b.date} ${b.time}`));
@@ -1106,23 +1118,34 @@ router.get('/admin/operations', requireAdmin, async (req,res) => {
   const counts = {};
   const active = reservations.docs.map(d=>d.data()).filter(r=>r.date >= localISODate());
   active.forEach(r=>{counts[r.fieldId]=(counts[r.fieldId] || 0)+1;});
-  res.json({users:users.size, credits:users.docs.reduce((n,d)=>n+Number(d.data().credits || 0),0), upcoming:active.length, byField:counts, closures:closures.data()?.items || []});
+  res.json({users:users.size, credits:users.docs.reduce((n,d)=>n+Number(d.data().credits || 0),0), upcoming:active.length, byField:counts, closures:(closures.data()?.items || []).filter(c=>closureEndDate(c)>=localISODate())});
 });
 router.post('/admin/closures', requireAdmin, async (req,res) => {
   const time = z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/);
-  const schema = z.object({fieldId:z.string().min(1).max(80),date:z.string().regex(/^\d{4}-\d{2}-\d{2}$/),start:time,end:time,reason:z.string().trim().min(1).max(120)});
+  const date = z.string().refine(validDate);
+  const schema = z.object({
+    fieldId:z.string().min(1).max(80),date:date.optional(),
+    startDate:date.optional(),endDate:date.optional(),start:time,end:time,
+    reason:z.string().trim().min(1).max(120)
+  }).refine(value => value.date ? !value.startDate && !value.endDate : !!value.startDate && !!value.endDate);
   const parsed = schema.safeParse(req.body);
-  if (!parsed.success || parsed.data.start >= parsed.data.end || !validDate(parsed.data.date) || parsed.data.date < localISODate()) return res.status(400).json({error:'BAD_BODY'});
-  const value = parsed.data;
+  if (!parsed.success) return res.status(400).json({error:'BAD_BODY'});
+  const startDate = parsed.data.startDate || parsed.data.date;
+  const endDate = parsed.data.endDate || parsed.data.date;
+  if (parsed.data.start >= parsed.data.end || startDate < localISODate() || endDate < startDate) return res.status(400).json({error:'BAD_BODY'});
+  const value = {fieldId:parsed.data.fieldId,startDate,endDate,start:parsed.data.start,end:parsed.data.end,reason:parsed.data.reason};
+  // Legacy callers retain their single-day representation. A period is stored
+  // once and checked inclusively, without creating a document per day.
+  if (parsed.data.date) { value.date=parsed.data.date; delete value.startDate; delete value.endDate; }
   const ref = db.collection('admin').doc('closures');
   const result = await db.runTransaction(async tx => {
     const [snap, fields, cfg, reservations] = await Promise.all([
       tx.get(ref),tx.get(db.collection('admin').doc('fields')),tx.get(db.collection('admin').doc('config')),
-      tx.get(db.collection('reservations').where('date','==',value.date))
+      tx.get(db.collection('reservations').where('date','>=',startDate).where('date','<=',endDate))
     ]);
     if (!(fields.data()?.fields || []).some(f=>f.id===value.fieldId)) return 'INVALID_FIELD';
     if (reservations.docs.some(d=>{const r=d.data();return r.fieldId===value.fieldId && r.time < value.end && timeToMinutes(r.time)+Number(r.slotMinutes || cfg.data()?.slotMinutes || 45)>timeToMinutes(value.start);})) return 'EXISTING_RESERVATIONS';
-    const items = (snap.data()?.items || []).filter(c=>c.date>=localISODate());
+    const items = (snap.data()?.items || []).filter(c=>closureEndDate(c)>=localISODate());
     if (items.length >= 300) return 'CLOSURE_LIMIT';
     items.push({...value,id:db.collection('closureIds').doc().id});
     tx.set(ref,{items});
