@@ -15,18 +15,26 @@ router.post('/enter',safe(async(req,res)=>{
   if(!identity)return res.status(403).json({error:'NOT_AUTHORIZED'});
   const role=req.body.role;
   if(!['admin','user'].includes(role))return res.status(400).json({error:'BAD_BODY'});
-  const id='demo-'+createHash('sha256').update(identity.origin+'\0'+identity.username).digest('hex').slice(0,40);
-  const ref=db.collection('establishments').doc(id);
-  await db.runTransaction(async tx=>{
+  const base='demo-'+createHash('sha256').update(identity.origin+'\0'+identity.username).digest('hex').slice(0,40);
+  const pointer=db.collection('demoWorkspaces').doc(base);
+  const id=await db.runTransaction(async tx=>{
+    const current=await tx.get(pointer);
+    const generation=Number(current.data()?.generation || 0)+(req.body.reset===true?1:0);
+    const id=generation?base+'-r'+generation:base;
+    const ref=db.collection('establishments').doc(id);
     const snap=await tx.get(ref);
+    const previous=req.body.reset===true?await tx.get(db.collection('establishments').doc(current.data()?.id || base)):null;
     if(snap.exists){
       if(snap.data().demoOwner!==identity.origin+':'+identity.username)throw Error('Demo ownership mismatch');
-      return;
+      return id;
     }
+    if(previous?.exists)tx.update(previous.ref,{enabled:false});
+    tx.set(pointer,{id,generation});
     tx.create(ref,{name:'La tua demo',enabled:true,visibility:'private',demoOwner:identity.origin+':'+identity.username});
     tx.create(ref.collection('admin').doc('config'),{slotMinutes:45,dayStart:'09:00',dayEnd:'20:00',maxBookingsPerUserPerDay:3,maxActiveBookingsPerUser:5});
     tx.create(ref.collection('admin').doc('fields'),{fields:[{id:'volley-demo',name:'Volley demo'},{id:'tennis-demo',name:'Tennis demo'}]});
     for(const [username,userRole]of [['demo-manager','admin'],['demo-user','user']])tx.create(ref.collection('users').doc(username),{role:userRole,credits:100,disabled:false,platformAdmin:false,sessionVersion:0});
+    return id;
   });
   if(!req.session.demoOriginal)req.session.demoOriginal={user:{...req.session.user},managementEstablishment:req.session.managementEstablishment || null};
   req.session.user={username:role==='admin'?'demo-manager':'demo-user',role,establishment:id,sessionVersion:0};

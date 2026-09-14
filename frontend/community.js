@@ -128,6 +128,10 @@ async function openDemoLab(){
   if(STATE.me?.demo)qs('demoActions').append(adminButton('Torna al tuo stabilimento',async()=>{
     try{const data=await api('/demo/exit',{method:'POST'});localStorage.setItem('tommi38-establishment',data.establishmentId);location.reload();}catch(error){qs('demoStatus').textContent=errorMessage(error);}
   }));
+  qs('demoActions').append(adminButton('Ripristina demo',async()=>{
+    if(!await confirmAction('Ricominciare la demo?','La demo attuale verrà disattivata. Ripartirai con campi di esempio e 100 crediti. Lo stabilimento reale non cambia.','Ripristina demo'))return;
+    try{const data=await api('/demo/enter',{method:'POST',body:JSON.stringify({role:'admin',reset:true})});localStorage.setItem('tommi38-establishment',data.establishmentId);location.reload();}catch(error){qs('demoStatus').textContent=errorMessage(error);}
+  }));
 }
 async function openCommercialSettings(){
   try{

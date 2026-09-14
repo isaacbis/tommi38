@@ -27,3 +27,16 @@ test('manager demo isolates venues, preserves original identity and supports rol
   const other=await call('/enter',{user:{...original,establishment:'venue-b'}},{role:'admin'});assert.notEqual(other.body.establishmentId,first.body.establishmentId);
   assert.equal((await call('/exit',session)).code,200);assert.deepEqual(structuredClone(session.user),original);assert.equal(session.demoOriginal,undefined);
 });
+test('reset creates a fresh private demo, disables the old one and preserves other venues',async()=>{
+  const {call,memory}=setup();const session={user:{username:'manager',role:'admin',establishment:'venue-a'}};
+  const first=await call('/enter',session,{role:'user'});
+  const old=first.body.establishmentId;
+  await memory.db.collection('establishments').doc(old).collection('users').doc('demo-user').update({credits:3});
+  const reset=await call('/enter',session,{role:'admin',reset:true});
+  assert.notEqual(reset.body.establishmentId,old);
+  assert.equal((await memory.db.collection('establishments').doc(old).get()).data().enabled,false);
+  const ref=memory.db.collection('establishments').doc(reset.body.establishmentId);
+  assert.equal((await ref.get()).data().visibility,'private');
+  assert.equal((await ref.collection('users').doc('demo-user').get()).data().credits,100);
+  assert.equal((await call('/enter',session,{role:'user'})).body.establishmentId,reset.body.establishmentId);
+});
