@@ -141,13 +141,13 @@
   async function managePackages() {
     const {root,current}=modal('Pacchetti crediti','<p>Caricamento…</p>');
     try {
-      const data=await api('/auth/credit-packages');if(!current())return;
+      const data=await api('/auth/admin/credit-package-pricing');if(!current())return;
       const items=data.items.map(item=>({...item}));
-      root.innerHTML='<p class="helper-text">Gli utenti possono richiedere un pacchetto. Sei tu ad approvare ogni ricarica.</p><div id="packageRows"></div><form class="form-stack"><label class="field-label" for="packageTitle">Nome pacchetto</label><input id="packageTitle" class="admin-input" maxlength="60" required placeholder="10 partite"><label class="field-label" for="packageCredits">Crediti</label><input id="packageCredits" class="admin-input" type="number" min="1" max="10000" step="1" required><button class="primary-btn" type="submit">Aggiungi pacchetto</button><p role="status"></p></form>';
+      root.innerHTML='<p class="helper-text">Gli utenti possono richiedere un pacchetto. Sei tu ad approvare ogni ricarica. I prezzi sono bozze riservate al gestore: acquisti online non ancora attivi.</p><div id="packageRows"></div><form class="form-stack"><label class="field-label" for="packageTitle">Nome pacchetto</label><input id="packageTitle" class="admin-input" maxlength="60" required placeholder="10 partite"><label class="field-label" for="packageCredits">Crediti</label><input id="packageCredits" class="admin-input" type="number" min="1" max="10000" step="1" required><label class="field-label" for="packagePrice">Prezzo previsto in euro (facoltativo)</label><input id="packagePrice" class="admin-input" type="number" min="0.50" max="10000" step="0.01" placeholder="Es. 20,00"><button class="primary-btn" type="submit">Aggiungi pacchetto</button><p role="status"></p></form>';
       const rows=root.querySelector('#packageRows');
       const draw=()=>{
         rows.textContent='';
-        for(const pack of items){const row=document.createElement('div');row.className='wait-row';const label=document.createElement('p');label.textContent=`${pack.title} · ${pack.credits} crediti`;row.append(label,button('Rimuovi',async event=>{
+        for(const pack of items){const row=document.createElement('div');row.className='wait-row';const label=document.createElement('p');label.textContent=`${pack.title} · ${pack.credits} crediti`;if(pack.priceCents){const fee=Math.round(pack.priceCents*0.10);const eur=cents=>new Intl.NumberFormat('it-IT',{style:'currency',currency:'EUR'}).format(cents/100);label.textContent+=` · Bozza ${eur(pack.priceCents)} · Stabilimento ${eur(pack.priceCents-fee)}, CampoPronto ${eur(fee)} (prima delle spese di pagamento)`;}row.append(label,button('Rimuovi',async event=>{
           event.currentTarget.disabled=true;
           try{const next=items.filter(p=>p.id!==pack.id);await api('/auth/admin/credit-packages',{method:'PUT',body:JSON.stringify({items:next})});if(current()){items.splice(0,items.length,...next);draw();}}
           catch(error){if(current()){root.querySelector('[role="status"]').textContent=message(error);event.target.disabled=false;}}
@@ -155,7 +155,9 @@
       };draw();
       bindForm(root,current,async(form,status)=>{
         if(items.length>=12){status.textContent='Puoi creare al massimo 12 pacchetti.';return;}
-        const next=[...items,{id:crypto.randomUUID(),title:form.querySelector('#packageTitle').value.trim(),credits:Number(form.querySelector('#packageCredits').value)}];
+        const rawPrice=form.querySelector('#packagePrice').value;
+        const price=rawPrice===''?{}:{priceCents:Math.round(Number(rawPrice)*100)};
+        const next=[...items,{...price,id:crypto.randomUUID(),title:form.querySelector('#packageTitle').value.trim(),credits:Number(form.querySelector('#packageCredits').value)}];
         await api('/auth/admin/credit-packages',{method:'PUT',body:JSON.stringify({items:next})});
         if(current()){items.splice(0,items.length,...next);form.reset();draw();status.textContent='Pacchetto salvato.';}
       });

@@ -72,10 +72,14 @@ router.get('/admin/recovery-requests',requireAdmin,safe(async(req,res)=>{
   const snap=await db.collection('recoveryRequests').where('status','==','pending').get();
   res.json({items:snap.docs.map(d=>({username:d.id}))});
 }));
-const packageSchema=z.object({id:z.string().regex(/^[a-z0-9-]{1,40}$/),title:z.string().trim().min(1).max(60),credits:z.number().int().min(1).max(10000)}).strict();
+const packageSchema=z.object({id:z.string().regex(/^[a-z0-9-]{1,40}$/),title:z.string().trim().min(1).max(60),credits:z.number().int().min(1).max(10000),priceCents:z.number().int().min(50).max(1000000).optional()}).strict();
 router.get('/credit-packages',requireAuth,safe(async(req,res)=>{
   const snap=await db.collection('admin').doc('creditPackages').get();
-  res.json({items:snap.data()?.items || []});
+  res.json({items:(snap.data()?.items || []).map(({id,title,credits})=>({id,title,credits}))});
+}));
+router.get('/admin/credit-package-pricing',requireAdmin,safe(async(req,res)=>{
+  const snap=await db.collection('admin').doc('creditPackages').get();
+  res.json({items:snap.data()?.items || [],currency:'EUR',commissionPercent:10,paymentsAvailable:false});
 }));
 router.put('/admin/credit-packages',requireAdmin,safe(async(req,res)=>{
   const parsed=z.object({items:z.array(packageSchema).max(12)}).strict().safeParse(req.body);

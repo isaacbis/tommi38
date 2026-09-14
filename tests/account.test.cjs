@@ -42,3 +42,17 @@ test('failed approval is atomic and does not consume a pending request',async()=
 test('manager endpoints reject a session belonging to another venue even with matching username',async()=>{
  const e=setup();const r=await e.call('get','/admin/credit-requests',{tenant:'beach-b',session:{user:{username:'manager',role:'admin',establishment:'beach-a'}}});assert.equal(r.code,401);
 });
+
+test('draft package prices are manager-only, tenant scoped and never charge a request',async()=>{
+ const e=setup();const items=[{id:'five',title:'Cinque prenotazioni',credits:5,priceCents:2000}];
+ assert.equal((await e.call('put','/admin/credit-packages',{tenant:'beach-a',user:'manager',body:{items}})).code,200);
+ const publicItems=(await e.call('get','/credit-packages',{tenant:'beach-a'})).body.items;
+ assert.equal(publicItems[0].priceCents,undefined);
+ assert.equal((await e.call('get','/admin/credit-package-pricing',{tenant:'beach-a'})).code,403);
+ const pricing=(await e.call('get','/admin/credit-package-pricing',{tenant:'beach-a',user:'manager'})).body;
+ assert.equal(pricing.items[0].priceCents,2000);assert.equal(pricing.paymentsAvailable,false);
+ assert.equal((await e.call('get','/admin/credit-package-pricing',{tenant:'beach-b',user:'manager'})).body.items.length,0);
+ for(const priceCents of [-1,0,20.5,1000001])assert.equal((await e.call('put','/admin/credit-packages',{tenant:'beach-a',user:'manager',body:{items:[{...items[0],priceCents}]}})).code,400);
+ assert.equal((await e.call('post','/credit-requests',{tenant:'beach-a',body:{packageId:'five'}})).code,200);
+ assert.equal(e.data.get('establishments/beach-a/users/alice').credits,3);
+});
