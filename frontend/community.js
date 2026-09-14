@@ -128,6 +128,16 @@ async function openDemoLab(){
   if(STATE.me?.demo)qs('demoActions').append(adminButton('Torna al tuo stabilimento',async()=>{
     try{const data=await api('/demo/exit',{method:'POST'});localStorage.setItem('tommi38-establishment',data.establishmentId);location.reload();}catch(error){qs('demoStatus').textContent=errorMessage(error);}
   }));
+  if(STATE.me?.demo)for(const [label,action]of [['Simula acquisto di 5 crediti','purchase'],['Simula un video premio','video']])qs('demoActions').append(adminButton(label,async()=>{
+    try{
+      const data=await api('/demo/simulate',{method:'POST',body:JSON.stringify({action,requestId:crypto.randomUUID()})});
+      qs('demoStatus').textContent=`Simulazione completata. Saldo utente demo: ${data.credits} crediti. ${data.pendingVideos?'Un video simulato su due: ne manca uno per il credito premio.':''} Nessun addebito e nessuna pubblicità reale.`;
+    }catch(error){qs('demoStatus').textContent=errorMessage(error);}
+  }));
+  qs('demoActions').append(adminButton('Nuova demo con i tuoi campi e orari',async()=>{
+    if(!await confirmAction('Copiare campi e orari nella demo?','Ripartirai con una nuova demo e 100 crediti. Verranno copiati soltanto campi e orari; utenti e prenotazioni reali restano esclusi.','Crea demo'))return;
+    try{const data=await api('/demo/enter',{method:'POST',body:JSON.stringify({role:'admin',reset:true,copySettings:true})});localStorage.setItem('tommi38-establishment',data.establishmentId);location.reload();}catch(error){qs('demoStatus').textContent=errorMessage(error);}
+  }));
   qs('demoActions').append(adminButton('Ripristina demo',async()=>{
     if(!await confirmAction('Ricominciare la demo?','La demo attuale verrà disattivata. Ripartirai con campi di esempio e 100 crediti. Lo stabilimento reale non cambia.','Ripristina demo'))return;
     try{const data=await api('/demo/enter',{method:'POST',body:JSON.stringify({role:'admin',reset:true})});localStorage.setItem('tommi38-establishment',data.establishmentId);location.reload();}catch(error){qs('demoStatus').textContent=errorMessage(error);}

@@ -6,7 +6,7 @@ const {createHash}=require('node:crypto');
 const {createMemoryFirestore}=require('./helpers/memory-firestore.cjs');
 function setup(){
   const memory=createMemoryFirestore();const routes={};
-  const context=vm.createContext({db:memory.db,createHash,express:{Router:()=>({post:(path,handler)=>routes[path]=handler})},readSessionIdentity:async req=>{
+  const context=vm.createContext({db:memory.db,createHash,validEstablishmentId:value=>/^[a-z0-9-]{1,60}$/.test(value),express:{Router:()=>({post:(path,handler)=>routes[path]=handler})},readSessionIdentity:async req=>{
     const user=req.session.user;if(!user || user.disabled)return null;
     return {origin:user.establishment,username:user.username,account:{role:user.role},platformAdmin:false};
   }});
@@ -39,4 +39,28 @@ test('reset creates a fresh private demo, disables the old one and preserves oth
   assert.equal((await ref.get()).data().visibility,'private');
   assert.equal((await ref.collection('users').doc('demo-user').get()).data().credits,100);
   assert.equal((await call('/enter',session,{role:'user'})).body.establishmentId,reset.body.establishmentId);
+});
+
+test('simulated purchases and two videos credit only the demo user and are idempotent',async()=>{
+  const {call,memory}=setup();const session={user:{username:'manager',role:'admin',establishment:'venue-a'}};
+  assert.equal((await call('/simulate',session,{action:'purchase',requestId:'purchase-001'})).code,403);
+  const demo=await call('/enter',session,{role:'user'});
+  const purchase=await call('/simulate',session,{action:'purchase',requestId:'purchase-001'});
+  assert.equal(purchase.body.credits,105);
+  assert.equal((await call('/simulate',session,{action:'purchase',requestId:'purchase-001'})).body.credits,105);
+  assert.equal((await call('/simulate',session,{action:'video',requestId:'video-001'})).body.added,0);
+  assert.equal((await call('/simulate',session,{action:'video',requestId:'video-002'})).body.credits,106);
+  await memory.db.collection('establishments').doc(demo.body.establishmentId).update({demoOwner:'other'});
+  assert.equal((await call('/simulate',session,{action:'purchase',requestId:'purchase-002'})).code,403);
+});
+test('copy imports only scheduling and field labels into a fresh demo',async()=>{
+  const {call,memory}=setup();const source=memory.db.collection('establishments').doc('venue-a');
+  await source.collection('admin').doc('config').set({dayStart:'08:00',secret:'do not copy'});
+  await source.collection('admin').doc('fields').set({fields:[{id:'court',name:'Campo',privateNote:'private'}]});
+  const session={user:{username:'manager',role:'admin',establishment:'venue-a'}};
+  const demo=await call('/enter',session,{role:'admin',reset:true,copySettings:true});
+  const target=memory.db.collection('establishments').doc(demo.body.establishmentId);
+  const config=(await target.collection('admin').doc('config').get()).data();
+  assert.equal(config.dayStart,'08:00');assert.equal(config.secret,undefined);
+  assert.deepEqual((await target.collection('admin').doc('fields').get()).data(),{fields:[{id:'court',name:'Campo'}]});
 });
