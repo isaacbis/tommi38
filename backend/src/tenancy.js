@@ -13,14 +13,16 @@ export const db = {
   batch: () => root.batch(),
   runTransaction: fn => root.runTransaction(fn)
 };
-export async function establishments() {
+export async function establishments(code) {
   const snap = await root.collection('establishments').get();
   const legacy = snap.docs.find(d=>d.id === 'tommi38');
-  const items = [{ id: 'tommi38', name: String(legacy?.data().name || 'Tommi38').slice(0,80) }];
+  const publicItem = (id, value) => ({id, name:String(value.name || id).slice(0,80), city:String(value.city || '').slice(0,100), latitude:Number.isFinite(value.latitude)?value.latitude:null, longitude:Number.isFinite(value.longitude)?value.longitude:null});
+  const visible = (id, value) => code ? id === code : value.visibility !== 'private';
+  const items = visible('tommi38', legacy?.data() || {}) ? [publicItem('tommi38', {name:'Tommi38', ...legacy?.data()})] : [];
   for (const doc of snap.docs) {
     const value = doc.data();
-    if (doc.id !== 'tommi38' && value.enabled === true && /^[a-z0-9-]{1,60}$/.test(doc.id)) {
-      items.push({ id: doc.id, name: String(value.name || doc.id).slice(0,80) });
+    if (doc.id !== 'tommi38' && value.enabled === true && visible(doc.id, value) && /^[a-z0-9-]{1,60}$/.test(doc.id)) {
+      items.push(publicItem(doc.id, value));
     }
   }
   return items;

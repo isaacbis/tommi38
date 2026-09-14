@@ -9,6 +9,7 @@ import session from "express-session";
 import routes from "./src/routes.js";
 import platformRouter from "./src/platform-routes.js";
 import accountRouter from "./src/account-routes.js";
+import demoRouter from "./src/demo-routes.js";
 import { db, FieldValue } from "./src/db.js";
 import { appointInitialPlatformAdmin } from "./src/platform-migration.js";
 import { tenantMiddleware } from "./src/tenancy.js";
@@ -98,6 +99,7 @@ export function createApp({
   // The platform router verifies the original root account itself. Its context
   // controls must remain reachable even while a disabled venue is selected.
   app.use("/api/platform", platformRoutes);
+  app.use("/api/demo", demoRouter);
   app.use("/api/auth", tenantResolver, accountRoutes);
   app.use("/api", tenantResolver, apiRoutes);
   app.use("/api", (req, res) => res.status(404).json({ error: "NOT_FOUND" }));

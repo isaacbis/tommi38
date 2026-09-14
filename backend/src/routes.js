@@ -188,7 +188,13 @@ function publicRequestData(doc) {
 
 
 /* =================== AUTH =================== */
-router.get("/establishments", async (req, res) => res.json({ items: await establishments() }));
+router.get("/establishments", async (req, res, next) => {
+  try {
+    const code = req.query.code;
+    if (code !== undefined && (typeof code !== 'string' || !/^[a-z0-9-]{1,60}$/.test(code))) return res.status(400).json({error:'INVALID_ESTABLISHMENT'});
+    res.json({ items: await establishments(code) });
+  } catch(error) { next(error); }
+});
 
 router.post("/login", loginLimiter, async (req, res) => {
   const schema = z.object({
@@ -229,6 +235,7 @@ router.get("/me", requireAuth, async (req, res) => {
   const u = req.account;
   res.json({
     username:req.session.user.username,
+    demo:!!req.session.demoOriginal,
     role:req.session.user.role,
     credits:req.isPlatformManagement ? 0 : u.credits ?? 0,
     disabled:!!u.disabled,

@@ -10,6 +10,17 @@ import { requirePersonalAccount } from './management-guards.js';
 
 const router=express.Router();
 const safe=fn=>(req,res,next)=>Promise.resolve(fn(req,res,next)).catch(next);
+const commercialDefaults={plan:'ads',rewardEnabled:false,dailyRewardLimit:1,videosPerCredit:2,commissionPercent:10,userAnnualPriceCents:999,venueAnnualPriceCents:14900,currency:'EUR'};
+router.get('/commercial',requireAuth,safe(async(req,res)=>{
+  const snap=await db.collection('admin').doc('commercial').get();
+  res.json({...commercialDefaults,...snap.data(),paymentsAvailable:false,adsAvailable:false,demo:!!req.session.demoOriginal});
+}));
+router.put('/admin/commercial',requireAdmin,safe(async(req,res)=>{
+  const parsed=z.object({plan:z.enum(['ads','annual']),rewardEnabled:z.boolean(),dailyRewardLimit:z.number().int().min(1).max(5)}).strict().safeParse(req.body);
+  if(!parsed.success)return res.status(400).json({error:'BAD_BODY'});
+  await db.collection('admin').doc('commercial').set({...parsed.data,rewardEnabled:parsed.data.plan==='ads' && parsed.data.rewardEnabled,updatedAt:FieldValue.serverTimestamp()});
+  res.json({ok:true});
+}));
 const usernameSchema=z.string().regex(/^[a-zA-Z0-9._-]{3,40}$/);
 const passwordSchema=z.string().min(12).refine(value=>Buffer.byteLength(value,'utf8')<=72);
 const signupLimiter=rateLimit({windowMs:60*60*1000,max:8});

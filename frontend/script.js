@@ -467,6 +467,14 @@ async function loadAll(setToday = false) {
   qs("welcome").innerHTML = `Ciao <strong>${escapeHTML(displayName)}</strong>`;
   qs("creditsBox").textContent = `${Number(me.credits || 0)} ${Number(me.credits) === 1 ? "credito" : "crediti"}`;
   qs("roleBadge").textContent = me.platformAdmin ? "Amministratore globale" : me.role === "admin" ? "Amministratore del tuo stabilimento" : "";
+  let demoButton=qs('demoLabButton');
+  if(!demoButton){demoButton=document.createElement('button');demoButton.id='demoLabButton';demoButton.className='secondary-btn';qs('app').prepend(demoButton);}
+  demoButton.textContent=me.demo?'DEMO · Cambia ruolo o esci':'Laboratorio di prova';
+  demoButton.hidden=!(me.demo || me.platformAdmin || me.role==='admin');
+  demoButton.onclick=openDemoLab;
+  let commercialButton=qs('commercialSettingsButton');
+  if(!commercialButton){commercialButton=document.createElement('button');commercialButton.id='commercialSettingsButton';commercialButton.className='secondary-btn';demoButton.after(commercialButton);}
+  commercialButton.textContent='Piano e crediti premio';commercialButton.hidden=!(me.role==='admin');commercialButton.onclick=openCommercialSettings;
   me.role === "admin" || me.platformAdmin ? show(qs("roleBadge")) : hide(qs("roleBadge"));
   configureManagementAccess();
   qs("notesView").textContent = STATE.notes || "Nessuna comunicazione al momento.";

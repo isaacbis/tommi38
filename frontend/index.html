@@ -28,7 +28,14 @@
   <main class="app-shell">
     <section id="establishmentPicker" class="login-screen hidden">
       <div class="picker-brand"><img src="/icon-192.png" alt="" width="48" height="48"><div><strong>CampoPronto</strong><p>Prenota campi, trova giocatori.</p></div></div>
-      <h1>Scegli il tuo stabilimento</h1><p class="muted">Accedi con le credenziali del tuo stabilimento.</p><div id="establishmentList" class="form-stack"></div><nav class="legal-links" aria-label="Informazioni"><a href="/privacy.html" target="_blank" rel="noopener">Privacy</a><a href="/support.html" target="_blank" rel="noopener">Assistenza</a></nav>
+      <h1>Scegli il tuo stabilimento</h1>
+      <label for="venueSearch">Cerca stabilimento o città</label>
+      <input id="venueSearch" type="search" placeholder="Nome o città" autocomplete="off">
+      <button id="nearbyVenues" class="secondary-btn" type="button">Vicino a me</button>
+      <p id="venueSearchStatus" class="helper-text" role="status"></p>
+      <div id="establishmentList" class="form-stack"></div>
+      <details><summary>Hai un codice stabilimento?</summary><form id="venueCodeForm" class="form-stack"><label for="venueCode">Codice ricevuto dal gestore</label><input id="venueCode" required maxlength="60" autocapitalize="none" placeholder="Codice stabilimento"><button class="secondary-btn" type="submit">Apri stabilimento</button></form></details>
+      <nav class="legal-links" aria-label="Informazioni"><a href="/privacy.html" target="_blank" rel="noopener">Privacy</a><a href="/support.html" target="_blank" rel="noopener">Assistenza</a></nav>
     </section>
     <!-- LOGIN -->
     <section id="loginBox" class="login-screen hidden">

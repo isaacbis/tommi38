@@ -82,7 +82,7 @@ function loadApplication(memory, dates) {
   const cached = new Map();
   const localModules = new Set([
     'server.js', 'src/authorization.js', 'src/tenancy.js', 'src/permissions.js',
-    'src/management-guards.js', 'src/routes.js', 'src/account-routes.js', 'src/platform-routes.js'
+    'src/management-guards.js', 'src/routes.js', 'src/account-routes.js', 'src/platform-routes.js', 'src/demo-routes.js'
   ]);
   const packages = new Set(['express', 'express-session', 'bcrypt', 'zod', 'express-rate-limit', 'helmet', 'cookie-parser']);
   const builtins = new Set(['node:path', 'node:url', 'node:async_hooks', 'node:crypto']);

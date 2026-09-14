@@ -4,6 +4,46 @@ function rememberedEstablishment() {
 }
 let selectedEstablishment = rememberedEstablishment() || 'tommi38';
 let establishmentItems = [];
+let nearbyPosition = null;
+function renderEstablishmentSearch() {
+  const list=qs('establishmentList');
+  list.textContent='';
+  const term=(qs('venueSearch').value || '').trim().toLocaleLowerCase('it');
+  let items=establishmentItems.filter(item=>(item.name+' '+(item.city||'')).toLocaleLowerCase('it').includes(term));
+  const distance=item=>{
+    if(!nearbyPosition || !Number.isFinite(item.latitude) || !Number.isFinite(item.longitude))return Infinity;
+    const rad=n=>n*Math.PI/180;
+    const a=Math.sin(rad(item.latitude-nearbyPosition.latitude)/2)**2+Math.cos(rad(item.latitude))*Math.cos(rad(nearbyPosition.latitude))*Math.sin(rad(item.longitude-nearbyPosition.longitude)/2)**2;
+    return 6371*2*Math.atan2(Math.sqrt(a),Math.sqrt(Math.max(0,1-a)));
+  };
+  if(nearbyPosition)items=items.filter(item=>Number.isFinite(distance(item))).sort((a,b)=>distance(a)-distance(b));
+  for(const item of items){
+    const button=document.createElement('button');button.className='secondary-btn venue-choice';
+    button.textContent=item.name+(item.city?' · '+item.city:'')+(nearbyPosition?' · '+distance(item).toFixed(1)+' km':'')+' →';
+    button.onclick=()=>selectVenue(item);list.append(button);
+  }
+  if(!items.length)list.textContent=nearbyPosition?'Nessuno stabilimento con posizione disponibile. Prova la ricerca per nome.':'Nessuno stabilimento trovato. Se è riservato, inserisci il codice ricevuto dal gestore.';
+  paginateCommunityList('establishmentList');
+}
+async function selectVenue(item){
+  selectedEstablishment=item.id;
+  try{localStorage.setItem('tommi38-establishment',item.id);}catch{}
+  applyEstablishmentName(item.name);hide(qs('establishmentPicker'));show(qs('loginBox'));await loadPublicLoginGallery();
+}
+function setupVenueSearch(){
+  qs('venueSearch').oninput=renderEstablishmentSearch;
+  qs('nearbyVenues').onclick=()=>{
+    if(nearbyPosition){nearbyPosition=null;qs('nearbyVenues').textContent='Vicino a me';renderEstablishmentSearch();return;}
+    if(!navigator.geolocation){qs('venueSearchStatus').textContent='Posizione non disponibile: cerca per città.';return;}
+    qs('venueSearchStatus').textContent='Ricerca della posizione…';
+    navigator.geolocation.getCurrentPosition(position=>{nearbyPosition=position.coords;qs('nearbyVenues').textContent='Mostra tutti';qs('venueSearchStatus').textContent='Stabilimenti ordinati per distanza.';renderEstablishmentSearch();},()=>{qs('venueSearchStatus').textContent='Posizione non disponibile: puoi cercare per città.';},{timeout:10000,maximumAge:60000});
+  };
+  qs('venueCodeForm').onsubmit=async event=>{event.preventDefault();try{
+    const data=await api('/establishments?code='+encodeURIComponent(qs('venueCode').value.trim().toLowerCase()));
+    if(!data.items.length){qs('venueSearchStatus').textContent='Codice non valido o stabilimento non disponibile.';return;}
+    await selectVenue(data.items[0]);
+  }catch(error){qs('venueSearchStatus').textContent=errorMessage(error);}};
+}
 let managementContextEpoch = 0;
 let contextChanging = false;
 function paginateCommunityList(id, options) {
@@ -46,22 +86,8 @@ async function chooseEstablishment() {
   try {
     const data = await api('/establishments');
     establishmentItems = data.items;
-    list.innerHTML = '';
-    data.items.forEach(item => {
-      const button = document.createElement('button');
-      button.className = 'secondary-btn venue-choice';
-      button.textContent = item.name + ' →';
-      button.onclick = async () => {
-        selectedEstablishment = item.id;
-        try { localStorage.setItem('tommi38-establishment', item.id); } catch {}
-        applyEstablishmentName(item.name);
-        hide(qs('establishmentPicker'));
-        show(qs('loginBox'));
-        await loadPublicLoginGallery();
-      };
-      list.appendChild(button);
-    });
-    paginateCommunityList('establishmentList');
+    setupVenueSearch();
+    renderEstablishmentSearch();
   } catch (e) {
     list.textContent = errorMessage(e);
     const retry = document.createElement('button');
@@ -88,11 +114,30 @@ async function initializeCommunity() {
     try { await api('/me'); } catch(e) { if (e.status === 401) return chooseEstablishment(); throw e; }
     try { localStorage.setItem('tommi38-establishment','tommi38'); } catch {}
   }
-  const data = await api('/establishments');
+  const data = await api('/establishments?code='+encodeURIComponent(selectedEstablishment));
   if (!data.items.some(v=>v.id===selectedEstablishment)) { selectedEstablishment='tommi38'; return chooseEstablishment(); }
   applyEstablishmentName(data.items.find(v=>v.id===selectedEstablishment).name);
   await loadPublicLoginGallery();
   return loadAll(true);
+}
+async function openDemoLab(){
+  openAppModal('Laboratorio di prova',`<p>Una demo personale, separata dai dati reali. Prova campi, orari e prenotazioni con 100 crediti iniziali. Non vengono effettuati pagamenti.</p><div id="demoActions" class="form-stack"></div><p id="demoStatus" role="status"></p>`);
+  for(const [label,role]of [['Prova come gestore','admin'],['Prova come utente','user']])qs('demoActions').append(adminButton(label,async()=>{
+    try{const data=await api('/demo/enter',{method:'POST',body:JSON.stringify({role})});localStorage.setItem('tommi38-establishment',data.establishmentId);location.reload();}catch(error){qs('demoStatus').textContent=errorMessage(error);}
+  }));
+  if(STATE.me?.demo)qs('demoActions').append(adminButton('Torna al tuo stabilimento',async()=>{
+    try{const data=await api('/demo/exit',{method:'POST'});localStorage.setItem('tommi38-establishment',data.establishmentId);location.reload();}catch(error){qs('demoStatus').textContent=errorMessage(error);}
+  }));
+}
+async function openCommercialSettings(){
+  try{
+    const value=await api('/auth/commercial');
+    openAppModal('Piano e crediti premio',`<form id="commercialForm" class="form-stack"><p>Prepara le tue preferenze. Pubblicità e pagamenti non sono ancora attivi.</p><label for="commercialPlan">Piano desiderato</label><select id="commercialPlan"><option value="ads">Con pubblicità</option><option value="annual">Senza pubblicità · 149 € / anno (proposta)</option></select><label><input id="commercialRewards" type="checkbox"> Offri un credito ogni 2 video completati</label><p class="helper-text">Il credito equivale a una prenotazione offerta dal tuo stabilimento.</p><label for="commercialLimit">Crediti premio al giorno per utente</label><input id="commercialLimit" type="number" min="1" max="5" value="${value.dailyRewardLimit}"><p>Commissione sui pacchetti venduti: 10%. Spese di pagamento da definire. L’assegnazione manuale dei crediti resta disponibile.</p><button class="primary-btn">Salva preferenze</button><p id="commercialStatus" role="status"></p></form>`);
+    qs('commercialPlan').value=value.plan;qs('commercialRewards').checked=value.rewardEnabled;
+    qs('commercialForm').onsubmit=async event=>{event.preventDefault();try{
+      await api('/auth/admin/commercial',{method:'PUT',body:JSON.stringify({plan:qs('commercialPlan').value,rewardEnabled:qs('commercialRewards').checked,dailyRewardLimit:Number(qs('commercialLimit').value)})});qs('commercialStatus').textContent='Preferenze salvate. Nessun pagamento effettuato.';
+    }catch(error){qs('commercialStatus').textContent=errorMessage(error);}};
+  }catch(error){alert(errorMessage(error));}
 }
 let homeRequest = 0;
 async function loadHome() {
@@ -477,6 +522,19 @@ function openEstablishmentOptions(item) {
   const epoch=managementContextEpoch;
   openAppModal(item.name, `<p class="helper-text">Codice: <strong>${escapeHTML(item.id)}</strong> · ${item.enabled?'Attivo':'Sospeso'}</p><h3>Gestori</h3><div id="venueManagersList">${(item.managers || []).map(manager=>`<p class="ledger-row"><strong>${escapeHTML(manager.username)}</strong><span>${manager.disabled?'Disabilitato':'Attivo'}</span></p>`).join('') || '<p class="muted">Nessun gestore assegnato.</p>'}</div><div id="venueOptionsActions" class="form-stack"></div>`);
   const actions=qs('venueOptionsActions');
+  actions.appendChild(adminButton(item.visibility==='private'?'Autorizza pubblicazione nella ricerca':'Rendi riservato (solo codice)',async()=>{
+    await api('/platform/establishments/'+encodeURIComponent(item.id),{method:'PATCH',body:JSON.stringify({visibility:item.visibility==='private'?'public':'private'})});
+    closeAppModal();await loadPlatformEstablishments();
+  }));
+  actions.appendChild(adminButton('Città e posizione',()=>{
+    openAppModal('Posizione dello stabilimento',`<form id="venueLocationForm" class="form-stack"><label for="venueCity">Città</label><input id="venueCity" maxlength="100" value="${escapeHTML(item.city||'')}"><label for="venueLatitude">Latitudine</label><input id="venueLatitude" type="number" min="-90" max="90" step="any" value="${item.latitude??''}"><label for="venueLongitude">Longitudine</label><input id="venueLongitude" type="number" min="-180" max="180" step="any" value="${item.longitude??''}"><p class="helper-text">La posizione dello stabilimento serve per la ricerca «Vicino a me».</p><button class="primary-btn">Salva posizione</button><p id="venueLocationStatus" role="status"></p></form>`);
+    qs('venueLocationForm').onsubmit=async event=>{event.preventDefault();try{
+      const latitude=qs('venueLatitude').value,longitude=qs('venueLongitude').value;
+      if(Boolean(latitude)!==Boolean(longitude)){qs('venueLocationStatus').textContent='Inserisci entrambe le coordinate.';return;}
+      await api('/platform/establishments/'+encodeURIComponent(item.id),{method:'PATCH',body:JSON.stringify({city:qs('venueCity').value.trim(),latitude:latitude===''?null:Number(latitude),longitude:longitude===''?null:Number(longitude)})});
+      closeAppModal();await loadPlatformEstablishments();
+    }catch(error){qs('venueLocationStatus').textContent=errorMessage(error);}};
+  }));
   actions.appendChild(adminButton('Modifica nome', () => {
     if(epoch===managementContextEpoch)openEstablishmentName(item);
   }));

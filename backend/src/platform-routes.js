@@ -18,7 +18,11 @@ const createSchema = z.object({
 }).strict();
 const updateSchema = z.object({
   name: establishmentName.optional(),
-  enabled: z.boolean().optional()
+  enabled: z.boolean().optional(),
+  visibility: z.enum(['public','private']).optional(),
+  city: z.string().trim().max(100).optional(),
+  latitude: z.number().min(-90).max(90).nullable().optional(),
+  longitude: z.number().min(-180).max(180).nullable().optional()
 }).strict().refine(value => Object.keys(value).length > 0);
 
 const wrap = handler => (req, res, next) => Promise.resolve().then(() => handler(req, res, next)).catch(next);
@@ -53,6 +57,10 @@ function establishmentSummary(id, value, managers = []) {
     name: String(value.name || (id === "tommi38" ? "Tommi38" : id)).slice(0, 80),
     enabled: id === "tommi38" || value.enabled === true,
     legacy: id === "tommi38",
+    visibility: value.visibility || 'public',
+    city: value.city || '',
+    latitude: value.latitude ?? null,
+    longitude: value.longitude ?? null,
     managers
   };
 }
@@ -97,7 +105,7 @@ register("post", "/establishments", requirePlatformAdmin, async (req, res) => {
     const existing = await transaction.get(ref);
     if (existing.exists) return false;
     const createdAt = FieldValue.serverTimestamp();
-    transaction.create(ref, { name, enabled: true, createdAt, createdBy: req.session.user.username });
+    transaction.create(ref, { name, enabled: true, visibility: 'private', createdAt, createdBy: req.session.user.username });
     transaction.create(userRef, {
       passwordHash, role: "admin", platformAdmin: false, credits: 0, disabled: false,
       createdAt, createdBy: req.session.user.username
@@ -112,7 +120,7 @@ register("post", "/establishments", requirePlatformAdmin, async (req, res) => {
   if (!created) return res.status(409).json({ error: "ESTABLISHMENT_EXISTS" });
   res.status(201).json({
     ok: true,
-    establishment: establishmentSummary(id, { name, enabled: true }, [{ username, disabled: false }])
+    establishment: establishmentSummary(id, { name, enabled: true, visibility: 'private' }, [{ username, disabled: false }])
   });
 });
 
