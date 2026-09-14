@@ -22,7 +22,7 @@ La versione **1.0, build 2**, con il nome CampoPronto e l’icona blu scelta dal
 | Pubblicazione | Automatica dopo l’approvazione Apple |
 | Dispositivi | iPhone e iPad; disponibilità Mac e Apple Vision Pro disattivata |
 | Titolare e copyright | Isaac Morganti; © 2026 Isaac Morganti |
-| Email pubblica di assistenza e privacy | isaacmorg93@virgilio.it |
+| Email pubblica di assistenza e privacy | campopronto.assistenza@gmail.com |
 
 Scheda: [App Store Connect](https://appstoreconnect.apple.com/apps/6810684742/distribution/ios/version/inflight).
 
