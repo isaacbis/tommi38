@@ -64,3 +64,11 @@ test('copy imports only scheduling and field labels into a fresh demo',async()=>
   assert.equal(config.dayStart,'08:00');assert.equal(config.secret,undefined);
   assert.deepEqual((await target.collection('admin').doc('fields').get()).data(),{fields:[{id:'court',name:'Campo'}]});
 });
+
+test('Stripe endpoints reject real sessions and foreign demos before accessing Stripe',async()=>{
+ const {call,memory}=setup();const session={user:{username:'manager',role:'admin',establishment:'venue-a'}};
+ for(const path of ['/payment-options','/checkout','/checkout/confirm'])assert.equal((await call(path,session,{})).code,403);
+ const demo=await call('/enter',session,{role:'user'});
+ await memory.db.collection('establishments').doc(demo.body.establishmentId).update({demoOwner:'other'});
+ for(const path of ['/payment-options','/checkout','/checkout/confirm'])assert.equal((await call(path,session,{})).code,403);
+});

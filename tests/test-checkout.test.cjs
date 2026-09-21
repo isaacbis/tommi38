@@ -1,0 +1,23 @@
+const {test}=require('node:test');const assert=require('node:assert/strict');
+const {createMemoryFirestore}=require('./helpers/memory-firestore.cjs');
+test('sandbox checkout fixes price and destination server-side and credits exactly once',async()=>{
+ const {createTestCheckout}=await import('../backend/src/test-checkout.js');
+ const {db}=createMemoryFirestore();const ref=db.collection('establishments').doc('demo-example');
+ await ref.set({enabled:true,demoOwner:'venue:owner'});
+ await ref.collection('users').doc('demo-user').set({credits:100});
+ await ref.collection('admin').doc('creditPackages').set({items:[{id:'five',title:'Cinque',credits:5,priceCents:2000}]});
+ let sent;const stripe={checkout:{sessions:{create:async(params,options)=>{sent={params,options};return {id:'cs_test_example',livemode:false,url:'https://checkout.stripe.com/c/pay/cs_test_example'};}}}};
+ const opts={stripe,db,secretKey:'sk_test_fixture',connectedAccount:'acct_fixture',returnUrl:'https://example.com/demo'};
+ assert.throws(()=>createTestCheckout({...opts,secretKey:'sk_live_fixture'}),/TEST_KEY_REQUIRED/);
+ const service=createTestCheckout(opts);
+ await assert.rejects(service.start({venue:'tommi38',owner:'venue:owner',packageId:'five',requestId:'request-0001'}),/DEMO_REQUIRED/);
+ await service.start({venue:'demo-example',owner:'venue:owner',packageId:'five',requestId:'request-0001'});
+ assert.equal(sent.params.line_items[0].price_data.unit_amount,2000);assert.equal(sent.params.payment_intent_data.application_fee_amount,200);
+ assert.equal(sent.options.stripeAccount,'acct_fixture');
+ const event={livemode:false,type:'checkout.session.completed',account:'acct_fixture',data:{object:{id:'cs_test_example',livemode:false,mode:'payment',payment_status:'paid',amount_total:2000,currency:'eur',metadata:{demoVenue:'demo-example',testOrder:'request-0001'}}}};
+ assert.equal(await service.fulfillVerifiedEvent({...event,account:'acct_other'}),false);
+ assert.equal(await service.fulfillVerifiedEvent({...event,livemode:true}),false);
+ assert.equal(await service.fulfillVerifiedEvent({...event,data:{object:{...event.data.object,amount_total:1}}}),false);
+ const results=await Promise.all([service.fulfillVerifiedEvent(event),service.fulfillVerifiedEvent(event)]);
+ assert.equal(results.filter(Boolean).length,1);assert.equal((await ref.collection('users').doc('demo-user').get()).data().credits,105);
+});

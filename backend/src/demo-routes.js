@@ -81,6 +81,45 @@ router.post('/simulate',safe(async(req,res)=>{
   if(!result)return res.status(403).json({error:'NOT_AUTHORIZED'});
   res.json(result);
 }));
+async function paymentContext(req){
+  const identity=await owner(req);
+  if(!identity || !req.session.demoOriginal)return null;
+  const id=req.session.user?.establishment;
+  if(!validEstablishmentId(id) || !id.startsWith('demo-'))return null;
+  const ref=db.collection('establishments').doc(id),meta=await ref.get();
+  if(!meta.data()?.enabled || meta.data().demoOwner!==identity.origin+':'+identity.username)return null;
+  return {identity,id,ref};
+}
+router.post('/payment-options',safe(async(req,res)=>{
+ const context=await paymentContext(req);if(!context)return res.status(403).json({error:'NOT_AUTHORIZED'});
+ const {sandbox}=await import('./stripe-sandbox.js');
+ const packages=await context.ref.collection('admin').doc('creditPackages').get();
+ res.json({available:!!sandbox(),items:(packages.data()?.items || []).filter(p=>Number.isInteger(p.priceCents)&&p.priceCents>=50).map(({id,title,credits,priceCents})=>({id,title,credits,priceCents}))});
+}));
+router.post('/checkout',safe(async(req,res)=>{
+ const context=await paymentContext(req);if(!context)return res.status(403).json({error:'NOT_AUTHORIZED'});
+ const {packageId,requestId}=req.body;
+ if(typeof packageId!=='string' || !/^[a-z0-9-]{1,40}$/.test(packageId) || typeof requestId!=='string' || !/^[a-zA-Z0-9-]{8,80}$/.test(requestId))return res.status(400).json({error:'BAD_BODY'});
+ const {sandbox}=await import('./stripe-sandbox.js');const payment=sandbox();
+ if(!payment)return res.status(503).json({error:'TEST_PAYMENTS_NOT_CONFIGURED'});
+ try{res.json(await payment.service.start({venue:context.id,owner:context.identity.origin+':'+context.identity.username,packageId,requestId}));}
+ catch{res.status(409).json({error:'TEST_CHECKOUT_UNAVAILABLE'});}
+}));
+router.post('/checkout/confirm',safe(async(req,res)=>{
+ const context=await paymentContext(req);if(!context)return res.status(403).json({error:'NOT_AUTHORIZED'});
+ const {requestId}=req.body;
+ if(typeof requestId!=='string' || !/^[a-zA-Z0-9-]{8,80}$/.test(requestId))return res.status(400).json({error:'BAD_BODY'});
+ const order=await context.ref.collection('testOrders').doc(requestId).get();
+ if(!order.exists || !order.data().sessionId)return res.status(404).json({error:'ORDER_NOT_FOUND'});
+ const {sandbox}=await import('./stripe-sandbox.js');const payment=sandbox();
+ if(!payment || order.data().account!==payment.account)return res.status(503).json({error:'TEST_PAYMENTS_NOT_CONFIGURED'});
+ // Read the canonical session directly from Stripe. Browser success redirects are not proof of payment.
+ const session=await payment.stripe.checkout.sessions.retrieve(order.data().sessionId,{},{stripeAccount:payment.account});
+ if(session.metadata?.demoVenue!==context.id || session.metadata?.testOrder!==requestId)return res.status(409).json({error:'ORDER_MISMATCH'});
+ await payment.service.fulfillVerifiedEvent({livemode:session.livemode,type:'checkout.session.completed',account:payment.account,data:{object:session}});
+ const updated=await context.ref.collection('testOrders').doc(requestId).get();
+ res.json({paid:updated.data().status==='paid',simulation:true});
+}));
 router.post('/exit',safe(async(req,res)=>{
   if(!req.session.demoOriginal)return res.status(400).json({error:'NO_DEMO_SESSION'});
   if(!await owner(req))return res.status(403).json({error:'NOT_AUTHORIZED'});

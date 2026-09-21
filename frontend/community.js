@@ -134,6 +134,7 @@ async function openDemoLab(){
       qs('demoStatus').textContent=`Simulazione completata. Saldo utente demo: ${data.credits} crediti. ${data.pendingVideos?'Un video simulato su due: ne manca uno per il credito premio.':''} Nessun addebito e nessuna pubblicità reale.`;
     }catch(error){qs('demoStatus').textContent=errorMessage(error);}
   }));
+  if(STATE.me?.demo)qs('demoActions').append(adminButton('Prova pagamento Stripe',openStripeDemo));
   qs('demoActions').append(adminButton('Nuova demo con i tuoi campi e orari',async()=>{
     if(!await confirmAction('Copiare campi e orari nella demo?','Ripartirai con una nuova demo e 100 crediti. Verranno copiati soltanto campi e orari; utenti e prenotazioni reali restano esclusi.','Crea demo'))return;
     try{const data=await api('/demo/enter',{method:'POST',body:JSON.stringify({role:'admin',reset:true,copySettings:true})});localStorage.setItem('tommi38-establishment',data.establishmentId);location.reload();}catch(error){qs('demoStatus').textContent=errorMessage(error);}
@@ -907,3 +908,22 @@ document.addEventListener('DOMContentLoaded',()=>{
     qs('appModalBody').querySelectorAll('input[type="password"]').forEach(input => { input.value = ''; });
   });
 });
+
+async function openStripeDemo(){
+ openAppModal('Pagamento Stripe di prova','<p>Solo sandbox: usa esclusivamente carte di test Stripe, mai una carta reale. I crediti vengono aggiunti soltanto all’utente demo.</p><div id="stripeDemoPackages" class="form-stack"></div><p id="stripeDemoStatus" role="status"></p>');
+ const status=qs('stripeDemoStatus');
+ try{
+  const options=await api('/demo/payment-options',{method:'POST',body:'{}'});
+  if(!options.available){status.textContent='Collegamento Stripe di test non ancora configurato.';return;}
+  const pendingKey='stripe-demo-order:'+selectedEstablishment;
+  const pending=localStorage.getItem(pendingKey);
+  if(pending)qs('stripeDemoPackages').append(adminButton('Verifica ultimo pagamento di prova',async()=>{
+   try{const result=await api('/demo/checkout/confirm',{method:'POST',body:JSON.stringify({requestId:pending})});status.textContent=result.paid?'Pagamento verificato. Crediti accreditati all’utente demo.':'Pagamento non ancora completato.';if(result.paid)localStorage.removeItem(pendingKey);}catch(error){status.textContent=errorMessage(error);}
+  }));
+  if(!options.items.length)status.textContent='Come gestore demo, crea un pacchetto con prezzo nella sezione Pacchetti crediti, poi torna qui.';
+  for(const pack of options.items)qs('stripeDemoPackages').append(adminButton(`${pack.title} · ${pack.credits} crediti · ${(pack.priceCents/100).toFixed(2)} € di prova`,async()=>{
+   const requestId=pending || crypto.randomUUID();localStorage.setItem(pendingKey,requestId);
+   try{const checkout=await api('/demo/checkout',{method:'POST',body:JSON.stringify({packageId:pack.id,requestId})});location.assign(checkout.url);}catch(error){status.textContent='Pagamento di prova non disponibile: controlla la configurazione dell’account Stripe.';}
+  }));
+ }catch(error){status.textContent=errorMessage(error);}
+}
