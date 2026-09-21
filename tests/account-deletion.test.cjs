@@ -77,7 +77,7 @@ test('credit approval cannot recreate a ledger entry after account deletion has 
   const response=await e.call('patch','/admin/credit-requests/:username',{
     tenant:'beach-a',user:'manager',params:{username:'alice'},body:{status:'approved'}
   });
-  assert.equal(response.code,409);assert.equal(response.body.error,'ACCOUNT_CHANGED');
+  assert.equal(response.code,410);assert.equal(response.body.error,'MANUAL_RECHARGE_REMOVED');
   assert.deepEqual(e.data,before);
 });
 

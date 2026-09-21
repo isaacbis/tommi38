@@ -62,7 +62,7 @@ test('waitlist is private and observes availability after cancellation',async()=
 test('ledger access is private and admin cannot make balance negative or fractional',async()=>{
  const e=setup();await e.call('post','/reservations','alice',slot);
  assert.equal((await e.call('get','/credits','bob')).body.items.length,0);
- for(const delta of [-100,0.5])assert.equal((await e.call('put','/admin/users/credits','admin',{username:'alice',delta})).code,400);
+ for(const delta of [-100,0.5,10])assert.equal((await e.call('put','/admin/users/credits','admin',{username:'alice',delta})).code,403);
  assert.equal(e.data.get('users/alice').credits,2);
  assert.equal((await e.call('get','/credits',null)).code,401);
 });

@@ -99,39 +99,14 @@
     root.append(links);
   }
   async function requestCredits() {
-    const {root,current} = modal('Richiedi crediti', '<p>Caricamento…</p>');
-    try {
-      const [packages,requests] = await Promise.all([api('/auth/credit-packages'),api('/auth/credit-requests')]);
-      if(!current())return;
-      root.textContent='';
-      const note=document.createElement('p'); note.className='muted';
-      note.textContent='La ricarica richiede l’approvazione del gestore. Concorda con lui le modalità; qui non viene effettuato alcun pagamento.'; root.append(note);
-      if(requests.item){const p=document.createElement('p');p.textContent=`Ultima richiesta: ${requests.item.packageTitle} · ${Number(requests.item.credits)} crediti · ${ {pending:'in attesa',approved:'approvata',rejected:'rifiutata'}[requests.item.status] || requests.item.status}`;root.append(p);}
-      if(requests.item?.status==='pending')return;
-      if(!packages.items.length){root.append(document.createTextNode('Nessun pacchetto disponibile. Rivolgiti al gestore.'));return;}
-      for(const pack of packages.items) root.append(button(`${pack.title} · ${Number(pack.credits)} crediti`,async event => {
-        const btn=event.currentTarget;btn.disabled=true;
-        try { await api('/auth/credit-requests',{method:'POST',body:JSON.stringify({packageId:pack.id})});if(current())await requestCredits(); }
-        catch(error){if(current()){note.textContent=message(error);btn.disabled=false;}}
-      }));
-    }catch(error){if(current())root.textContent=message(error);}
+    modal('Ottieni crediti', '<p>In Campo Pronto ADS puoi ottenere crediti guardando video premio oppure acquistando pacchetti.</p><p>Due video completati danno un credito, con un massimo di un credito premio al giorno per stabilimento.</p><p role="status">Pubblicità e acquisti sono ancora in preparazione. Non vengono effettuati addebiti. I crediti già presenti restano validi.</p>');
   }
   async function manageRequests() {
     const {root,current} = modal('Richieste utenti', '<p>Caricamento…</p>');
     try {
-      const [credits,recoveries] = await Promise.all([api('/auth/admin/credit-requests'),api('/auth/admin/recovery-requests')]);
+      const recoveries = await api('/auth/admin/recovery-requests');
       if(!current())return;
-      root.innerHTML='<h3>Ricariche da approvare</h3>';
-      if(!credits.items.length) root.append(document.createTextNode('Nessuna ricarica in attesa.'));
-      for(const item of credits.items){
-        const row=document.createElement('div');row.className='wait-row';
-        const label=document.createElement('p');label.textContent=`${item.username} · ${item.packageTitle} · ${Number(item.credits)} crediti`;row.append(label);
-        for(const [status,label] of [['approved','Approva ricarica'],['rejected','Rifiuta']])row.append(button(label,async()=>{
-          row.querySelectorAll('button').forEach(b=>b.disabled=true);
-          try{await api('/auth/admin/credit-requests/'+encodeURIComponent(item.username),{method:'PATCH',body:JSON.stringify({status})});if(current())await manageRequests();}
-          catch(error){if(current()){const p=document.createElement('p');p.textContent=message(error);row.append(p);row.querySelectorAll('button').forEach(b=>b.disabled=false);}}
-        }));root.append(row);
-      }
+      root.textContent='';
       const heading=document.createElement('h3');heading.textContent='Assistenza per l’accesso';root.append(heading);
       const note=document.createElement('p');note.className='helper-text';note.textContent='Verifica l’identità della persona prima di reimpostare la password. Una richiesta da sola non dimostra che sia il titolare dell’account.';root.append(note);
       if(!recoveries.items.length)root.append(document.createTextNode('Nessuna richiesta di assistenza.'));
@@ -143,7 +118,7 @@
     try {
       const data=await api('/auth/admin/credit-package-pricing');if(!current())return;
       const items=data.items.map(item=>({...item}));
-      root.innerHTML='<p class="helper-text">Gli utenti possono richiedere un pacchetto. Sei tu ad approvare ogni ricarica. I prezzi sono bozze riservate al gestore: acquisti online non ancora attivi.</p><div id="packageRows"></div><form class="form-stack"><label class="field-label" for="packageTitle">Nome pacchetto</label><input id="packageTitle" class="admin-input" maxlength="60" required placeholder="10 partite"><label class="field-label" for="packageCredits">Crediti</label><input id="packageCredits" class="admin-input" type="number" min="1" max="10000" step="1" required><label class="field-label" for="packagePrice">Prezzo previsto in euro (facoltativo)</label><input id="packagePrice" class="admin-input" type="number" min="0.50" max="10000" step="0.01" placeholder="Es. 20,00"><button class="primary-btn" type="submit">Aggiungi pacchetto</button><p role="status"></p></form>';
+      root.innerHTML='<p class="helper-text">In Campo Pronto ADS i crediti si ottengono tramite video premio o pacchetti acquistati. Solo l’amministratore globale può assegnarli manualmente. I prezzi sono bozze riservate al gestore: acquisti online non ancora attivi.</p><div id="packageRows"></div><form class="form-stack"><label class="field-label" for="packageTitle">Nome pacchetto</label><input id="packageTitle" class="admin-input" maxlength="60" required placeholder="10 partite"><label class="field-label" for="packageCredits">Crediti</label><input id="packageCredits" class="admin-input" type="number" min="1" max="10000" step="1" required><label class="field-label" for="packagePrice">Prezzo previsto in euro (facoltativo)</label><input id="packagePrice" class="admin-input" type="number" min="0.50" max="10000" step="0.01" placeholder="Es. 20,00"><button class="primary-btn" type="submit">Aggiungi pacchetto</button><p role="status"></p></form>';
       const rows=root.querySelector('#packageRows');
       const draw=()=>{
         rows.textContent='';
@@ -178,8 +153,8 @@
     settings.append(button('Account, privacy e assistenza',accountSettings));qs('viewAlerts').append(settings);
     const ownAccount=button('Account, privacy e assistenza',accountSettings);ownAccount.classList.add('compact-account-button');ownAccount.dataset.personalAccount='';qs('adminMenu').append(ownAccount);
     const globalAccount=button('Account, privacy e assistenza',accountSettings);globalAccount.classList.add('compact-account-button');globalAccount.dataset.personalAccount='';qs('adminEstablishments').append(globalAccount);
-    qs('creditHistory').closest('section').append(button('Richiedi crediti',requestCredits));
+    qs('creditHistory').closest('section').append(button('Ottieni crediti',requestCredits));
     const admin=document.createElement('div');admin.className='home-actions';
-    admin.append(button('Richieste utenti',manageRequests),button('Pacchetti crediti',managePackages));qs('adminUsers').prepend(admin);
+    admin.append(button('Assistenza accesso',manageRequests),button('Pacchetti crediti',managePackages));qs('adminUsers').prepend(admin);
   });
 })();

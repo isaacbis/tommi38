@@ -144,14 +144,7 @@ async function openDemoLab(){
   }));
 }
 async function openCommercialSettings(){
-  try{
-    const value=await api('/auth/commercial');
-    openAppModal('Piano e crediti premio',`<form id="commercialForm" class="form-stack"><p>Prepara le tue preferenze. Pubblicità e pagamenti non sono ancora attivi.</p><label for="commercialPlan">Piano desiderato</label><select id="commercialPlan"><option value="ads">Con pubblicità</option><option value="annual">Senza pubblicità · 149 € / anno (proposta)</option></select><label><input id="commercialRewards" type="checkbox"> Offri un credito ogni 2 video completati</label><p class="helper-text">Il credito equivale a una prenotazione offerta dal tuo stabilimento.</p><label for="commercialLimit">Crediti premio al giorno per utente</label><input id="commercialLimit" type="number" min="1" max="5" value="${value.dailyRewardLimit}"><p>Commissione sui pacchetti venduti: 10%. Spese di pagamento da definire. L’assegnazione manuale dei crediti resta disponibile.</p><button class="primary-btn">Salva preferenze</button><p id="commercialStatus" role="status"></p></form>`);
-    qs('commercialPlan').value=value.plan;qs('commercialRewards').checked=value.rewardEnabled;
-    qs('commercialForm').onsubmit=async event=>{event.preventDefault();try{
-      await api('/auth/admin/commercial',{method:'PUT',body:JSON.stringify({plan:qs('commercialPlan').value,rewardEnabled:qs('commercialRewards').checked,dailyRewardLimit:Number(qs('commercialLimit').value)})});qs('commercialStatus').textContent='Preferenze salvate. Nessun pagamento effettuato.';
-    }catch(error){qs('commercialStatus').textContent=errorMessage(error);}};
-  }catch(error){alert(errorMessage(error));}
+  openAppModal('Regole Campo Pronto ADS','<p>Un credito permette una prenotazione. I crediti si ottengono attraverso pacchetti acquistati oppure due video premio completati.</p><p>Massimo un credito premio al giorno per utente e stabilimento. Solo l’amministratore globale può assegnare crediti manualmente.</p><p>Non sono previsti abbonamenti senza pubblicità. Campo Pronto Premium sarà un’app separata.</p><p>Commissione pacchetti: 10% CampoPronto, 90% stabilimento, prima delle spese. Pubblicità e pagamenti non sono ancora attivi.</p>');
 }
 let homeRequest = 0;
 async function loadHome() {
@@ -620,7 +613,7 @@ async function createManagedUser(event) {
   status.textContent = 'Creazione account…';
   try {
     const role = STATE.me.platformAdmin ? qs('newUserRole').value : 'user';
-    await api('/admin/users',{method:'POST',body:JSON.stringify({username,password:qs('newUserPassword').value,credits:Number(qs('newUserCredits').value), ...(STATE.me.platformAdmin ? {role} : {})})});
+    await api('/admin/users',{method:'POST',body:JSON.stringify({username,password:qs('newUserPassword').value,credits:STATE.me.platformAdmin?Number(qs('newUserCredits').value):0, ...(STATE.me.platformAdmin ? {role} : {})})});
     form.reset();
     if (user !== STATE.me) return;
     status.textContent = `${role==='admin'?'Gestore':'Utente'} ${username} creato. Può accedere selezionando questo stabilimento.`;

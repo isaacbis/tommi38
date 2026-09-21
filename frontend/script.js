@@ -356,7 +356,7 @@ function updateBookingPreview() {
   const remaining = Math.max(0, credits - (STATE.me?.role === "admin" ? 0 : 1));
   const creditText = STATE.me?.role === "admin"
     ? "Prenotazione amministratore"
-    : (credits < 1 ? "Crediti esauriti: rivolgiti al gestore" : `1 credito · Ne resteranno ${remaining}`);
+    : (credits < 1 ? "Crediti esauriti: apri Ottieni crediti" : `1 credito · Ne resteranno ${remaining}`);
 
   box.innerHTML = `
     <img src="/icon-192.png" alt="" class="preview-logo">
@@ -465,6 +465,8 @@ async function loadAll(setToday = false) {
   const firstName = String(me.username || "").split(/[._\-\s]/)[0] || me.username;
   const displayName = firstName.charAt(0).toUpperCase() + firstName.slice(1);
   qs("welcome").innerHTML = `Ciao <strong>${escapeHTML(displayName)}</strong>`;
+  const initialCredits=qs('newUserCredits');
+  if(initialCredits){initialCredits.disabled=!STATE.me?.platformAdmin;initialCredits.hidden=!STATE.me?.platformAdmin;const label=document.querySelector('label[for="newUserCredits"]');if(label)label.hidden=!STATE.me?.platformAdmin;if(!STATE.me?.platformAdmin)initialCredits.value='0';}
   qs("creditsBox").textContent = `${Number(me.credits || 0)} ${Number(me.credits) === 1 ? "credito" : "crediti"}`;
   qs("roleBadge").textContent = me.platformAdmin ? "Amministratore globale" : me.role === "admin" ? "Amministratore del tuo stabilimento" : "";
   let demoButton=qs('demoLabButton');
@@ -474,7 +476,7 @@ async function loadAll(setToday = false) {
   demoButton.onclick=openDemoLab;
   let commercialButton=qs('commercialSettingsButton');
   if(!commercialButton){commercialButton=document.createElement('button');commercialButton.id='commercialSettingsButton';commercialButton.className='secondary-btn';demoButton.after(commercialButton);}
-  commercialButton.textContent='Piano e crediti premio';commercialButton.hidden=!(me.role==='admin');commercialButton.onclick=openCommercialSettings;
+  commercialButton.textContent='Regole Campo Pronto ADS';commercialButton.hidden=!(me.role==='admin');commercialButton.onclick=openCommercialSettings;
   me.role === "admin" || me.platformAdmin ? show(qs("roleBadge")) : hide(qs("roleBadge"));
   configureManagementAccess();
   qs("notesView").textContent = STATE.notes || "Nessuna comunicazione al momento.";
@@ -1557,7 +1559,8 @@ function renderUsers(filter = "") {
         qs('userMenuActions').append(password,rename,toggle);
         if(STATE.me?.platformAdmin)qs('userMenuActions').append(adminButton('Cambia ruolo',()=>openUserRole(user)));
       });
-      actions.append(credits,manage);
+      if(STATE.me?.platformAdmin)actions.append(credits);
+      actions.append(manage);
     }
     item.append(main, actions);
     list.appendChild(item);

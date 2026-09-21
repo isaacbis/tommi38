@@ -17,7 +17,7 @@ test('expired reservations are archived once instead of disappearing from manage
 });
 test('manager cannot grant administrative roles when creating a user or mutate another venue',async()=>{
  const e=setup();const body={username:'new.user',password:'Fixture-secret-2026!',credits:8};assert.equal((await e.call('post','/admin/users',{tenant:'beach-a',user:'manager',body:{...body,role:'admin'}})).code,403);
- assert.equal((await e.call('post','/admin/users',{tenant:'beach-a',user:'manager',body})).code,201);assert.equal(e.data.get('establishments/beach-a/users/new.user').role,'user');assert.ok(!e.data.has('users/new.user'));
+ assert.equal((await e.call('post','/admin/users',{tenant:'beach-a',user:'manager',body})).code,403);assert.equal((await e.call('post','/admin/users',{tenant:'beach-a',user:'manager',body:{...body,credits:0}})).code,201);assert.equal(e.data.get('establishments/beach-a/users/new.user').role,'user');assert.ok(!e.data.has('users/new.user'));
 });
 test('changing duration or removing a booked court cannot invalidate active bookings',async()=>{
  const e=setup();await e.call('post','/reservations',{tenant:'beach-a',body:booking});const config={...e.data.get('establishments/beach-a/admin/config'),slotMinutes:60};
@@ -35,4 +35,10 @@ test('renaming a user atomically keeps history, pending requests and player part
  e.data.set(p+'playerSearches/group/requests/one',{requesterUser:'alice'});
  const r=await e.call('post','/admin/users/rename',{tenant:'beach-a',user:'manager',body:{oldUsername:'alice',newUsername:'alice.new'}});assert.equal(r.code,200);
  assert.equal(e.data.get(p+'reservationHistory/past').user,'alice.new');assert.equal(e.data.get(p+'creditRequests/alice.new').user,'alice.new');assert.equal(e.data.get(p+'playerSearches/group').ownerUser,'alice.new');assert.equal(e.data.get(p+'playerSearches/group/requests/one').requesterUser,'alice.new');assert.ok(!e.data.has(p+'users/alice'));assert.equal(e.data.get('users/alice').credits,3);
+});
+
+test('ADS manager cannot assign or remove credits even with a forged platform flag',async()=>{
+ const e=setup();const before=structuredClone(e.data);
+ for(const delta of [10,-1])assert.equal((await e.call('put','/admin/users/credits',{tenant:'beach-a',session:{user:{username:'manager',role:'admin',platformAdmin:true,establishment:'beach-a'}},body:{username:'alice',delta}})).code,403);
+ assert.deepEqual(e.data,before);
 });

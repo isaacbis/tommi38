@@ -1083,6 +1083,7 @@ router.get("/admin/users", requireAdmin, async (req, res) => {
 });
 
 router.put("/admin/users/credits", requireAdmin, async (req, res) => {
+  if(!req.session.user.platformAdmin)return res.status(403).json({error:"GLOBAL_ADMIN_REQUIRED"});
   const schema = z.object({
     username: z.string().min(1).max(80).refine(value=>!value.includes("/")),
     delta: z.number().finite()
@@ -1363,6 +1364,7 @@ router.post("/admin/users", requireAdmin, async (req,res) => {
   const parsed=z.object({username:z.string().regex(/^[a-zA-Z0-9._-]{3,40}$/),password:z.string().min(12).max(72).refine(value => Buffer.byteLength(value,"utf8") <= 72),credits:z.number().int().min(0).max(100000),role:z.enum(["user","admin"]).optional()}).strict().safeParse(req.body);
   if (!parsed.success) return res.status(400).json({error:"BAD_BODY"});
   const {username,password,credits,role="user"}=parsed.data;
+  if(credits!==0 && !req.session.user.platformAdmin)return res.status(403).json({error:"GLOBAL_ADMIN_REQUIRED"});
   if(role==="admin" && !req.session.user.platformAdmin)return res.status(403).json({error:"NOT_AUTHORIZED"});
   const passwordHash=await bcrypt.hash(password,12);
   const ref=db.collection("users").doc(username);

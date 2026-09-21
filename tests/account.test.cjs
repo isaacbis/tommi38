@@ -28,16 +28,12 @@ test('recovery requests hide account existence and are visible only to the local
  assert.equal((await e.call('get','/admin/recovery-requests',{tenant:'beach-a',user:'manager'})).body.items[0].username,'alice');
 });
 async function pending(e){await e.call('put','/admin/credit-packages',{tenant:'beach-a',user:'manager',body:{items:[{id:'ten',title:'10 partite',credits:10}]}});return e.call('post','/credit-requests',{tenant:'beach-a',body:{packageId:'ten'}});}
-test('credit requests do not charge or credit users until the venue manager approves',async()=>{
- const e=setup();assert.equal((await pending(e)).code,200);assert.equal(e.data.get('establishments/beach-a/users/alice').credits,3);
- assert.equal((await e.call('post','/credit-requests',{tenant:'beach-a',body:{packageId:'ten'}})).code,409);
- assert.equal((await e.call('patch','/admin/credit-requests/:username',{tenant:'beach-a',params:{username:'alice'},body:{status:'approved'}})).code,403);
- const results=await Promise.all([1,2].map(()=>e.call('patch','/admin/credit-requests/:username',{tenant:'beach-a',user:'manager',params:{username:'alice'},body:{status:'approved'}})));
- assert.deepEqual(results.map(r=>r.code).sort(),[200,409]);assert.equal(e.data.get('establishments/beach-a/users/alice').credits,13);assert.equal(e.data.get('users/alice').credits,3);assert.equal(e.data.get('establishments/beach-b/users/alice').credits,3);assert.equal([...e.data.keys()].filter(k=>k.includes('/creditLedger/')).length,1);
-});
-test('failed approval is atomic and does not consume a pending request',async()=>{
- const e=setup();await pending(e);e.failCommit();await assert.rejects(e.call('patch','/admin/credit-requests/:username',{tenant:'beach-a',user:'manager',params:{username:'alice'},body:{status:'approved'}}),/Storage failure/);
- assert.equal(e.data.get('establishments/beach-a/users/alice').credits,3);assert.equal(e.data.get('establishments/beach-a/creditRequests/alice').status,'pending');
+test('ADS rejects manual recharge requests and approvals without changing balances or pending records',async()=>{
+ const e=setup();assert.equal((await pending(e)).code,410);
+ e.data.set('establishments/beach-a/creditRequests/alice',{status:'pending',credits:10});
+ const before=structuredClone(e.data);
+ assert.equal((await e.call('patch','/admin/credit-requests/:username',{tenant:'beach-a',user:'manager',params:{username:'alice'},body:{status:'approved'}})).code,410);
+ assert.deepEqual(e.data,before);
 });
 test('manager endpoints reject a session belonging to another venue even with matching username',async()=>{
  const e=setup();const r=await e.call('get','/admin/credit-requests',{tenant:'beach-b',session:{user:{username:'manager',role:'admin',establishment:'beach-a'}}});assert.equal(r.code,401);
@@ -53,6 +49,13 @@ test('draft package prices are manager-only, tenant scoped and never charge a re
  assert.equal(pricing.items[0].priceCents,2000);assert.equal(pricing.paymentsAvailable,false);
  assert.equal((await e.call('get','/admin/credit-package-pricing',{tenant:'beach-b',user:'manager'})).body.items.length,0);
  for(const priceCents of [-1,0,20.5,1000001])assert.equal((await e.call('put','/admin/credit-packages',{tenant:'beach-a',user:'manager',body:{items:[{...items[0],priceCents}]}})).code,400);
- assert.equal((await e.call('post','/credit-requests',{tenant:'beach-a',body:{packageId:'five'}})).code,200);
+ assert.equal((await e.call('post','/credit-requests',{tenant:'beach-a',body:{packageId:'five'}})).code,410);
  assert.equal(e.data.get('establishments/beach-a/users/alice').credits,3);
+});
+
+test('ADS rules cannot be overridden by old stored annual preferences or a manager',async()=>{
+ const e=setup();e.data.set('establishments/beach-a/admin/commercial',{plan:'annual',rewardEnabled:false,dailyRewardLimit:5});
+ const r=await e.call('get','/commercial',{tenant:'beach-a'});
+ assert.equal(r.body.plan,'ads');assert.equal(r.body.videosPerCredit,2);assert.equal(r.body.dailyRewardLimit,1);assert.equal(r.body.userAnnualPriceCents,undefined);
+ assert.equal((await e.call('put','/admin/commercial',{tenant:'beach-a',user:'manager',body:{plan:'annual',rewardEnabled:false,dailyRewardLimit:5}})).code,403);
 });

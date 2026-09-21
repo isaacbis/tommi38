@@ -10,17 +10,11 @@ import { requirePersonalAccount } from './management-guards.js';
 
 const router=express.Router();
 const safe=fn=>(req,res,next)=>Promise.resolve(fn(req,res,next)).catch(next);
-const commercialDefaults={plan:'ads',rewardEnabled:false,dailyRewardLimit:1,videosPerCredit:2,commissionPercent:10,userAnnualPriceCents:999,venueAnnualPriceCents:14900,currency:'EUR'};
+const commercialDefaults={edition:'ads',plan:'ads',rewardEnabled:true,dailyRewardLimit:1,videosPerCredit:2,commissionPercent:10,currency:'EUR'};
 router.get('/commercial',requireAuth,safe(async(req,res)=>{
-  const snap=await db.collection('admin').doc('commercial').get();
-  res.json({...commercialDefaults,...snap.data(),paymentsAvailable:false,adsAvailable:false,demo:!!req.session.demoOriginal});
+  res.json({...commercialDefaults,paymentsAvailable:false,adsAvailable:false,demo:!!req.session.demoOriginal});
 }));
-router.put('/admin/commercial',requireAdmin,safe(async(req,res)=>{
-  const parsed=z.object({plan:z.enum(['ads','annual']),rewardEnabled:z.boolean(),dailyRewardLimit:z.number().int().min(1).max(5)}).strict().safeParse(req.body);
-  if(!parsed.success)return res.status(400).json({error:'BAD_BODY'});
-  await db.collection('admin').doc('commercial').set({...parsed.data,rewardEnabled:parsed.data.plan==='ads' && parsed.data.rewardEnabled,updatedAt:FieldValue.serverTimestamp()});
-  res.json({ok:true});
-}));
+router.put('/admin/commercial',requireAdmin,(req,res)=>res.status(403).json({error:'ADS_POLICY_FIXED'}));
 const usernameSchema=z.string().regex(/^[a-zA-Z0-9._-]{3,40}$/);
 const passwordSchema=z.string().min(12).refine(value=>Buffer.byteLength(value,'utf8')<=72);
 const signupLimiter=rateLimit({windowMs:60*60*1000,max:8});
@@ -86,50 +80,11 @@ router.put('/admin/credit-packages',requireAdmin,safe(async(req,res)=>{
   if(!parsed.success || new Set(parsed.data.items.map(p=>p.id)).size!==parsed.data.items.length)return res.status(400).json({error:'BAD_BODY'});
   await db.collection('admin').doc('creditPackages').set(parsed.data);res.json({ok:true});
 }));
-router.post('/credit-requests',requireAuth,requirePersonalAccount,safe(async(req,res)=>{
-  const parsed=z.object({packageId:z.string().min(1).max(40)}).strict().safeParse(req.body);
-  if(!parsed.success)return res.status(400).json({error:'BAD_BODY'});
-  const ref=db.collection('creditRequests').doc(req.session.user.username);
-  const error=await db.runTransaction(async tx=>{
-    const [packages,current,account]=await Promise.all([tx.get(db.collection('admin').doc('creditPackages')),tx.get(ref),tx.get(db.collection('users').doc(req.session.user.username))]);
-    if(!account.exists || account.data().disabled || account.data().deletionPending)return 'ACCOUNT_CHANGED';
-    const pack=(packages.data()?.items || []).find(p=>p.id===parsed.data.packageId);
-    if(!pack)return 'PACKAGE_NOT_FOUND';
-    if(current.data()?.status==='pending')return 'REQUEST_PENDING';
-    tx.set(ref,{user:req.session.user.username,packageTitle:pack.title,credits:pack.credits,status:'pending',createdAt:FieldValue.serverTimestamp()});return null;
-  });
-  if(error)return res.status(409).json({error});res.json({ok:true});
-}));
-router.get('/credit-requests',requireAuth,requirePersonalAccount,safe(async(req,res)=>{
-  const snap=await db.collection('creditRequests').doc(req.session.user.username).get();
-  const value=snap.data();
-  res.json({item:value ? {packageTitle:value.packageTitle,credits:value.credits,status:value.status}:null});
-}));
-router.get('/admin/credit-requests',requireAdmin,safe(async(req,res)=>{
-  const snap=await db.collection('creditRequests').where('status','==','pending').get();
-  res.json({items:snap.docs.map(d=>({username:d.id,packageTitle:d.data().packageTitle,credits:d.data().credits}))});
-}));
-router.patch('/admin/credit-requests/:username',requireAdmin,safe(async(req,res)=>{
-  const parsed=z.object({status:z.enum(['approved','rejected'])}).strict().safeParse(req.body);
-  if(!parsed.success || !z.string().min(1).max(80).refine(value=>!value.includes('/')).safeParse(req.params.username).success)return res.status(400).json({error:'BAD_BODY'});
-  const ref=db.collection('creditRequests').doc(req.params.username);
-  const userRef=db.collection('users').doc(req.params.username);
-  const error=await db.runTransaction(async tx=>{
-    const [request,user]=await Promise.all([tx.get(ref),tx.get(userRef)]);
-    if(!request.exists || request.data().status!=='pending')return 'REQUEST_ALREADY_HANDLED';
-    if(!user.exists)return 'USER_NOT_FOUND';
-    if(user.data().deletionPending)return 'ACCOUNT_CHANGED';
-    if(parsed.data.status==='approved'){
-      const credits=request.data().credits;
-      const balance=user.data().credits ?? 0;
-      if(!Number.isSafeInteger(credits) || credits<=0 || credits>10000 || !Number.isSafeInteger(balance) || balance<0 || !Number.isSafeInteger(balance+credits))return 'INVALID_CREDITS';
-      tx.update(userRef,{credits:FieldValue.increment(credits)});
-      tx.set(db.collection('creditLedger').doc(),{user:req.params.username,delta:credits,reason:'Ricarica: '+request.data().packageTitle,actor:req.actorId || req.session.user.username,createdAt:FieldValue.serverTimestamp()});
-    }
-    tx.update(ref,{status:parsed.data.status,handledBy:req.actorId || req.session.user.username,handledAt:FieldValue.serverTimestamp()});return null;
-  });
-  if(error)return res.status(409).json({error});res.json({ok:true});
-}));
+// Legacy requests are retained for audit, but can no longer grant credits.
+router.post('/credit-requests',requireAuth,requirePersonalAccount,(req,res)=>res.status(410).json({error:'MANUAL_RECHARGE_REMOVED'}));
+router.get('/credit-requests',requireAuth,requirePersonalAccount,(req,res)=>res.json({item:null}));
+router.get('/admin/credit-requests',requireAdmin,(req,res)=>res.json({items:[]}));
+router.patch('/admin/credit-requests/:username',requireAdmin,(req,res)=>res.status(410).json({error:'MANUAL_RECHARGE_REMOVED'}));
 
 const deletionError=code=>Object.assign(new Error(code),{code});
 async function assertDeletionOwner(tx,userRef,token){
