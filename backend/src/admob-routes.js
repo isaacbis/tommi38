@@ -26,6 +26,7 @@ export async function admobCallback(req,res,next){
     await rewardStore.fulfill(event);
     res.status(200).send('OK');
   }catch(error){
+    console.warn('AdMob verification rejected',error.message,JSON.stringify({unit:req.query.ad_unit,amount:req.query.reward_amount,timestamp:req.query.timestamp,parameters:Object.keys(req.query)}));
     if(['INVALID_CALLBACK','DUPLICATE_PARAMETER','INVALID_SIGNATURE','EXPIRED_CALLBACK','INVALID_TRANSACTION','UNKNOWN_KEY','INVALID_REWARD'].includes(error.message))return res.status(400).send('Invalid callback');
     next(error);
   }
