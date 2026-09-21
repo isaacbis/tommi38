@@ -1663,7 +1663,7 @@ async function refreshVisibleData() {
     qs("datePick").min = localISODate();
     if (isPastDate(qs("datePick").value)) setDate(localISODate());
     const jobs = [refreshCredits()];
-    if (!qs("viewHome").classList.contains("hidden")) jobs.push(loadHome());
+    if (!qs("viewHome").classList.contains("hidden")) jobs.push(loadHome({background:true}));
     if (!qs("viewBook").classList.contains("hidden")) jobs.push(loadReservations());
     if (!qs("viewMatches").classList.contains("hidden")) jobs.push(loadMyReservations(), loadPlayerSearches());
     if (!qs("viewPlayers").classList.contains("hidden")) jobs.push(loadPlayerSearches());

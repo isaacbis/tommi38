@@ -149,11 +149,11 @@ async function openCommercialSettings(){
   openAppModal('Regole CampoPronto ADS','<p>Un credito permette una prenotazione. I crediti si ottengono attraverso pacchetti acquistati oppure due video premio completati.</p><p>Massimo un credito premio al giorno per utente e stabilimento. Solo l’amministratore globale può assegnare crediti manualmente.</p><p>Non sono previsti abbonamenti senza pubblicità. Campo Pronto Premium sarà un’app separata.</p><p>Commissione pacchetti: 10% CampoPronto, 90% stabilimento, prima delle spese. I video premio richiedono l’app iPhone aggiornata e la disponibilità di annunci Google. I pagamenti reali non sono ancora attivi.</p>');
 }
 let homeRequest = 0;
-async function loadHome() {
+async function loadHome({background = false} = {}) {
   if (STATE.me?.managementMode) return openAdminShell();
   const request = ++homeRequest;
   const box = qs('homeSummary');
-  box.textContent = 'Caricamento…';
+  if (!background || !box.children.length) box.textContent = 'Caricamento…';
   try {
     const [credits, waiting, matches, players] = await Promise.all([
       api('/credits'), api('/waitlist'), api('/reservations/mine'), api('/player-searches')
