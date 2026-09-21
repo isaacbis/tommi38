@@ -80,5 +80,11 @@ window.CampoAds = (() => {
     const result=await native('testReward','0'.repeat(64));
     alert(result.status==='earned'?'Annuncio di test completato. Nessun credito reale assegnato.':'Annuncio di test chiuso o non disponibile. Nessun credito reale assegnato.');
   }
+  document.addEventListener('DOMContentLoaded',()=>{
+    if(window.tommi38Native?.adsTesting){
+      const test=document.createElement('button');test.className='secondary-btn';test.textContent='Test AdMob (sviluppo)';test.onclick=testReward;
+      document.getElementById('loginBox')?.append(test);
+    }
+  });
   return {supported,privacy,credits,afterLogin,testReward};
 })();

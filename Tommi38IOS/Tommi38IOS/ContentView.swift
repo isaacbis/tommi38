@@ -26,8 +26,13 @@ struct TommiWebView: UIViewRepresentable {
         configuration.applicationNameForUserAgent = "CampoPronto-iOS-App/1.1"
         configuration.userContentController.add(context.coordinator, name: "tommi38Notifications")
         configuration.userContentController.add(context.coordinator, name: "campoprontoAds")
+        #if DEBUG
+        let adsTesting = "true"
+        #else
+        let adsTesting = "false"
+        #endif
         configuration.userContentController.addUserScript(WKUserScript(
-            source: "window.tommi38Native = Object.freeze({notificationsVersion: 2, adsVersion: 1});",
+            source: "window.tommi38Native = Object.freeze({notificationsVersion: 2, adsVersion: 1, adsTesting: \(adsTesting)});",
             injectionTime: .atDocumentStart,
             forMainFrameOnly: true
         ))

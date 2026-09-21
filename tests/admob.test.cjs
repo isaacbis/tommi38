@@ -42,3 +42,11 @@ test('expired, cancelled duplicate attempts cannot exceed two videos or reward a
  assert.equal((await service.fulfill({ad_unit:REWARDED_UNIT,reward_amount:'1',custom_data:token,transaction_id:'late',timestamp:String(now)})).ignored,true);
  assert.equal((await user.get()).data().credits,0);
 });
+test('percent escaped reward labels support the Google decoded URI reference without accepting tampering',async()=>{
+ const {verifyAdMobQuery}=await import('../backend/src/admob-verification.js');const {privateKey,publicKey}=generateKeyPairSync('ec',{namedCurve:'prime256v1'});
+ const key=publicKey.export({type:'spki',format:'pem'}),now=Date.now();const raw='reward_item=Video%20completato&timestamp='+now+'&transaction_id=probe';
+ const signature=sign('sha256',Buffer.from(decodeURIComponent(raw)),privateKey).toString('base64url');
+ const query=raw+'&signature='+signature+'&key_id=1';
+ assert.equal((await verifyAdMobQuery(query,async()=>key,now)).reward_item,'Video completato');
+ await assert.rejects(verifyAdMobQuery(query.replace('completato','falso'),async()=>key,now),/INVALID_SIGNATURE/);
+});

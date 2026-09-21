@@ -8,7 +8,12 @@ export async function verifyAdMobQuery(query, keyForId, now = Date.now()) {
   const params = new URLSearchParams(query);
   if ([...params.keys()].some(key => params.getAll(key).length !== 1)) throw Error('DUPLICATE_PARAMETER');
   const key = await keyForId(match[3]);
-  if (!verify('sha256', Buffer.from(match[1]), createPublicKey(key), Buffer.from(decodeURIComponent(match[2]), 'base64url'))) throw Error('INVALID_SIGNATURE');
+  const publicKey=createPublicKey(key), signature=Buffer.from(decodeURIComponent(match[2]), 'base64url');
+  // Google's Java reference uses URI.getQuery(), i.e. decoded percent escapes.
+  // Accept either documented representation only when its signature verifies.
+  const valid=verify('sha256',Buffer.from(match[1]),publicKey,signature) ||
+    verify('sha256',Buffer.from(decodeURIComponent(match[1])),publicKey,signature);
+  if(!valid)throw Error('INVALID_SIGNATURE');
   const event = Object.fromEntries(params);
   const timestamp = Number(event.timestamp);
   if (!Number.isSafeInteger(timestamp) || timestamp > now + 60000 || timestamp < now - 86400000) throw Error('EXPIRED_CALLBACK');

@@ -23,6 +23,8 @@ export async function admobCallback(req,res,next){
   try{
     const query=req.originalUrl.split('?')[1] || '';
     const event=await verifyAdMobQuery(query,googleKey);
+    // AdMob's signed console probe uses a fixed fictitious ad unit. It never grants rewards.
+    if(event.ad_unit==='1234567890' && event.custom_data==='0'.repeat(64))return res.status(200).send('Probe OK');
     await rewardStore.fulfill(event);
     res.status(200).send('OK');
   }catch(error){
