@@ -4,7 +4,7 @@ import rateLimit from 'express-rate-limit';
 import { z } from 'zod';
 import { randomInt } from 'node:crypto';
 import { db, tenantId } from './tenancy.js';
-import { FieldValue } from './db.js';
+import { FieldValue, db as root } from './db.js';
 import { requireAuth, requireAdmin } from './permissions.js';
 import { requirePersonalAccount } from './management-guards.js';
 
@@ -154,6 +154,9 @@ async function removeAccountParticipation(userRef,token,searchRef,username){
 }
 
 async function finishAccountDeletion(userRef,token,username){
+  for(const collection of ['admobAttempts','admobDaily']){
+    await deleteAccountQuery(userRef,token,root.collection(collection).where('ownerKey','==',tenantId()+':'+username));
+  }
   const ownSearches=await db.collection('playerSearches').where('ownerUser','==',username).get();
   for(const search of ownSearches.docs)await removeAccountSearch(userRef,token,search.ref,username);
   const remainingSearches=await db.collection('playerSearches').get();

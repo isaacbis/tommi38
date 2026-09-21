@@ -1,0 +1,44 @@
+const {test}=require('node:test');
+const assert=require('node:assert/strict');
+const {generateKeyPairSync,sign}=require('node:crypto');
+const {createMemoryFirestore}=require('./helpers/memory-firestore.cjs');
+test('AdMob callback requires signed original bytes, fresh timestamp and unique parameters',async()=>{
+ const {verifyAdMobQuery}=await import('../backend/src/admob-verification.js');
+ const {privateKey,publicKey}=generateKeyPairSync('ec',{namedCurve:'prime256v1'});
+ const key=publicKey.export({type:'spki',format:'pem'});const now=Date.now();
+ const signed=q=>q+'&signature='+sign('sha256',Buffer.from(q),privateKey).toString('base64url')+'&key_id=1';
+ const query='ad_unit=123&timestamp='+now+'&transaction_id=test-1';
+ assert.equal((await verifyAdMobQuery(signed(query),async()=>key,now)).transaction_id,'test-1');
+ await assert.rejects(verifyAdMobQuery(signed(query).replace('ad_unit=123','ad_unit=456'),async()=>key,now),/INVALID_SIGNATURE/);
+ await assert.rejects(verifyAdMobQuery(signed(query+'&ad_unit=123'),async()=>key,now),/DUPLICATE_PARAMETER/);
+ await assert.rejects(verifyAdMobQuery(signed(query),async()=>key,now+86400001),/EXPIRED_CALLBACK/);
+});
+test('two verified unique videos grant one credit per Rome day and stay tenant scoped',async()=>{
+ const {createRewardStore,REWARDED_UNIT}=await import('../backend/src/admob-rewards.js');const {db}=createMemoryFirestore();
+ let now=Date.parse('2026-09-21T12:00:00Z');const service=createRewardStore(db,()=>now);
+ const venue=db.collection('establishments').doc('beach-a');await venue.set({enabled:true});
+ const user=venue.collection('users').doc('alice');await user.set({credits:3,sessionVersion:1});
+ await db.collection('users').doc('alice').set({credits:8});
+ const event=(token,id)=>({ad_unit:REWARDED_UNIT,reward_amount:'1',custom_data:token,transaction_id:id,timestamp:String(now)});
+ const one=await service.start('beach-a','alice');
+ await assert.rejects(service.start('beach-a','alice'),/REWARD_PENDING/);
+ await Promise.all([service.fulfill(event(one,'one')),service.fulfill(event(one,'one'))]);
+ assert.equal((await user.get()).data().credits,3);assert.equal((await service.status('beach-a','alice')).videos,1);
+ const two=await service.start('beach-a','alice');
+ await assert.rejects(service.fulfill({...event(two,'wrong'),ad_unit:'wrong'}),/INVALID_REWARD/);
+ await Promise.all([service.fulfill(event(two,'two')),service.fulfill(event(two,'two-copy'))]);
+ assert.equal((await user.get()).data().credits,4);assert.equal((await db.collection('users').doc('alice').get()).data().credits,8);
+ await assert.rejects(service.start('beach-a','alice'),/DAILY_REWARD_LIMIT/);
+ assert.equal((await venue.collection('creditLedger').get()).docs.length,1);
+ now+=86400000;const next=await service.start('beach-a','alice');await user.update({sessionVersion:2});
+ assert.equal((await service.fulfill(event(next,'revoked'))).ignored,true);
+});
+test('expired, cancelled duplicate attempts cannot exceed two videos or reward another identity',async()=>{
+ const {createRewardStore,REWARDED_UNIT}=await import('../backend/src/admob-rewards.js');const {db}=createMemoryFirestore();
+ let now=Date.now();const service=createRewardStore(db,()=>now);const user=db.collection('users').doc('alice');await user.set({credits:0});
+ const token=await service.start('tommi38','alice');await service.cancel('tommi38','bob',token);
+ await assert.rejects(service.start('tommi38','alice'),/REWARD_PENDING/);
+ now+=3600001;
+ assert.equal((await service.fulfill({ad_unit:REWARDED_UNIT,reward_amount:'1',custom_data:token,transaction_id:'late',timestamp:String(now)})).ignored,true);
+ assert.equal((await user.get()).data().credits,0);
+});

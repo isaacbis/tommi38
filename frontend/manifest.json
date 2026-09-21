@@ -1,6 +1,6 @@
 {
-  "name": "Campo Pronto ADS: prenota campi",
-  "short_name": "Campo Pronto ADS",
+  "name": "CampoPronto ADS: prenota campi",
+  "short_name": "CampoPronto ADS",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#061525",

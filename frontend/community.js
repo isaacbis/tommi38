@@ -128,6 +128,7 @@ async function openDemoLab(){
   if(STATE.me?.demo)qs('demoActions').append(adminButton('Torna al tuo stabilimento',async()=>{
     try{const data=await api('/demo/exit',{method:'POST'});localStorage.setItem('tommi38-establishment',data.establishmentId);location.reload();}catch(error){qs('demoStatus').textContent=errorMessage(error);}
   }));
+  if(STATE.me?.demo && window.CampoAds?.supported())qs('demoActions').append(adminButton('Prova video AdMob (annuncio di test)',CampoAds.testReward));
   if(STATE.me?.demo)for(const [label,action]of [['Simula acquisto di 5 crediti','purchase'],['Simula un video premio','video']])qs('demoActions').append(adminButton(label,async()=>{
     try{
       const data=await api('/demo/simulate',{method:'POST',body:JSON.stringify({action,requestId:crypto.randomUUID()})});
@@ -145,7 +146,7 @@ async function openDemoLab(){
   }));
 }
 async function openCommercialSettings(){
-  openAppModal('Regole Campo Pronto ADS','<p>Un credito permette una prenotazione. I crediti si ottengono attraverso pacchetti acquistati oppure due video premio completati.</p><p>Massimo un credito premio al giorno per utente e stabilimento. Solo l’amministratore globale può assegnare crediti manualmente.</p><p>Non sono previsti abbonamenti senza pubblicità. Campo Pronto Premium sarà un’app separata.</p><p>Commissione pacchetti: 10% CampoPronto, 90% stabilimento, prima delle spese. Pubblicità e pagamenti non sono ancora attivi.</p>');
+  openAppModal('Regole CampoPronto ADS','<p>Un credito permette una prenotazione. I crediti si ottengono attraverso pacchetti acquistati oppure due video premio completati.</p><p>Massimo un credito premio al giorno per utente e stabilimento. Solo l’amministratore globale può assegnare crediti manualmente.</p><p>Non sono previsti abbonamenti senza pubblicità. Campo Pronto Premium sarà un’app separata.</p><p>Commissione pacchetti: 10% CampoPronto, 90% stabilimento, prima delle spese. I video premio richiedono l’app iPhone aggiornata e la disponibilità di annunci Google. I pagamenti reali non sono ancora attivi.</p>');
 }
 let homeRequest = 0;
 async function loadHome() {

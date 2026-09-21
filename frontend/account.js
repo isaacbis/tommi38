@@ -94,12 +94,14 @@
     if(STATE.me?.managementMode)return;
     const {root}=modal('Account, privacy e assistenza','<p class="helper-text">Gestisci il tuo account nello stabilimento selezionato.</p>');
     root.append(button('Cambia password',changePassword),button('Elimina account',deleteAccount));
+    if(window.CampoAds?.supported())root.append(button('Preferenze pubblicitarie',CampoAds.privacy));
     const links=document.createElement('p');links.className='helper-text';
     links.innerHTML='<a href="/privacy.html">Informativa privacy</a> · <a href="/support.html">Assistenza</a> · <a href="/community-rules.html">Regole della community</a>';
     root.append(links);
   }
   async function requestCredits() {
-    modal('Ottieni crediti', '<p>In Campo Pronto ADS puoi ottenere crediti guardando video premio oppure acquistando pacchetti.</p><p>Due video completati danno un credito, con un massimo di un credito premio al giorno per stabilimento.</p><p role="status">Pubblicità e acquisti sono ancora in preparazione. Non vengono effettuati addebiti. I crediti già presenti restano validi.</p>');
+    const {root,current}=modal('Ottieni crediti', '<p>Un credito = una prenotazione. Ottieni un credito premio con due video completati, massimo uno al giorno per stabilimento.</p><p class="helper-text">I pacchetti a pagamento non sono ancora disponibili. I crediti già presenti restano validi.</p>');
+    if(window.CampoAds)await CampoAds.credits(root,current);
   }
   async function manageRequests() {
     const {root,current} = modal('Richieste utenti', '<p>Caricamento…</p>');
@@ -118,7 +120,7 @@
     try {
       const data=await api('/auth/admin/credit-package-pricing');if(!current())return;
       const items=data.items.map(item=>({...item}));
-      root.innerHTML='<p class="helper-text">In Campo Pronto ADS i crediti si ottengono tramite video premio o pacchetti acquistati. Solo l’amministratore globale può assegnarli manualmente. I prezzi sono bozze riservate al gestore: acquisti online non ancora attivi.</p><div id="packageRows"></div><form class="form-stack"><label class="field-label" for="packageTitle">Nome pacchetto</label><input id="packageTitle" class="admin-input" maxlength="60" required placeholder="10 partite"><label class="field-label" for="packageCredits">Crediti</label><input id="packageCredits" class="admin-input" type="number" min="1" max="10000" step="1" required><label class="field-label" for="packagePrice">Prezzo previsto in euro (facoltativo)</label><input id="packagePrice" class="admin-input" type="number" min="0.50" max="10000" step="0.01" placeholder="Es. 20,00"><button class="primary-btn" type="submit">Aggiungi pacchetto</button><p role="status"></p></form>';
+      root.innerHTML='<p class="helper-text">In CampoPronto ADS i crediti si ottengono tramite video premio o pacchetti acquistati. Solo l’amministratore globale può assegnarli manualmente. I prezzi sono bozze riservate al gestore: acquisti online non ancora attivi.</p><div id="packageRows"></div><form class="form-stack"><label class="field-label" for="packageTitle">Nome pacchetto</label><input id="packageTitle" class="admin-input" maxlength="60" required placeholder="10 partite"><label class="field-label" for="packageCredits">Crediti</label><input id="packageCredits" class="admin-input" type="number" min="1" max="10000" step="1" required><label class="field-label" for="packagePrice">Prezzo previsto in euro (facoltativo)</label><input id="packagePrice" class="admin-input" type="number" min="0.50" max="10000" step="0.01" placeholder="Es. 20,00"><button class="primary-btn" type="submit">Aggiungi pacchetto</button><p role="status"></p></form>';
       const rows=root.querySelector('#packageRows');
       const draw=()=>{
         rows.textContent='';

@@ -238,6 +238,7 @@ async function api(path, options = {}) {
         hide(qs("app"));
         show(qs("loginBox"));
         qs("password").value = "";
+    window.CampoAds?.afterLogin();
         qs("loginErr").textContent = "La sessione è scaduta. Accedi di nuovo.";
         show(qs("loginErr"));
       }
@@ -476,7 +477,7 @@ async function loadAll(setToday = false) {
   demoButton.onclick=openDemoLab;
   let commercialButton=qs('commercialSettingsButton');
   if(!commercialButton){commercialButton=document.createElement('button');commercialButton.id='commercialSettingsButton';commercialButton.className='secondary-btn';demoButton.after(commercialButton);}
-  commercialButton.textContent='Regole Campo Pronto ADS';commercialButton.hidden=!(me.role==='admin');commercialButton.onclick=openCommercialSettings;
+  commercialButton.textContent='Regole CampoPronto ADS';commercialButton.hidden=!(me.role==='admin');commercialButton.onclick=openCommercialSettings;
   me.role === "admin" || me.platformAdmin ? show(qs("roleBadge")) : hide(qs("roleBadge"));
   configureManagementAccess();
   qs("notesView").textContent = STATE.notes || "Nessuna comunicazione al momento.";

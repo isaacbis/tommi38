@@ -23,23 +23,26 @@ struct TommiWebView: UIViewRepresentable {
         let configuration = WKWebViewConfiguration()
         configuration.websiteDataStore = .default()
         configuration.defaultWebpagePreferences.allowsContentJavaScript = true
-        configuration.applicationNameForUserAgent = "CampoPronto-iOS-App/1.0"
+        configuration.applicationNameForUserAgent = "CampoPronto-iOS-App/1.1"
         configuration.userContentController.add(context.coordinator, name: "tommi38Notifications")
+        configuration.userContentController.add(context.coordinator, name: "campoprontoAds")
         configuration.userContentController.addUserScript(WKUserScript(
-            source: "window.tommi38Native = Object.freeze({notificationsVersion: 2});",
+            source: "window.tommi38Native = Object.freeze({notificationsVersion: 2, adsVersion: 1});",
             injectionTime: .atDocumentStart,
             forMainFrameOnly: true
         ))
 
         let webView = WKWebView(frame: .zero, configuration: configuration)
         context.coordinator.webView = webView
+        context.coordinator.ads.webView = webView
 
         webView.navigationDelegate = context.coordinator
         webView.uiDelegate = context.coordinator
         webView.isOpaque = false
         webView.backgroundColor = UIColor(red: 0.024, green: 0.082, blue: 0.145, alpha: 1)
         webView.scrollView.backgroundColor = webView.backgroundColor
-        webView.scrollView.alwaysBounceVertical = true
+        webView.scrollView.alwaysBounceVertical = false
+        webView.scrollView.keyboardDismissMode = .interactive
         webView.scrollView.contentInsetAdjustmentBehavior = .never
         webView.allowsBackForwardNavigationGestures = true
 
@@ -66,6 +69,7 @@ struct TommiWebView: UIViewRepresentable {
 
     static func dismantleUIView(_ uiView: WKWebView, coordinator: Coordinator) {
         uiView.configuration.userContentController.removeScriptMessageHandler(forName: "tommi38Notifications")
+        uiView.configuration.userContentController.removeScriptMessageHandler(forName: "campoprontoAds")
         uiView.navigationDelegate = nil
         uiView.uiDelegate = nil
     }
@@ -73,6 +77,7 @@ struct TommiWebView: UIViewRepresentable {
     final class Coordinator: NSObject, WKNavigationDelegate, WKUIDelegate, WKScriptMessageHandler {
         weak var webView: WKWebView?
         private let homeURL: URL
+        let ads = AdMobController()
 
         init(homeURL: URL) {
             self.homeURL = homeURL
@@ -182,7 +187,7 @@ struct TommiWebView: UIViewRepresentable {
             guard let presenter = dialogPresenter(for: webView, frame: frame) else {
                 completionHandler(); return
             }
-            let alert = UIAlertController(title: "CampoPronto", message: message, preferredStyle: .alert)
+            let alert = UIAlertController(title: "CampoPronto ADS", message: message, preferredStyle: .alert)
             alert.addAction(UIAlertAction(title: "OK", style: .default) { _ in completionHandler() })
             presenter.present(alert, animated: true)
         }
@@ -192,7 +197,7 @@ struct TommiWebView: UIViewRepresentable {
             guard let presenter = dialogPresenter(for: webView, frame: frame) else {
                 completionHandler(false); return
             }
-            let alert = UIAlertController(title: "CampoPronto", message: message, preferredStyle: .alert)
+            let alert = UIAlertController(title: "CampoPronto ADS", message: message, preferredStyle: .alert)
             alert.addAction(UIAlertAction(title: "Annulla", style: .cancel) { _ in completionHandler(false) })
             alert.addAction(UIAlertAction(title: "Conferma", style: .default) { _ in completionHandler(true) })
             presenter.present(alert, animated: true)
@@ -204,7 +209,7 @@ struct TommiWebView: UIViewRepresentable {
             guard let presenter = dialogPresenter(for: webView, frame: frame) else {
                 completionHandler(nil); return
             }
-            let alert = UIAlertController(title: "CampoPronto", message: prompt, preferredStyle: .alert)
+            let alert = UIAlertController(title: "CampoPronto ADS", message: prompt, preferredStyle: .alert)
             alert.addTextField { field in
                 field.text = defaultText
                 field.autocapitalizationType = .none
@@ -220,6 +225,11 @@ struct TommiWebView: UIViewRepresentable {
 
         // Riceve i messaggi inviati da script.js dopo creazione/cancellazione prenotazione.
         func userContentController(_ userContentController: WKUserContentController, didReceive message: WKScriptMessage) {
+            if message.name == "campoprontoAds" {
+                guard trustedFrame(message.frameInfo), let payload = message.body as? [String: Any] else { return }
+                ads.receive(payload)
+                return
+            }
             guard trustedFrame(message.frameInfo),
                   message.name == "tommi38Notifications",
                   let payload = message.body as? [String: Any],
@@ -426,7 +436,7 @@ final class BookingReminderStore {
             fireDate = Date().addingTimeInterval(5)
         }
         let content = UNMutableNotificationContent()
-        content.title = "CampoPronto"
+        content.title = "CampoPronto ADS"
         content.body = "La tua prenotazione di \(item.field) inizia alle \(item.time)."
         content.sound = .default
         content.userInfo = ["reservationId": item.id, "tommi38Scope": scope]

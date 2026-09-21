@@ -1768,3 +1768,18 @@ button:focus-visible, summary:focus-visible, input:focus-visible, select:focus-v
 .picker-brand p { margin: 4px 0 0; font-size: 12px; color: var(--muted); }
 .header-platform { display: block; color: #bdccda; font-size: 10px; line-height: 1.2; margin-bottom: 2px; }
 .selected-establishment .mini-label { display: block; font-size: 10px; line-height: 1.2; margin-bottom: 2px; }
+
+/* iPhone: maintain readable controls while the keyboard reduces the visual viewport. */
+@supports (-webkit-touch-callout: none) {
+  input,select,textarea { font-size:16px !important; }
+  #appModal { max-height:calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 16px); }
+}
+#appModal { overscroll-behavior:contain; }
+@media(max-width:600px) {
+  .native-header { padding-left:max(12px,env(safe-area-inset-left)); padding-right:max(12px,env(safe-area-inset-right)); }
+  #appModal p { overflow-wrap:anywhere; }
+  .form-stack button { min-height:44px; }
+}
+@media(prefers-reduced-motion:reduce) {
+  *,*::before,*::after { scroll-behavior:auto !important; animation-duration:.01ms !important; transition-duration:.01ms !important; }
+}

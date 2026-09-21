@@ -9,6 +9,7 @@ import session from "express-session";
 import routes from "./src/routes.js";
 import platformRouter from "./src/platform-routes.js";
 import accountRouter from "./src/account-routes.js";
+import admobRouter, { admobCallback } from "./src/admob-routes.js";
 import demoRouter from "./src/demo-routes.js";
 import { db, FieldValue } from "./src/db.js";
 import { appointInitialPlatformAdmin } from "./src/platform-migration.js";
@@ -24,7 +25,7 @@ export const PUBLIC_FILES = new Map([
   ["/", "index.html"],
   ...[
     "index.html", "success.html", "style.css", "script.js", "community.js",
-    "account.js", "service-worker.js", "manifest.json",
+    "account.js", "ads.js", "app-ads.txt", "service-worker.js", "manifest.json",
     "privacy.html", "support.html", "community-rules.html", "legal.css",
     "icon-192.png", "icon-512.png", "icons/apple-touch-icon-v2.png",
     "icons/apple-touch-icon-v3.png"
@@ -81,6 +82,8 @@ export function createApp({
     time: new Date().toISOString()
   }));
 
+  app.get("/api/admob/ssv", admobCallback);
+
   app.use("/api", sameOriginMutation, express.json(), cookieParser(), session({
     store: sessionStore || new FirestoreSessionStore({ db, secret }),
     name: process.env.SESSION_COOKIE_NAME || "tommi38sid",
@@ -100,6 +103,7 @@ export function createApp({
   // controls must remain reachable even while a disabled venue is selected.
   app.use("/api/platform", platformRoutes);
   app.use("/api/demo", demoRouter);
+  app.use("/api/ads", tenantResolver, admobRouter);
   app.use("/api/auth", tenantResolver, accountRoutes);
   app.use("/api", tenantResolver, apiRoutes);
   app.use("/api", (req, res) => res.status(404).json({ error: "NOT_FOUND" }));
