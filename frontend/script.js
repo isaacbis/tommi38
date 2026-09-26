@@ -51,7 +51,7 @@ function paginateList(id, options = {}) {
   const compact = window.innerWidth <= 760;
   const tall = window.innerHeight >= 760;
   const defaultSize = id === 'fieldButtons' ? (compact ? 2 : 5)
-    : id === 'establishmentList' ? (compact ? 4 : 8)
+    : id === 'establishmentList' ? (window.innerHeight < 600 ? 2 : tall ? 5 : 3)
     : id === 'creditHistory' ? (compact ? 3 : 8)
     : compact ? (tall ? 2 : 1) : 5;
   const size = Math.max(1, Number(options.pageSize) || defaultSize);

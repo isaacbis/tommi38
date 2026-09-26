@@ -19,10 +19,15 @@ function renderEstablishmentSearch() {
   if(nearbyPosition)items=items.filter(item=>Number.isFinite(distance(item))).sort((a,b)=>distance(a)-distance(b));
   for(const item of items){
     const button=document.createElement('button');button.className='secondary-btn venue-choice';
-    button.textContent=item.name+(item.city?' · '+item.city:'')+(nearbyPosition?' · '+distance(item).toFixed(1)+' km':'')+' →';
+    const name=document.createElement('strong');name.textContent=item.name;
+    const copy=document.createElement('span');copy.className='venue-copy';copy.append(name);
+    const detail=[item.city,nearbyPosition?distance(item).toFixed(1)+' km':''].filter(Boolean).join(' · ');
+    if(detail){const meta=document.createElement('small');meta.textContent=detail;copy.append(meta);}
+    const mark=document.createElement('span');mark.className='venue-mark';mark.setAttribute('aria-hidden','true');mark.textContent='↗';
+    button.append(copy,mark);
     button.onclick=()=>selectVenue(item);list.append(button);
   }
-  if(!items.length)list.textContent=nearbyPosition?'Nessuno stabilimento con posizione disponibile. Prova la ricerca per nome.':'Nessuno stabilimento trovato. Se è riservato, inserisci il codice ricevuto dal gestore.';
+  if(!items.length)list.textContent=nearbyPosition?'Nessuno stabilimento con posizione disponibile. Prova la ricerca per nome.':'Nessuno stabilimento trovato. Prova un altro nome o una città.';
   paginateCommunityList('establishmentList');
 }
 async function selectVenue(item){
@@ -33,16 +38,11 @@ async function selectVenue(item){
 function setupVenueSearch(){
   qs('venueSearch').oninput=renderEstablishmentSearch;
   qs('nearbyVenues').onclick=()=>{
-    if(nearbyPosition){nearbyPosition=null;qs('nearbyVenues').textContent='Vicino a me';renderEstablishmentSearch();return;}
+    if(nearbyPosition){nearbyPosition=null;qs('venueSearchStatus').textContent='';qs('nearbyVenues').textContent='Vicini';qs('nearbyVenues').setAttribute('aria-label','Cerca stabilimenti vicino a me');renderEstablishmentSearch();return;}
     if(!navigator.geolocation){qs('venueSearchStatus').textContent='Posizione non disponibile: cerca per città.';return;}
     qs('venueSearchStatus').textContent='Ricerca della posizione…';
-    navigator.geolocation.getCurrentPosition(position=>{nearbyPosition=position.coords;qs('nearbyVenues').textContent='Mostra tutti';qs('venueSearchStatus').textContent='Stabilimenti ordinati per distanza.';renderEstablishmentSearch();},()=>{qs('venueSearchStatus').textContent='Posizione non disponibile: puoi cercare per città.';},{timeout:10000,maximumAge:60000});
+    navigator.geolocation.getCurrentPosition(position=>{nearbyPosition=position.coords;qs('nearbyVenues').textContent='Tutti';qs('nearbyVenues').setAttribute('aria-label','Mostra tutti gli stabilimenti');qs('venueSearchStatus').textContent='Stabilimenti ordinati per distanza.';renderEstablishmentSearch();},()=>{qs('venueSearchStatus').textContent='Posizione non disponibile: puoi cercare per città.';},{timeout:10000,maximumAge:60000});
   };
-  qs('venueCodeForm').onsubmit=async event=>{event.preventDefault();try{
-    const data=await api('/establishments?code='+encodeURIComponent(qs('venueCode').value.trim().toLowerCase()));
-    if(!data.items.length){qs('venueSearchStatus').textContent='Codice non valido o stabilimento non disponibile.';return;}
-    await selectVenue(data.items[0]);
-  }catch(error){qs('venueSearchStatus').textContent=errorMessage(error);}};
 }
 let managementContextEpoch = 0;
 let contextChanging = false;

@@ -1784,24 +1784,57 @@ button:focus-visible, summary:focus-visible, input:focus-visible, select:focus-v
   *,*::before,*::after { scroll-behavior:auto !important; animation-duration:.01ms !important; transition-duration:.01ms !important; }
 }
 
-/* A clear first stop for players and prospective venue managers. */
-#establishmentPicker { padding-top:max(22px,env(safe-area-inset-top)); }
-#establishmentPicker > h1 { font-size:clamp(25px,7vw,34px);line-height:1.12;letter-spacing:-.04em;margin:4px 0 22px; }
-#establishmentPicker > label { display:block;margin-bottom:8px;font-size:13px;color:var(--muted); }
-#venueSearch { display:block;width:100%;min-height:48px;border-radius:15px;padding:12px 16px;font-size:16px;box-sizing:border-box; }
-#nearbyVenues { margin:10px 0 4px;min-height:44px;border-radius:22px; }
-#establishmentList .venue-choice { display:flex;align-items:center;min-height:56px;border-radius:16px;padding:14px 16px;margin:0;font-weight:700; }
-.public-demo-card { margin:22px 0 18px;padding:20px;border:1px solid #ffbd554d;border-radius:22px;background:linear-gradient(145deg,#18334a,#102233);box-shadow:0 12px 32px #0002; }
-.demo-badge { font-size:10px;letter-spacing:.12em;font-weight:800;color:#ffc66a; }
-.public-demo-card h2 { font-size:22px;letter-spacing:-.03em;line-height:1.16;margin:12px 0 10px; }
-.public-demo-card p { color:#c2d1dd;font-size:14px;line-height:1.5;margin:0 0 16px; }
-.public-demo-card .primary-btn { width:100%;min-height:48px;font-size:15px; }
-.public-demo-card .public-demo-status:empty { display:none; }
-.public-demo-card .public-demo-status { margin:12px 0 0; }
-.trial-login-link { display:block;width:100%;font-size:12px;min-height:44px;color:#ffca78; }
-#demoLabButton.trial-clock { background:#17384a;color:#ffcf83;border:1px solid #ffbf5555;min-height:44px;width:100%;font-variant-numeric:tabular-nums; }
-@media (max-width:380px) { .public-demo-card { padding:16px;margin-top:16px; } .public-demo-card h2 { font-size:20px; } }
-#venueSearch { -webkit-appearance:none;appearance:none;background:#10283c;color:#f3f7fb;border:1px solid #8ca6bc55;outline:none;box-shadow:none; }
+/* Compact mobile entry: one search, venue choices, one manager action. */
+#establishmentPicker {
+  display:flex;flex-direction:column;gap:16px;
+  padding:max(22px,env(safe-area-inset-top)) 20px max(12px,env(safe-area-inset-bottom));
+  background:radial-gradient(ellipse at 95% 0%,#20527444,transparent 48%);
+}
+#establishmentPicker .picker-brand { margin:0;gap:10px;flex-shrink:0; }
+#establishmentPicker .picker-brand img { width:42px;height:42px;border-radius:12px; }
+#establishmentPicker .picker-brand strong { font-size:20px;letter-spacing:-.04em; }
+.brand-edition { font-size:10px;letter-spacing:.03em;vertical-align:middle;color:#9bb8cb;border:1px solid #64869a55;border-radius:5px;padding:3px 4px;margin-left:3px; }
+#establishmentPicker .picker-brand p { font-size:12px;margin-top:3px; }
+.picker-heading { margin:8px 0 2px; }
+#establishmentPicker .picker-heading h1 { font-size:30px;line-height:1.1;letter-spacing:-.045em;margin:0 0 7px; }
+.picker-heading p { margin:0;color:#a7bac9;font-size:14px; }
+.venue-search-row { display:flex;gap:8px;align-items:center;flex-shrink:0; }
+#venueSearch { display:block;min-width:0;flex:1;width:100%;height:48px;min-height:48px;padding:12px;font-size:16px;border-radius:14px;-webkit-appearance:none;appearance:none;background:#10283c;color:#f3f7fb;border:1px solid #8ca6bc44;outline:none;box-shadow:none; }
 #venueSearch::placeholder { color:#9bb0c2;opacity:1; }
 #venueSearch:focus { border-color:#ffc463;box-shadow:0 0 0 3px #ffc46322; }
-#establishmentList { gap:8px; }
+#nearbyVenues { flex:0 0 72px;min-height:48px;padding:10px 8px;margin:0;border-radius:14px;font-size:13px;color:#ffce88;background:#ffbc5810;border-color:#ffbc5833; }
+#venueSearchStatus { margin:0;font-size:12px;line-height:1.4; }
+#venueSearchStatus:empty { display:none; }
+.picker-venues { flex:1 0 auto; }
+#establishmentList { display:grid;gap:8px; }
+#establishmentList .venue-choice { display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:58px;border-radius:16px;padding:11px 14px;margin:0;background:linear-gradient(115deg,#19344a,#10273b);border:1px solid #7c9eb02c;box-shadow:0 2px 0 #ffffff03 inset;text-align:left; }
+.venue-copy { min-width:0;display:grid;gap:3px; }
+.venue-copy strong { font-size:15px;font-weight:650;overflow-wrap:anywhere;line-height:1.25; }
+.venue-copy small { color:#a6bccb;font-size:12px;font-weight:400;overflow-wrap:anywhere; }
+.venue-mark { display:grid;place-items:center;width:28px;height:28px;flex-shrink:0;border-radius:50%;background:#bdd9ec0b;color:#adcadd;font-size:18px; }
+.public-demo-card { display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:8px 12px;margin:0;padding:14px;border:1px solid #ffbd552d;border-radius:17px;background:linear-gradient(110deg,#22343e,#142938);flex-shrink:0; }
+.public-demo-card h2 { font-size:15px;font-weight:700;letter-spacing:-.02em;line-height:1.2;margin:0 0 4px; }
+.public-demo-card p { color:#b7c7d1;font-size:12px;line-height:1.4;margin:0; }
+.public-demo-card .primary-btn { min-height:44px;width:auto;min-width:82px;padding:10px 12px;border-radius:12px;font-size:13px;box-shadow:none;background:#ffc36b; }
+.public-demo-card .public-demo-status { grid-column:1/-1; }
+.public-demo-card .public-demo-status:empty { display:none; }
+#establishmentPicker .legal-links { margin:0;gap:20px;flex-shrink:0; }
+#establishmentPicker .legal-links a { min-height:44px;font-size:11px;color:#9bb0c2;text-decoration:none; }
+#establishmentPicker .list-pager { margin:8px 0 0; }
+#demoLabButton.trial-clock { background:#17384a;color:#ffcf83;border:1px solid #ffbf5555;min-height:44px;width:100%;font-variant-numeric:tabular-nums; }
+#loginBox { padding-left:20px;padding-right:20px; }
+#loginBox .login-panel { background:#10263b;border-color:#7c9eb033;box-shadow:none;border-radius:18px;padding:16px; }
+#loginBox .login-hero { padding:8px 0 18px; }
+#loginBox .selected-establishment { background:#10263b;box-shadow:none;border-color:#7c9eb033; }
+@media(max-height:700px) {
+  #establishmentPicker { gap:12px;padding-top:max(14px,env(safe-area-inset-top));padding-bottom:max(6px,env(safe-area-inset-bottom)); }
+  .picker-heading { margin:2px 0; }
+  #establishmentPicker .picker-heading h1 { font-size:28px; }
+  #establishmentList .venue-choice { min-height:54px;padding:10px 12px; }
+  .public-demo-card { padding:12px; }
+  #loginBox .login-hero { padding:4px 0 10px; }
+}
+@media(max-width:350px) {
+  #establishmentPicker,#loginBox { padding-left:14px;padding-right:14px; }
+  #establishmentPicker .picker-brand strong { font-size:19px; }
+}
