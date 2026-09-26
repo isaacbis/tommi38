@@ -22,11 +22,11 @@ window.CampoAds = (() => {
     const refresh=document.createElement('button');refresh.className='secondary-btn';refresh.textContent='Aggiorna premio';
     const watch=document.createElement('button');watch.className='primary-btn';root.append(watch,refresh);
     let data;
-    async function update(){
+    async function update(verified){
       try{
-        data=await api('/ads/status');if(!current())return;
-        status.textContent=data.earned?'Credito premio di oggi assegnato. Torna domani.':`${data.videos}/2 video verificati oggi. Due video completati danno un credito personale, non trasferibile e non convertibile in denaro.`;
-        watch.textContent=data.videos===1?'Guarda il secondo video':'Guarda il primo video';
+        data=verified?.earned===true?verified:await api('/ads/status');if(!current())return;
+        status.textContent=data.earned?'Credito premio di oggi assegnato. Torna domani.':'Un video completato e verificato dà un credito personale, non trasferibile e non convertibile in denaro.';
+        watch.textContent='Guarda un video · +1 credito';
         watch.disabled=busy || data.earned || !data.available || !supported();
         if(!supported())status.textContent+=' I video sono disponibili nell’app iPhone aggiornata.';
         else if(!data.available)status.textContent+=' I video premio non sono ancora disponibili in questo ambiente.';
@@ -48,11 +48,10 @@ window.CampoAds = (() => {
         if(!current())return;
         if(result.status==='earned'){
           status.textContent='Video completato. Attendo la verifica di Google…';
-          const before=data.videos;
-          for(let i=0;i<10 && current();i++){
-            await new Promise(resolve=>setTimeout(resolve,2000));
+          for(let i=0;i<30 && current();i++){
+            if(i>0)await new Promise(resolve=>setTimeout(resolve,i<10?1000:2500));
             const next=await api('/ads/status');
-            if(next.videos>before){await update();if(typeof refreshHome==='function')refreshHome();return;}
+            if(next.earned){await update(next);if(typeof refreshHome==='function')refreshHome();return;}
           }
           if(current())status.textContent='Video completato: la verifica è ancora in corso. Premi Aggiorna premio tra poco; non serve riguardarlo.';
         } else {
@@ -68,7 +67,7 @@ window.CampoAds = (() => {
     if(!supported() || !STATE.me || STATE.me.demo || STATE.me.role==='admin')return;
     const venue=selectedEstablishment,user=STATE.me.username;
     try{
-      const data=await api('/ads/status');
+      const data=verified?.earned===true?verified:await api('/ads/status');
       if(!data.available || venue!==selectedEstablishment || user!==STATE.me?.username)return;
       // A dedicated transition before interacting with the venue; never on a booking confirmation.
       const cancel=()=>window.webkit.messageHandlers.campoprontoAds.postMessage({action:'cancel',id:'navigation'});

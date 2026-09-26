@@ -1,6 +1,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 export const REWARDED_UNIT = 'ca-app-pub-5793073160443124/7248847275';
 export const INTERSTITIAL_UNIT = 'ca-app-pub-5793073160443124/2680912264';
+const hasEarned = progress => progress?.earned === true || Number(progress?.videos || 0) >= 2;
 const hash = value => createHash('sha256').update(value).digest('hex');
 export const rewardDay = time => new Intl.DateTimeFormat('en-CA',{timeZone:'Europe/Rome',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(time));
 export function createRewardStore(root, now = () => Date.now()) {
@@ -9,7 +10,8 @@ export function createRewardStore(root, now = () => Date.now()) {
   const status = async (venue,user) => {
     const snap = await daily(venue,user,rewardDay(now())).get();
     const videos = Math.min(2,Number(snap.data()?.videos || 0));
-    return {videos,remainingVideos:2-videos,earned:videos===2};
+    const earned = hasEarned(snap.data());
+    return {videos,remainingVideos:earned?0:1,earned};
   };
   async function start(venue,user) {
     if (venue.startsWith('demo-')) throw Error('DEMO_UNSUPPORTED');
@@ -20,7 +22,7 @@ export function createRewardStore(root, now = () => Date.now()) {
       const account = await tx.get(users(venue).doc(user));
       const progress = await tx.get(daily(venue,user,day));
       if (!account.exists || account.data().disabled || account.data().deletionPending) throw Error('ACCOUNT_CHANGED');
-      if (Number(progress.data()?.videos || 0) >= 2) throw Error('DAILY_REWARD_LIMIT');
+      if (hasEarned(progress.data())) throw Error('DAILY_REWARD_LIMIT');
       // Reuse an in-flight slot only after its one-hour expiry; no unbounded attempts.
       if (progress.data()?.pendingUntil > now()) throw Error('REWARD_PENDING');
       tx.set(tokenRef,{venue,user,day,createdAt:now(),expiresAt:now()+3600000,sessionVersion:Number(account.data().sessionVersion || 0),ownerKey:venue+":"+user,used:false});
@@ -57,14 +59,14 @@ export function createRewardStore(root, now = () => Date.now()) {
       const venue=await tx.get(root.collection('establishments').doc(a.venue));
       if(!account.exists || account.data().disabled || account.data().deletionPending || Number(account.data().sessionVersion||0)!==a.sessionVersion || (venue.exists && venue.data().enabled===false))return {ignored:true};
       const videos=Math.min(2,Number(progress.data()?.videos||0)+1);
-      const grant=Number(progress.data()?.videos||0)===1;
+      const grant=!hasEarned(progress.data());
       tx.set(eventRef,{attempt:ref.id,at:now()});
       tx.update(ref,{used:true});
-      tx.set(dayRef,{ownerKey:a.venue+":"+a.user,videos,pendingUntil:0,attempt:null});
+      tx.set(dayRef,{ownerKey:a.venue+":"+a.user,videos,earned:true,pendingUntil:0,attempt:null});
       if(grant){
         tx.update(userRef,{credits:Number(account.data().credits||0)+1});
         const ledger=a.venue==='tommi38'?root.collection('creditLedger'):root.collection('establishments').doc(a.venue).collection('creditLedger');
-        tx.set(ledger.doc('admob-'+dayRef.id),{user:a.user,delta:1,reason:'Premio: 2 video verificati',createdAt:new Date(now())});
+        tx.set(ledger.doc('admob-'+dayRef.id),{user:a.user,delta:1,reason:'Premio: 1 video verificato',createdAt:new Date(now())});
       }
       return {granted:grant,videos};
     });

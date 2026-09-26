@@ -100,7 +100,7 @@
     root.append(links);
   }
   async function requestCredits() {
-    const {root,current}=modal('Ottieni crediti', '<p>Un credito = una prenotazione. Ottieni un credito premio con due video completati, massimo uno al giorno per stabilimento.</p><p class="helper-text">I pacchetti a pagamento non sono ancora disponibili. I crediti già presenti restano validi.</p>');
+    const {root,current}=modal('Ottieni crediti', '<p>Un credito = una prenotazione. Ottieni un credito premio con un video completato, massimo uno al giorno per stabilimento.</p><p class="helper-text">I pacchetti a pagamento non sono ancora disponibili. I crediti già presenti restano validi.</p>');
     if(window.CampoAds)await CampoAds.credits(root,current);
   }
   async function manageRequests() {
