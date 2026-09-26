@@ -2,6 +2,7 @@ import express from 'express';
 import { createHash } from 'node:crypto';
 import { db } from './db.js';
 import { validEstablishmentId, readSessionIdentity } from './authorization.js';
+import { enterPublicDemoRole } from './public-demo.js';
 
 const router=express.Router();
 const safe=fn=>(req,res,next)=>Promise.resolve(fn(req,res)).catch(next);
@@ -11,6 +12,10 @@ async function owner(req){
   return identity && (identity.platformAdmin || identity.account.role==='admin') ? identity : null;
 }
 router.post('/enter',safe(async(req,res)=>{
+  if(req.session.publicDemo){
+    if(req.body.reset || req.body.copySettings || !enterPublicDemoRole(req.session,req.body.role))return res.status(400).json({error:'DEMO_EXPIRED_OR_INVALID_ROLE'});
+    return res.json({ok:true,establishmentId:req.session.publicDemo.id});
+  }
   const identity=await owner(req);
   if(!identity)return res.status(403).json({error:'NOT_AUTHORIZED'});
   const role=req.body.role;
@@ -82,6 +87,7 @@ router.post('/simulate',safe(async(req,res)=>{
   res.json(result);
 }));
 async function paymentContext(req){
+  if(req.session.publicDemo)return null;
   const identity=await owner(req);
   if(!identity || !req.session.demoOriginal)return null;
   const id=req.session.user?.establishment;
@@ -121,6 +127,10 @@ router.post('/checkout/confirm',safe(async(req,res)=>{
  res.json({paid:updated.data().status==='paid',simulation:true});
 }));
 router.post('/exit',safe(async(req,res)=>{
+  if(req.session.publicDemo){
+    await new Promise((resolve,reject)=>req.session.destroy(error=>error?reject(error):resolve()));
+    return res.json({ok:true,publicDemo:true});
+  }
   if(!req.session.demoOriginal)return res.status(400).json({error:'NO_DEMO_SESSION'});
   if(!await owner(req))return res.status(403).json({error:'NOT_AUTHORIZED'});
   const original=req.session.demoOriginal;

@@ -11,6 +11,8 @@ import platformRouter from "./src/platform-routes.js";
 import accountRouter from "./src/account-routes.js";
 import admobRouter, { admobCallback } from "./src/admob-routes.js";
 import demoRouter from "./src/demo-routes.js";
+import rateLimit from 'express-rate-limit';
+import { createPublicDemo, enterPublicDemoRole, cleanupExpiredPublicDemos } from './src/public-demo.js';
 import { db, FieldValue } from "./src/db.js";
 import { appointInitialPlatformAdmin } from "./src/platform-migration.js";
 import { tenantMiddleware } from "./src/tenancy.js";
@@ -99,6 +101,26 @@ export function createApp({
       maxAge: SESSION_MAX_AGE_MS
     }
   }));
+  app.post('/api/demo/public', rateLimit({windowMs:3600000,max:5,standardHeaders:true,legacyHeaders:false,message:{error:'DEMO_LIMIT'}}), async (req,res,next) => {
+    try {
+      if (req.session.publicDemo?.expiresAt > Date.now()) {
+        return res.json({ok:true,establishmentId:req.session.publicDemo.id,expiresAt:req.session.publicDemo.expiresAt});
+      }
+      if (req.session.user && !req.session.publicDemo) return res.status(409).json({error:'SIGN_OUT_FIRST'});
+      const trial = await createPublicDemo(db);
+      await new Promise((resolve,reject)=>req.session.regenerate(error=>error?reject(error):resolve()));
+      req.session.publicDemo = trial;
+      req.session.demoOriginal = {user:{username:'demo-host',role:'admin',establishment:trial.id,sessionVersion:0}};
+      enterPublicDemoRole(req.session,'admin');
+      res.json({ok:true,establishmentId:trial.id,expiresAt:trial.expiresAt});
+    } catch(error) { next(error); }
+  });
+  app.use('/api', (req,res,next)=>{
+    if(req.session.publicDemo && req.session.publicDemo.expiresAt <= Date.now() && req.path !== '/demo/exit' && req.path !== '/logout') {
+      return res.status(401).json({error:'DEMO_EXPIRED'});
+    }
+    next();
+  });
   // The platform router verifies the original root account itself. Its context
   // controls must remain reachable even while a disabled venue is selected.
   app.use("/api/platform", platformRoutes);
@@ -132,6 +154,9 @@ export function createApp({
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === __filename) {
+  const cleanup = () => cleanupExpiredPublicDemos(db).catch(()=>console.warn('Demo cleanup deferred'));
+  cleanup();
+  setInterval(cleanup, 10*60*1000).unref();
   const PORT = Number(process.env.PORT || 3001);
   try {
     const outcome = await appointInitialPlatformAdmin(db, () => FieldValue.serverTimestamp());

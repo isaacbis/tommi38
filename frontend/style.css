@@ -1783,3 +1783,21 @@ button:focus-visible, summary:focus-visible, input:focus-visible, select:focus-v
 @media(prefers-reduced-motion:reduce) {
   *,*::before,*::after { scroll-behavior:auto !important; animation-duration:.01ms !important; transition-duration:.01ms !important; }
 }
+
+/* A clear first stop for players and prospective venue managers. */
+#establishmentPicker { padding-top:max(22px,env(safe-area-inset-top)); }
+#establishmentPicker > h1 { font-size:clamp(25px,7vw,34px);line-height:1.12;letter-spacing:-.04em;margin:4px 0 22px; }
+#establishmentPicker > label { display:block;margin-bottom:8px;font-size:13px;color:var(--muted); }
+#venueSearch { display:block;width:100%;min-height:48px;border-radius:15px;padding:12px 16px;font-size:16px;box-sizing:border-box; }
+#nearbyVenues { margin:10px 0 4px;min-height:44px;border-radius:22px; }
+#establishmentList .venue-choice { display:flex;align-items:center;min-height:56px;border-radius:16px;padding:14px 16px;margin:0;font-weight:700; }
+.public-demo-card { margin:22px 0 18px;padding:20px;border:1px solid #ffbd554d;border-radius:22px;background:linear-gradient(145deg,#18334a,#102233);box-shadow:0 12px 32px #0002; }
+.demo-badge { font-size:10px;letter-spacing:.12em;font-weight:800;color:#ffc66a; }
+.public-demo-card h2 { font-size:22px;letter-spacing:-.03em;line-height:1.16;margin:12px 0 10px; }
+.public-demo-card p { color:#c2d1dd;font-size:14px;line-height:1.5;margin:0 0 16px; }
+.public-demo-card .primary-btn { width:100%;min-height:48px;font-size:15px; }
+.public-demo-card .public-demo-status:empty { display:none; }
+.public-demo-card .public-demo-status { margin:12px 0 0; }
+.trial-login-link { display:block;width:100%;font-size:12px;min-height:44px;color:#ffca78; }
+#demoLabButton.trial-clock { background:#17384a;color:#ffcf83;border:1px solid #ffbf5555;min-height:44px;width:100%;font-variant-numeric:tabular-nums; }
+@media (max-width:380px) { .public-demo-card { padding:16px;margin-top:16px; } .public-demo-card h2 { font-size:20px; } }

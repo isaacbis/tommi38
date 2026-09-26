@@ -224,6 +224,7 @@ async function api(path, options = {}) {
     const data = await response.json();
     if (typeof managementContextEpoch !== 'undefined' && epoch !== managementContextEpoch) throw {error:'CONTEXT_CHANGED'};
     if (!response.ok) {
+      if(data.error==='DEMO_EXPIRED'){expirePublicDemo();throw {...data,status:response.status};}
       if (response.status === 401 && STATE.me && path !== "/login" && (typeof managementContextEpoch === 'undefined' || epoch === managementContextEpoch)) {
         stopAutoRefresh();
         clearNativeBookingNotifications();
@@ -238,7 +239,6 @@ async function api(path, options = {}) {
         hide(qs("app"));
         show(qs("loginBox"));
         qs("password").value = "";
-    window.CampoAds?.afterLogin();
         qs("loginErr").textContent = "La sessione è scaduta. Accedi di nuovo.";
         show(qs("loginErr"));
       }
@@ -263,7 +263,7 @@ function loadPublicConfig() {
 
 /* ===================== NATIVE BRIDGE ===================== */
 function nativeMessage(payload) {
-  if (!STATE.me || STATE.me.managementMode) return;
+  if (!STATE.me || STATE.me.managementMode || STATE.me.demo) return;
   const establishment = typeof selectedEstablishment === 'undefined' ? 'tommi38' : selectedEstablishment;
   payload = {...payload, account:STATE.me.username, establishment};
   if (payload.id && establishment !== 'tommi38') payload.id = establishment + ':' + payload.id;
@@ -475,6 +475,7 @@ async function loadAll(setToday = false) {
   demoButton.textContent=me.demo?'DEMO · Cambia ruolo o esci':'Laboratorio di prova';
   demoButton.hidden=!(me.demo || me.platformAdmin || me.role==='admin');
   demoButton.onclick=openDemoLab;
+  setupPublicDemoClock();
   let commercialButton=qs('commercialSettingsButton');
   if(!commercialButton){commercialButton=document.createElement('button');commercialButton.id='commercialSettingsButton';commercialButton.className='secondary-btn';demoButton.after(commercialButton);}
   commercialButton.textContent='Regole CampoPronto ADS';commercialButton.hidden=!(me.role==='admin');commercialButton.onclick=openCommercialSettings;

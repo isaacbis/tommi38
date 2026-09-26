@@ -121,6 +121,7 @@ async function initializeCommunity() {
   return loadAll(true);
 }
 async function openDemoLab(){
+  if(STATE.me?.demoExpiresAt) return openPublicDemoControls();
   openAppModal('Laboratorio di prova',`<p>Una demo personale, separata dai dati reali. Prova campi, orari e prenotazioni con 100 crediti iniziali. Non vengono effettuati pagamenti.</p><div id="demoActions" class="form-stack"></div><p id="demoStatus" role="status"></p>`);
   for(const [label,role]of [['Prova come gestore','admin'],['Prova come utente','user']])qs('demoActions').append(adminButton(label,async()=>{
     try{const data=await api('/demo/enter',{method:'POST',body:JSON.stringify({role})});localStorage.setItem('tommi38-establishment',data.establishmentId);location.reload();}catch(error){qs('demoStatus').textContent=errorMessage(error);}
@@ -145,6 +146,59 @@ async function openDemoLab(){
     try{const data=await api('/demo/enter',{method:'POST',body:JSON.stringify({role:'admin',reset:true})});localStorage.setItem('tommi38-establishment',data.establishmentId);location.reload();}catch(error){qs('demoStatus').textContent=errorMessage(error);}
   }));
 }
+let publicDemoTimer;
+async function startPublicDemo(event) {
+  const button=event.currentTarget;
+  button.disabled=true;
+  const label=button.textContent; button.textContent='Prepariamo i tuoi campi…';
+  try {
+    const data=await api('/demo/public',{method:'POST',body:'{}'});
+    localStorage.setItem('tommi38-establishment',data.establishmentId);
+    location.reload();
+  } catch(error) {
+    const message=error.error==='DEMO_LIMIT'?'Hai già provato più demo. Riprova tra un’ora.':error.error==='SIGN_OUT_FIRST'?'Esci dal tuo account prima di aprire una demo.':errorMessage(error);
+    document.querySelectorAll('.public-demo-status').forEach(el=>el.textContent=message);
+    if(!button.closest('.public-demo-card'))alert(message);
+    button.disabled=false;button.textContent=label;
+  }
+}
+async function exitPublicDemo() {
+  await api('/demo/exit',{method:'POST',body:'{}'});
+  clearInterval(publicDemoTimer);
+  localStorage.removeItem('tommi38-establishment');
+  location.reload();
+}
+function setupPublicDemoClock() {
+  clearInterval(publicDemoTimer);
+  const expiry=STATE.me?.demoExpiresAt;
+  const button=qs('demoLabButton');
+  if(!expiry || !button)return;
+  const update=()=>{
+    if(STATE.me?.demoExpiresAt!==expiry){clearInterval(publicDemoTimer);return;}
+    const remaining=Math.max(0,Math.ceil((expiry-Date.now())/1000));
+    button.textContent=`DEMO · ${Math.floor(remaining/60)}:${String(remaining%60).padStart(2,'0')} · Cambia ruolo`;
+    button.classList.add('trial-clock');
+    if(!remaining){clearInterval(publicDemoTimer);expirePublicDemo();}
+  };
+  update();publicDemoTimer=setInterval(update,1000);
+}
+let publicDemoExpiring=false;
+function expirePublicDemo() {
+  if(publicDemoExpiring)return;
+  publicDemoExpiring=true;
+  clearInterval(publicDemoTimer);
+  stopAutoRefresh();
+  openAppModal('La tua prova è terminata','<p>Hai completato i 10 minuti di demo. Le prove non modificano gli stabilimenti reali.</p><button id="endPublicDemo" class="primary-btn">Torna agli stabilimenti</button><p class="helper-text">Per attivare il tuo stabilimento, contatta <a href="mailto:campopronto.assistenza@gmail.com">campopronto.assistenza@gmail.com</a>.</p>');
+  qs('endPublicDemo').onclick=()=>exitPublicDemo().catch(()=>location.reload());
+}
+function openPublicDemoControls() {
+  openAppModal('La tua demo di 10 minuti','<p>Prima imposta campi e orari come gestore, poi passa a utente e prova a prenotare. Il tempo continua anche cambiando ruolo.</p><div id="publicDemoActions" class="form-stack"></div><p class="helper-text">100 crediti fittizi. Nessun pagamento e nessun annuncio reale. Evita di inserire dati personali.</p>');
+  for(const [label,role]of [['Gestore · campi e orari','admin'],['Utente · prova a prenotare','user']])qs('publicDemoActions').append(adminButton(label,async()=>{
+    await api('/demo/enter',{method:'POST',body:JSON.stringify({role})});location.reload();
+  }));
+  qs('publicDemoActions').append(adminButton('Termina la demo',exitPublicDemo));
+}
+document.querySelectorAll('[data-start-public-demo]').forEach(button=>button.addEventListener('click',startPublicDemo));
 async function openCommercialSettings(){
   openAppModal('Regole CampoPronto ADS','<p>Un credito permette una prenotazione. I crediti si ottengono attraverso pacchetti acquistati oppure due video premio completati.</p><p>Massimo un credito premio al giorno per utente e stabilimento. Solo l’amministratore globale può assegnare crediti manualmente.</p><p>Non sono previsti abbonamenti senza pubblicità. Campo Pronto Premium sarà un’app separata.</p><p>Commissione pacchetti: 10% CampoPronto, 90% stabilimento, prima delle spese. I video premio richiedono l’app iPhone aggiornata e la disponibilità di annunci Google. I pagamenti reali non sono ancora attivi.</p>');
 }

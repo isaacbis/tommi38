@@ -82,7 +82,7 @@ function loadApplication(memory, dates) {
   const cached = new Map();
   const localModules = new Set([
     'server.js', 'src/authorization.js', 'src/tenancy.js', 'src/permissions.js',
-    'src/management-guards.js', 'src/routes.js', 'src/account-routes.js', 'src/platform-routes.js', 'src/demo-routes.js'
+    'src/management-guards.js', 'src/routes.js', 'src/account-routes.js', 'src/platform-routes.js', 'src/demo-routes.js', 'src/public-demo.js', 'src/admob-routes.js', 'src/admob-rewards.js', 'src/admob-verification.js'
   ]);
   const packages = new Set(['express', 'express-session', 'bcrypt', 'zod', 'express-rate-limit', 'helmet', 'cookie-parser']);
   const builtins = new Set(['node:path', 'node:url', 'node:async_hooks', 'node:crypto']);
@@ -135,6 +135,7 @@ function loadApplication(memory, dates) {
     source = source.replace(/^import\s+(['"])dotenv\/config\1;?\s*$/gm, '');
     source = source.replace(/^import\s+(.+?)\s+from\s+(['"])(.+?)\2;?\s*$/gm, (statement, binding, quote, specifier) => {
       const index = dependencies.push(imported(specifier, relative)) - 1;
+      if (/^[A-Za-z_$][\w$]*,\s*\{/.test(binding)) { const split=binding.indexOf(','); return `const ${binding.slice(0,split)} = __dependencies[${index}].default; const ${binding.slice(split+1).replace(/\bas\b/g, ':')} = __dependencies[${index}];`; }
       if (binding.startsWith('{')) return `const ${binding.replace(/\bas\b/g, ':')} = __dependencies[${index}];`;
       if (/^[A-Za-z_$][\w$]*$/.test(binding)) return `const ${binding} = __dependencies[${index}].default ?? __dependencies[${index}];`;
       throw new Error(`Unsupported preview import in ${relative}`);

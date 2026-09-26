@@ -21,7 +21,7 @@ export async function establishments(code) {
   const items = visible('tommi38', legacy?.data() || {}) ? [publicItem('tommi38', {name:'Tommi38', ...legacy?.data()})] : [];
   for (const doc of snap.docs) {
     const value = doc.data();
-    if (doc.id !== 'tommi38' && value.enabled === true && visible(doc.id, value) && /^[a-z0-9-]{1,60}$/.test(doc.id)) {
+    if (doc.id !== 'tommi38' && value.enabled === true && (!value.expiresAt || value.expiresAt > Date.now()) && visible(doc.id, value) && /^[a-z0-9-]{1,60}$/.test(doc.id)) {
       items.push(publicItem(doc.id, value));
     }
   }

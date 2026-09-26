@@ -211,7 +211,8 @@ router.post("/login", loginLimiter, async (req, res) => {
   if (!snap.exists) return res.status(401).json({ error: "INVALID_LOGIN" });
 
   const user = snap.data();
-  if (user.disabled) return res.status(403).json({ error: "USER_DISABLED" });
+  if (user.disabled || (user.expiresAt && user.expiresAt <= Date.now())) return res.status(403).json({ error: "USER_DISABLED" });
+  if (typeof user.passwordHash !== 'string') return res.status(401).json({error:'INVALID_LOGIN'});
 
   const ok = await bcrypt.compare(password, user.passwordHash);
   if (!ok) return res.status(401).json({ error: "INVALID_LOGIN" });
@@ -236,6 +237,7 @@ router.get("/me", requireAuth, async (req, res) => {
   res.json({
     username:req.session.user.username,
     demo:!!req.session.demoOriginal,
+    demoExpiresAt:req.session.publicDemo?.expiresAt || null,
     role:req.session.user.role,
     credits:req.isPlatformManagement ? 0 : u.credits ?? 0,
     disabled:!!u.disabled,

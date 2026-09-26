@@ -26,7 +26,7 @@ export async function readSessionIdentity(req) {
     : root.collection('establishments').doc(origin).collection('users');
   const snap = await users.doc(sessionUser.username).get();
   const account = snap.data();
-  if (!snap.exists || account.disabled ||
+  if (!snap.exists || account.disabled || (account.expiresAt && account.expiresAt <= Date.now()) ||
       Number(account.sessionVersion || 0) !== Number(sessionUser.sessionVersion || 0)) {
     invalidateSession(req);
     identities.set(req, null);
@@ -50,7 +50,7 @@ export async function readEstablishment(id) {
   return {
     id,
     name: String(value.name || (id === 'tommi38' ? 'Tommi38' : id)).slice(0, 80),
-    enabled: id === 'tommi38' || value.enabled === true
+    enabled: (id === 'tommi38' || value.enabled === true) && (!value.expiresAt || value.expiresAt > Date.now())
   };
 }
 

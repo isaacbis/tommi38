@@ -28,17 +28,26 @@
   <main class="app-shell">
     <section id="establishmentPicker" class="login-screen hidden">
       <div class="picker-brand"><img src="/icon-192.png" alt="" width="48" height="48"><div><strong>CampoPronto ADS</strong><p>Prenota campi, trova giocatori.</p></div></div>
-      <h1>Scegli il tuo stabilimento</h1>
+      <p class="eyebrow">Il tuo prossimo campo</p>
+      <h1>Dove vuoi giocare?</h1>
       <label for="venueSearch">Cerca stabilimento o città</label>
       <input id="venueSearch" type="search" placeholder="Nome o città" autocomplete="off">
       <button id="nearbyVenues" class="secondary-btn" type="button">Vicino a me</button>
       <p id="venueSearchStatus" class="helper-text" role="status"></p>
       <div id="establishmentList" class="form-stack"></div>
+      <section class="public-demo-card" aria-labelledby="publicDemoTitle">
+        <span class="demo-badge">PER I GESTORI · 10 MINUTI</span>
+        <h2 id="publicDemoTitle">Il tuo stabilimento, in anteprima.</h2>
+        <p>Crea campi, scegli gli orari e prova una prenotazione come utente. Senza registrazione e senza pagamenti.</p>
+        <button data-start-public-demo class="primary-btn" type="button">Prova gratis la demo →</button>
+        <p class="public-demo-status helper-text" role="status"></p>
+      </section>
       <details><summary>Hai un codice stabilimento?</summary><form id="venueCodeForm" class="form-stack"><label for="venueCode">Codice ricevuto dal gestore</label><input id="venueCode" required maxlength="60" autocapitalize="none" placeholder="Codice stabilimento"><button class="secondary-btn" type="submit">Apri stabilimento</button></form></details>
       <nav class="legal-links" aria-label="Informazioni"><a href="/privacy.html" target="_blank" rel="noopener">Privacy</a><a href="/support.html" target="_blank" rel="noopener">Assistenza</a></nav>
     </section>
     <!-- LOGIN -->
     <section id="loginBox" class="login-screen hidden">
+      <button data-start-public-demo class="text-nav trial-login-link" type="button">Sei un gestore? Prova la demo di 10 minuti</button>
       <div class="login-topline">
         <button id="loginBackBtn" class="text-nav" type="button" aria-label="Torna agli stabilimenti">‹ <span>Stabilimenti</span></button>
       </div>
@@ -386,8 +395,8 @@
     </form>
   </dialog>
   <noscript><p class="empty-state">Attiva JavaScript nel browser per utilizzare CampoPronto ADS.</p></noscript>
-  <script src="/script.js" defer></script>
-  <script src="/community.js" defer></script>
+  <script src="/script.js?v=public-demo-1" defer></script>
+  <script src="/community.js?v=public-demo-1" defer></script>
   <script src="/ads.js" defer></script>
   <script src="/account.js" defer></script>
 </body>
