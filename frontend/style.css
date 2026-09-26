@@ -1801,3 +1801,7 @@ button:focus-visible, summary:focus-visible, input:focus-visible, select:focus-v
 .trial-login-link { display:block;width:100%;font-size:12px;min-height:44px;color:#ffca78; }
 #demoLabButton.trial-clock { background:#17384a;color:#ffcf83;border:1px solid #ffbf5555;min-height:44px;width:100%;font-variant-numeric:tabular-nums; }
 @media (max-width:380px) { .public-demo-card { padding:16px;margin-top:16px; } .public-demo-card h2 { font-size:20px; } }
+#venueSearch { -webkit-appearance:none;appearance:none;background:#10283c;color:#f3f7fb;border:1px solid #8ca6bc55;outline:none;box-shadow:none; }
+#venueSearch::placeholder { color:#9bb0c2;opacity:1; }
+#venueSearch:focus { border-color:#ffc463;box-shadow:0 0 0 3px #ffc46322; }
+#establishmentList { gap:8px; }
