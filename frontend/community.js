@@ -147,19 +147,20 @@ async function openDemoLab(){
   }));
 }
 let publicDemoTimer;
-async function startPublicDemo(event) {
-  const button=event.currentTarget;
-  button.disabled=true;
-  const label=button.textContent; button.textContent='Prepariamo i tuoi campi…';
+function startPublicDemo() { openPublicDemoSetup(); }
+async function launchPublicDemo(setup, button) {
+  const buttons=Array.from(qs('appModalBody').querySelectorAll('button'));
+  buttons.forEach(item=>item.disabled=true);
+  const label=button.textContent;button.textContent='Creazione demo…';
+  qs('demoSetupError').textContent='';
   try {
-    const data=await api('/demo/public',{method:'POST',body:'{}'});
+    const data=await api('/demo/public',{method:'POST',body:JSON.stringify(setup?{setup}:{})});
     localStorage.setItem('tommi38-establishment',data.establishmentId);
     location.reload();
   } catch(error) {
-    const message=error.error==='DEMO_LIMIT'?'Hai già provato più demo. Riprova tra un’ora.':error.error==='SIGN_OUT_FIRST'?'Esci dal tuo account prima di aprire una demo.':errorMessage(error);
-    document.querySelectorAll('.public-demo-status').forEach(el=>el.textContent=message);
-    if(!button.closest('.public-demo-card'))alert(message);
-    button.disabled=false;button.textContent=label;
+    const message=error.error==='DEMO_LIMIT'?'Hai già provato più demo. Riprova tra un’ora.':error.error==='SIGN_OUT_FIRST'?'Esci dal tuo account prima di aprire una demo.':error.error==='INVALID_DEMO_SETUP'?'Controlla nomi, campi e orari: la chiusura deve essere dopo l’apertura.':errorMessage(error);
+    qs('demoSetupError').textContent=message;
+    buttons.forEach(item=>item.disabled=false);button.textContent=label;
   }
 }
 async function exitPublicDemo() {
@@ -176,7 +177,7 @@ function setupPublicDemoClock() {
   const update=()=>{
     if(STATE.me?.demoExpiresAt!==expiry){clearInterval(publicDemoTimer);return;}
     const remaining=Math.max(0,Math.ceil((expiry-Date.now())/1000));
-    button.textContent=`DEMO · ${Math.floor(remaining/60)}:${String(remaining%60).padStart(2,'0')} · Cambia ruolo`;
+    button.textContent=`Demo ${STATE.me.role==='admin'?'gestore':'utente'} · ${Math.floor(remaining/60)}:${String(remaining%60).padStart(2,'0')} · Cambia ruolo`;
     button.classList.add('trial-clock');
     if(!remaining){clearInterval(publicDemoTimer);expirePublicDemo();}
   };

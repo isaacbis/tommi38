@@ -27,7 +27,7 @@ export const PUBLIC_FILES = new Map([
   ["/", "index.html"],
   ...[
     "index.html", "success.html", "style.css", "script.js", "community.js",
-    "account.js", "ads.js", "app-ads.txt", "service-worker.js", "manifest.json",
+    "account.js", "ads.js", "demo-setup.js", "app-ads.txt", "service-worker.js", "manifest.json",
     "privacy.html", "support.html", "community-rules.html", "legal.css",
     "icon-192.png", "icon-512.png", "icons/apple-touch-icon-v2.png",
     "icons/apple-touch-icon-v3.png"
@@ -107,13 +107,16 @@ export function createApp({
         return res.json({ok:true,establishmentId:req.session.publicDemo.id,expiresAt:req.session.publicDemo.expiresAt});
       }
       if (req.session.user && !req.session.publicDemo) return res.status(409).json({error:'SIGN_OUT_FIRST'});
-      const trial = await createPublicDemo(db);
+      const trial = await createPublicDemo(db, Date.now(), req.body?.setup);
       await new Promise((resolve,reject)=>req.session.regenerate(error=>error?reject(error):resolve()));
       req.session.publicDemo = trial;
       req.session.demoOriginal = {user:{username:'demo-host',role:'admin',establishment:trial.id,sessionVersion:0}};
       enterPublicDemoRole(req.session,'admin');
       res.json({ok:true,establishmentId:trial.id,expiresAt:trial.expiresAt});
-    } catch(error) { next(error); }
+    } catch(error) {
+      if (error.code === 'INVALID_DEMO_SETUP') return res.status(400).json({error:error.code,message:error.message});
+      next(error);
+    }
   });
   app.use('/api', (req,res,next)=>{
     if(req.session.publicDemo && req.session.publicDemo.expiresAt <= Date.now() && req.path !== '/demo/exit' && req.path !== '/logout') {

@@ -7,7 +7,7 @@
   <meta name="theme-color" content="#061525">
   <title>CampoPronto ADS · Prenota campi</title>
 
-  <link rel="stylesheet" href="/style.css?v=mobile-simple-1">
+  <link rel="stylesheet" href="/style.css?v=demo-setup-1">
   <link rel="manifest" href="/manifest.json">
   <link rel="apple-touch-icon" href="/icons/apple-touch-icon-v3.png">
   <link rel="icon" type="image/png" href="/icon-192.png">
@@ -86,7 +86,7 @@
         <button id="loginChangeBtn" class="change-btn" type="button">Cambia ›</button>
       </section>
 
-      <details id="loginGalleryDetails" class="login-gallery-details"><summary>Foto dello stabilimento</summary><div id="loginGallery" class="login-gallery"></div></details>
+      <section id="loginGalleryDetails" class="venue-gallery-section" aria-label="Foto dello stabilimento" hidden><div id="loginGallery" class="login-gallery"></div></section>
       <nav class="legal-links" aria-label="Informazioni"><a href="/privacy.html" target="_blank" rel="noopener">Privacy</a><a href="/support.html" target="_blank" rel="noopener">Assistenza</a></nav>
     </section>
 
@@ -102,6 +102,7 @@
           <button id="logoutBtn" class="icon-btn" type="button" aria-label="Esci"><svg class="ui-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 4H4v16h5M10 12h11m-4-4 4 4-4 4"/></svg></button>
         </div>
       </header>
+      <section class="venue-gallery-section app-venue-gallery" aria-label="Foto dello stabilimento" hidden><div id="appGallery" class="login-gallery"></div></section>
       <aside id="managementBanner" class="management-banner hidden" aria-label="Stabilimento in gestione"><div><span>Stai gestendo</span><strong id="managementVenueName"></strong></div><button id="returnToPlatformBtn" class="secondary-btn" type="button" aria-label="Torna a tutti gli stabilimenti">‹ Stabilimenti</button></aside>
 
       <section id="viewHome" class="app-view hidden">
@@ -341,12 +342,12 @@
         </section>
 
         <section id="adminGallery" class="glass-card admin-section hidden">
-          <h3>Galleria login</h3>
+          <h3>Foto dello stabilimento</h3>
           <label class="field-label" for="galleryUrl">URL immagine</label>
           <input id="galleryUrl" class="admin-input" inputmode="url" placeholder="https://...">
           <label class="field-label" for="galleryCaption">Didascalia</label>
           <input id="galleryCaption" class="admin-input" placeholder="Facoltativa">
-          <label class="field-label" for="galleryLink">Link di destinazione</label>
+          <label class="field-label" for="galleryLink">Link di destinazione (facoltativo)</label>
           <input id="galleryLink" class="admin-input" inputmode="url" placeholder="https://...">
           <button id="addGalleryBtn" class="secondary-btn" type="button">Aggiungi immagine</button>
           <div id="galleryList" class="admin-list"></div>
@@ -391,8 +392,9 @@
     </form>
   </dialog>
   <noscript><p class="empty-state">Attiva JavaScript nel browser per utilizzare CampoPronto ADS.</p></noscript>
-  <script src="/script.js?v=mobile-simple-1" defer></script>
-  <script src="/community.js?v=mobile-simple-1" defer></script>
+  <script src="/script.js?v=demo-setup-1" defer></script>
+  <script src="/community.js?v=demo-setup-1" defer></script>
+  <script src="/demo-setup.js?v=1" defer></script>
   <script src="/ads.js?v=one-video-1" defer></script>
   <script src="/account.js?v=one-video-1" defer></script>
 </body>

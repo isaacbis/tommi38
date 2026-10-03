@@ -1,10 +1,11 @@
-const CACHE_NAME = "tommi38-pwa-v28";
+const CACHE_NAME = "tommi38-pwa-v29";
 const ASSETS = [
   "/",
   "/index.html",
   "/style.css",
   "/script.js",
   "/community.js",
+  "/demo-setup.js",
   "/account.js",
   "/privacy.html",
   "/support.html",

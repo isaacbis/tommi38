@@ -372,6 +372,7 @@ function updateBookingPreview() {
 
 /* ===================== LOGIN ===================== */
 async function loadPublicLoginGallery() {
+  STATE.gallery=[];renderLoginGallery();
   try {
     const pub = await loadPublicConfig();
     STATE.gallery = pub.gallery || [];
@@ -459,6 +460,7 @@ async function loadAll(setToday = false) {
   STATE.notes = pub.notesText || "";
   STATE.gallery = pub.gallery || [];
   STATE.galleryDraft = [...STATE.gallery];
+  renderLoginGallery();
 
   hide(qs("loginBox"));
   show(qs("app"));
@@ -471,7 +473,7 @@ async function loadAll(setToday = false) {
   qs("creditsBox").textContent = `${Number(me.credits || 0)} ${Number(me.credits) === 1 ? "credito" : "crediti"}`;
   qs("roleBadge").textContent = me.platformAdmin ? "Amministratore globale" : me.role === "admin" ? "Amministratore del tuo stabilimento" : "";
   let demoButton=qs('demoLabButton');
-  if(!demoButton){demoButton=document.createElement('button');demoButton.id='demoLabButton';demoButton.className='secondary-btn';qs('app').prepend(demoButton);}
+  if(!demoButton){demoButton=document.createElement('button');demoButton.id='demoLabButton';demoButton.className='secondary-btn';document.querySelector('.native-header').after(demoButton);}
   demoButton.textContent=me.demo?'DEMO · Cambia ruolo o esci':'Laboratorio di prova';
   demoButton.hidden=!(me.demo || me.platformAdmin || me.role==='admin');
   demoButton.onclick=openDemoLab;
@@ -1608,7 +1610,7 @@ function addGalleryItem() {
   const caption = qs("galleryCaption").value.trim();
   const link = qs("galleryLink").value.trim();
 
-  if (!url.startsWith("http") || !link.startsWith("http")) return alert("Inserisci URL e link validi.");
+  if (!galleryHttpURL(url) || (link && !galleryHttpURL(link))) return alert("Inserisci un indirizzo immagine http o https. Il link è facoltativo.");
 
   STATE.galleryDraft.push({ url, caption, link });
   qs("galleryUrl").value = "";
@@ -1627,27 +1629,24 @@ async function saveGallery() {
   alert("Galleria aggiornata.");
 }
 
+function galleryHttpURL(value) {
+  try { const url=new URL(value);return ['http:','https:'].includes(url.protocol)?url.href:null; } catch { return null; }
+}
 function renderLoginGallery() {
-  const box = qs("loginGallery");
-  if (!box) return;
-  box.innerHTML = "";
-
-  STATE.gallery.forEach(image => {
-    if (!image.url || !image.link) return;
-    const wrap = document.createElement("div");
-    wrap.className = "login-gallery-item";
-    const link = document.createElement("a");
-    link.href = image.link;
-    link.target = "_blank";
-    link.rel = "noopener noreferrer";
-    const img = document.createElement("img");
-    img.src = image.url;
-    img.alt = image.caption || "";
-    img.loading = "lazy";
-    link.appendChild(img);
-    wrap.appendChild(link);
-    box.appendChild(wrap);
-  });
+  for(const id of ['loginGallery','appGallery']) {
+    const box=qs(id);if(!box)continue;box.textContent='';
+    const photos=STATE.gallery.filter(image=>image && galleryHttpURL(image.url));
+    box.parentElement.hidden=!photos.length;
+    photos.forEach((image,index)=>{
+      const wrap=document.createElement('figure');wrap.className='login-gallery-item';
+      const img=document.createElement('img');img.src=galleryHttpURL(image.url);
+      img.alt=image.caption || 'Foto dello stabilimento '+(index+1);img.loading=index===0?'eager':'lazy';
+      const link=galleryHttpURL(image.link);
+      if(link){const anchor=document.createElement('a');anchor.href=link;anchor.target='_blank';anchor.rel='noopener noreferrer';anchor.append(img);wrap.append(anchor);}
+      else wrap.append(img);
+      box.append(wrap);
+    });
+  }
 }
 
 /* ===================== AUTO REFRESH ===================== */
