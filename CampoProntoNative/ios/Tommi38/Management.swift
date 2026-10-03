@@ -28,10 +28,10 @@ struct AgendaView: View {
                 if items.isEmpty { Text("Nessuna prenotazione in questo giorno").foregroundStyle(.secondary) }
                 ForEach(items) { item in VStack(alignment: .leading, spacing: 8) { BookingRow(booking: item); Text(item.status ?? "attiva").font(.caption).foregroundStyle(.secondary); if item.status != "cancelled" { Button("Annulla prenotazione", role: .destructive) { cancel = item }.font(.caption) } } }
             }
-        }.navigationTitle("Agenda").task { await load() }.onChange(of: day) { _, _ in Task { await load() } }.refreshable { await load() }
+        }.navigationTitle("Agenda").task(id: Clock.day(day)) { await load() }.refreshable { await load() }
             .confirmationDialog("Annullare questa prenotazione?", isPresented: Binding(get: { cancel != nil }, set: { if !$0 { cancel = nil } }), titleVisibility: .visible) { Button("Annulla prenotazione", role: .destructive) { let id = cancel?.id ?? ""; cancel = nil; Task { await store.perform { try await store.mutate("admin/reservations/" + id, method: "DELETE") }; await load() } } }
     }
-    func load() async { await store.perform { let response: Items<Booking> = try await store.request("admin/reservations?date=" + Clock.day(day)); items = response.items.sorted { $0.time < $1.time } } }
+    func load() async { let expectedDay = Clock.day(day); do { let response: Items<Booking> = try await store.request("admin/reservations?date=" + expectedDay); guard !Task.isCancelled, expectedDay == Clock.day(day) else { return }; items = response.items.sorted { $0.time < $1.time } } catch is CancellationError {} catch { if !Task.isCancelled { store.message = error.localizedDescription } } }
 }
 struct UsersView: View {
     @EnvironmentObject var store: BeachStore
@@ -85,7 +85,7 @@ struct VenueSettingsView: View {
                 Stepper("Prenotazioni per giorno: \(config.maxBookingsPerUserPerDay)", value: $config.maxBookingsPerUserPerDay, in: 1...50)
                 Stepper("Prenotazioni attive: \(config.maxActiveBookingsPerUser)", value: $config.maxActiveBookingsPerUser, in: 1...100)
                 Toggle("Consenti richieste di iscrizione", isOn: Binding(get: { config.registrationEnabled ?? false }, set: { config.registrationEnabled = $0 }))
-                Button("Salva orari") { Task { await store.perform { try await store.mutate("admin/config", method: "PUT", body: ["slotMinutes": config.slotMinutes, "dayStart": config.dayStart, "dayEnd": config.dayEnd, "maxBookingsPerUserPerDay": config.maxBookingsPerUserPerDay, "maxActiveBookingsPerUser": config.maxActiveBookingsPerUser, "registrationEnabled": config.registrationEnabled ?? false]); try await store.refresh(); store.message = "Orari salvati." } } }.disabled(store.busy)
+                Button("Salva orari") { Task { await store.perform { try await store.mutate("admin/config", method: "PUT", body: ["slotMinutes": config.slotMinutes, "dayStart": config.dayStart, "dayEnd": config.dayEnd, "maxBookingsPerUserPerDay": config.maxBookingsPerUserPerDay, "maxActiveBookingsPerUser": config.maxActiveBookingsPerUser, "registrationEnabled": config.registrationEnabled ?? false]); try await store.refresh(); store.message = "Orari salvati." } } }.disabled(store.busy || !Clock.validTime(config.dayStart) || !Clock.validTime(config.dayEnd) || Clock.minutes(config.dayEnd) - Clock.minutes(config.dayStart) < config.slotMinutes)
             }
             Section("Campi") {
                 ForEach(config.fields.indices, id: \.self) { i in HStack { TextField("Nome campo", text: $config.fields[i].name); Button { config.fields.remove(at: i) } label: { Image(systemName: "minus.circle").foregroundStyle(.red) }.buttonStyle(.plain) } }
@@ -96,7 +96,7 @@ struct VenueSettingsView: View {
             Section("Comunicazione agli utenti") { TextField("Messaggio", text: $note, axis: .vertical); Button("Salva messaggio") { Task { await store.perform { try await store.mutate("admin/notes", method: "PUT", body: ["text": note]); try await store.refresh(); store.message = "Messaggio salvato." } } }.disabled(store.busy) }
             Section("Foto dello stabilimento") {
                 GalleryView(photos: photos)
-                ForEach(photos.indices, id: \.self) { i in VStack { TextField("URL immagine https://", text: $photos[i].url).keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled(); TextField("Didascalia", text: Binding(get: { photos[i].caption ?? "" }, set: { photos[i].caption = $0 })); Button("Rimuovi foto", role: .destructive) { photos.remove(at: i) }.font(.caption) } }
+                ForEach(photos.indices, id: \.self) { i in VStack { TextField("URL immagine https://", text: $photos[i].url).keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled(); TextField("Didascalia", text: Binding(get: { photos[i].caption ?? "" }, set: { photos[i].caption = $0 })); TextField("Link facoltativo https://", text: Binding(get: { photos[i].link ?? "" }, set: { photos[i].link = $0 })).keyboardType(.URL).textInputAutocapitalization(.never).autocorrectionDisabled(); Button("Rimuovi foto", role: .destructive) { photos.remove(at: i) }.font(.caption) } }
                 if photos.count < 10 { Button("Aggiungi foto") { photos.append(Photo(url: "", caption: "", link: "")) } }
                 Text("Pubblica solo immagini per cui hai i diritti e il consenso delle persone riconoscibili.").font(.caption).foregroundStyle(.secondary)
                 Button("Salva foto") { Task { await store.perform { guard photos.allSatisfy({ URL(string: $0.url)?.scheme == "https" }) else { throw APIError(code: "URL_FOTO_NON_VALIDO") }; try await store.mutate("admin/gallery", method: "PUT", body: ["images": photos.map { ["url": $0.url, "caption": $0.caption ?? "", "link": $0.link ?? ""] }]); try await store.refresh(); store.message = "Foto salvate." } } }.disabled(store.busy)
@@ -122,7 +122,7 @@ struct ClosuresView: View {
                 TextField("Ora inizio HH:mm", text: $start).keyboardType(.numbersAndPunctuation)
                 TextField("Ora fine HH:mm", text: $end).keyboardType(.numbersAndPunctuation)
                 TextField("Motivo", text: $reason)
-                Button("Blocca campo") { Task { await store.perform { try await store.mutate("admin/closures", body: ["fieldId": field, "startDate": Clock.day(startDate), "endDate": Clock.day(endDate), "start": start, "end": end, "reason": reason]); try await load(); store.message = "Periodo bloccato." } } }.disabled(store.busy || field.isEmpty || reason.isEmpty)
+                Button("Blocca campo") { Task { await store.perform { try await store.mutate("admin/closures", body: ["fieldId": field, "startDate": Clock.day(startDate), "endDate": Clock.day(endDate), "start": start, "end": end, "reason": reason]); try await load(); store.message = "Periodo bloccato." } } }.disabled(store.busy || field.isEmpty || reason.isEmpty || !Clock.validTime(start) || !Clock.validTime(end) || Clock.minutes(end) <= Clock.minutes(start) || Clock.day(endDate) < Clock.day(startDate))
                 Text("Il periodo include la data finale. Le prenotazioni esistenti non vengono cancellate automaticamente.").font(.caption).foregroundStyle(.secondary)
             }
             Section("Chiusure programmate") { ForEach(closures) { c in VStack(alignment: .leading) { Text(store.config.fields.first { $0.id == c.fieldId }?.name ?? c.fieldId).bold(); Text("\(c.startDate ?? c.date ?? "") – \(c.endDate ?? c.date ?? "") · \(c.start)–\(c.end)").font(.caption); Text(c.reason ?? "").font(.caption); Button("Rimuovi chiusura", role: .destructive) { Task { await store.perform { try await store.mutate("admin/closures/" + c.id, method: "DELETE"); try await load() } } }.font(.caption) } } }

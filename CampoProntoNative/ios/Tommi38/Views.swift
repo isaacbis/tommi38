@@ -2,6 +2,8 @@ import SwiftUI
 
 struct RootView: View {
     @EnvironmentObject var store: BeachStore
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.scenePhase) private var scenePhase
     var body: some View {
         Group {
             if store.loading { ProgressView("Apro CampoPronto…") }
@@ -9,7 +11,10 @@ struct RootView: View {
             else if store.selected != nil { LoginView() }
             else { WelcomeView() }
         }
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.22), value: store.member != nil)
+        .animation(reduceMotion ? nil : .easeInOut(duration: 0.18), value: store.message)
         .task { await store.bootstrap() }
+        .onChange(of: scenePhase) { _, phase in if phase == .active, store.member != nil { Task { await store.perform { try await store.refresh() } } } }
         .safeAreaInset(edge: .bottom) {
             if let message = store.message {
                 HStack(alignment: .top) { Text(message).font(.footnote); Spacer(); Button { store.message = nil } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary) }.accessibilityLabel("Chiudi messaggio") }
@@ -29,11 +34,11 @@ struct WelcomeView: View {
             List {
                 Section {
                     VStack(alignment: .leading, spacing: 8) {
-                        Label("CampoPronto ADS", systemImage: "sportscourt.fill").font(.title2.bold()).foregroundStyle(.blue)
+                        HStack { Image(systemName: "sportscourt.fill").font(.title2).foregroundStyle(.white).padding(12).background(.blue.gradient, in: RoundedRectangle(cornerRadius: 16)); Text("CampoPronto ADS").font(.title2.bold()); Spacer() }
                         Text("Scegli dove giocare").font(.headline)
                         Text("Campi, partite e prenotazioni in un solo posto.").font(.subheadline).foregroundStyle(.secondary)
                     }.padding(.vertical, 8)
-                }
+                }.listRowBackground(LinearGradient(colors: [.blue.opacity(0.10), .cyan.opacity(0.04)], startPoint: .topLeading, endPoint: .bottomTrailing))
                 Section("Stabilimenti") {
                     Button { nearby.locate() } label: { Label(nearby.location == nil ? "Vicini a me" : "Ordinati per distanza", systemImage: "location") }
                     if let status = nearby.status { Text(status).font(.caption).foregroundStyle(.secondary) }
@@ -41,11 +46,11 @@ struct WelcomeView: View {
                     ForEach(filtered) { venue in
                         Button { Task { await store.choose(venue) } } label: {
                             HStack {
-                                Image(systemName: "mappin.circle.fill").font(.title).foregroundStyle(.blue)
+                                Image(systemName: "mappin.and.ellipse").font(.title3).foregroundStyle(.blue).frame(width: 42, height: 42).background(.blue.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
                                 VStack(alignment: .leading) { Text(venue.name).font(.headline).foregroundStyle(.primary); if let city = venue.city, !city.isEmpty { Text(city).font(.caption).foregroundStyle(.secondary) } }
                                 Spacer(); if let distance = nearby.distance(venue) { Text(String(format: "%.1f km", distance)).font(.caption).foregroundStyle(.secondary) }; Image(systemName: "chevron.right").font(.caption).foregroundStyle(.secondary)
                             }.padding(.vertical, 5)
-                        }.disabled(store.busy)
+                        }.buttonStyle(SoftPressStyle()).disabled(store.busy)
                     }
                 }
                 Section {
@@ -62,21 +67,44 @@ struct WelcomeView: View {
 }
 struct GalleryView: View {
     let photos: [Photo]
+    @State private var expanded: Photo?
     var body: some View {
         if !photos.isEmpty {
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 10) {
+                HStack(spacing: 8) {
                     ForEach(Array(photos.enumerated()), id: \.offset) { _, photo in
-                        VStack(alignment: .leading, spacing: 4) {
-                            AsyncImage(url: URL(string: photo.url)) { image in image.resizable().scaledToFill() } placeholder: { ZStack { Color.blue.opacity(0.08); Image(systemName: "photo").foregroundStyle(.secondary) } }
-                                .frame(width: 180, height: 110).clipped().clipShape(RoundedRectangle(cornerRadius: 12))
-                            if let caption = photo.caption, !caption.isEmpty { Text(caption).font(.caption).lineLimit(2).frame(width: 180, alignment: .leading) }
-                            if let link = photo.link, let url = URL(string: link), ["https", "http"].contains(url.scheme?.lowercased() ?? "") { Link("Scopri di più", destination: url).font(.caption) }
-                        }
+                        Button { expanded = photo } label: {
+                            VStack(alignment: .leading, spacing: 4) {
+                                AsyncImage(url: URL(string: photo.url)) { phase in
+                                    if let image = phase.image { image.resizable().scaledToFill() }
+                                    else { ZStack { Color.blue.opacity(0.08); Image(systemName: phase.error == nil ? "photo" : "photo.badge.exclamationmark").foregroundStyle(.secondary) } }
+                                }.frame(width: 112, height: 64).clipped().clipShape(RoundedRectangle(cornerRadius: 10))
+                                if let caption = photo.caption, !caption.isEmpty { Text(caption).font(.caption2).foregroundStyle(.secondary).lineLimit(1).frame(width: 112, alignment: .leading) }
+                            }
+                        }.buttonStyle(SoftPressStyle()).accessibilityLabel(photo.caption?.isEmpty == false ? photo.caption! : "Apri foto dello stabilimento")
+                    }
+                }.padding(.vertical, 2)
+            }
+            .sheet(isPresented: Binding(get: { expanded != nil }, set: { if !$0 { expanded = nil } })) {
+                if let photo = expanded {
+                    NavigationStack {
+                        VStack(spacing: 16) {
+                            AsyncImage(url: URL(string: photo.url)) { image in image.resizable().scaledToFit() } placeholder: { Image(systemName: "photo").font(.largeTitle).foregroundStyle(.secondary) }
+                            if let caption = photo.caption { Text(caption).font(.subheadline) }
+                            if let link = photo.link, let url = URL(string: link), ["https", "http"].contains(url.scheme?.lowercased() ?? "") { Link("Scopri di più", destination: url) }
+                        }.padding().navigationTitle("Foto dello stabilimento").navigationBarTitleDisplayMode(.inline).toolbar { Button("Chiudi") { expanded = nil } }
                     }
                 }
             }
         }
+    }
+}
+struct SoftPressStyle: ButtonStyle {
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label.opacity(configuration.isPressed ? 0.75 : 1)
+            .scaleEffect(configuration.isPressed && !reduceMotion ? 0.97 : 1)
+            .animation(reduceMotion ? nil : .easeOut(duration: 0.16), value: configuration.isPressed)
     }
 }
 struct LoginView: View {
@@ -125,7 +153,7 @@ struct DemoWizard: View {
     @Environment(\.dismiss) var dismiss
     @State private var setup = DemoSetup()
     @State private var step = 0
-    var valid: Bool { !setup.name.trimmingCharacters(in: .whitespaces).isEmpty && setup.fields.allSatisfy { !$0.trimmingCharacters(in: .whitespaces).isEmpty } && Set(setup.fields.map { $0.lowercased().trimmingCharacters(in: .whitespaces) }).count == setup.fields.count && Clock.minutes(setup.dayEnd) - Clock.minutes(setup.dayStart) >= setup.slotMinutes }
+    var valid: Bool { Clock.validTime(setup.dayStart) && Clock.validTime(setup.dayEnd) && !setup.name.trimmingCharacters(in: .whitespaces).isEmpty && setup.fields.allSatisfy { !$0.trimmingCharacters(in: .whitespaces).isEmpty } && Set(setup.fields.map { $0.lowercased().trimmingCharacters(in: .whitespaces) }).count == setup.fields.count && Clock.minutes(setup.dayEnd) - Clock.minutes(setup.dayStart) >= setup.slotMinutes }
     var body: some View {
         NavigationStack {
             Form {
@@ -159,6 +187,7 @@ struct DemoWizard: View {
 }
 struct MainView: View {
     @EnvironmentObject var store: BeachStore
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var account = false
     @State private var adChecked = false
     var body: some View {
@@ -172,7 +201,7 @@ struct MainView: View {
                 shell { CreditsView() }.tabItem { Label("Crediti", systemImage: "play.circle") }
             }
             shell { CommunityView() }.tabItem { Label("Giocatori", systemImage: "person.2") }
-        }.sheet(isPresented: $account) { AccountView() }
+        }.tint(.blue).animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: store.member?.role).sheet(isPresented: $account) { AccountView() }
         .task {
             guard !adChecked, store.member?.demo != true, store.member?.isManager != true else { return }; adChecked = true
             do { let status: AdsStatus = try await store.request("ads/status"); if status.available { try await NativeAds.shared.showLoginAd() } } catch { /* Advertising must never prevent access. */ }
@@ -202,17 +231,18 @@ struct HomeView: View {
     var body: some View {
         List {
             Section {
-                HStack { VStack(alignment: .leading, spacing: 5) { Text("Ciao, \(store.member?.username ?? "")").font(.title2.bold()); Text(store.member?.isManager == true ? "Gestisci il tuo stabilimento" : "Pronto a giocare?").foregroundStyle(.secondary) }; Spacer(); Image(systemName: "sportscourt.fill").font(.largeTitle).foregroundStyle(.blue) }.padding(.vertical, 8)
+                HStack { VStack(alignment: .leading, spacing: 5) { Text("Ciao, \(store.member?.username ?? "")").font(.title2.bold()); Text(store.member?.isManager == true ? "Gestisci il tuo stabilimento" : "Pronto a giocare?").foregroundStyle(.secondary) }; Spacer(); Image(systemName: "sportscourt.fill").font(.largeTitle).foregroundStyle(.white).padding(12).background(.blue.gradient, in: RoundedRectangle(cornerRadius: 18)) }.padding(.vertical, 8)
                 if store.member?.demo == true { Text("Stai provando come \(store.member?.isManager == true ? "gestore" : "utente"). Usa il pulsante in alto a sinistra per cambiare ruolo.").font(.footnote).foregroundStyle(.orange) }
                 GalleryView(photos: store.config.gallery ?? [])
             }
             Section {
                 NavigationLink { BookingView() } label: { Label("Prenota un campo", systemImage: "calendar.badge.plus").font(.headline) }
-                NavigationLink { CreditsView() } label: { HStack { Label("I tuoi crediti", systemImage: "circle.hexagongrid"); Spacer(); Text("\(store.member?.credits ?? 0)").font(.title3.bold()).foregroundStyle(.blue) } }
+                if store.member?.managementMode != true { NavigationLink { CreditsView() } label: { HStack { Label("I tuoi crediti", systemImage: "circle.hexagongrid"); Spacer(); Text("\(store.member?.credits ?? 0)").font(.title3.bold()).foregroundStyle(.blue) } } }
             }
             if let next = store.mine.sorted(by: { $0.date + $0.time < $1.date + $1.time }).first {
                 Section("La tua prossima partita") { BookingRow(booking: next) }
             }
+            if store.selected?.id == "tommi38" { Section { WeatherSummaryView() } }
             if let notes = store.config.notesText, !notes.isEmpty { Section("Dal tuo stabilimento") { Text(notes) } }
             Section("Come funziona") { Text("Un credito permette una prenotazione. Scegli il campo e un orario libero. Se è occupato, puoi entrare in lista d’attesa.").font(.footnote).foregroundStyle(.secondary) }
         }.refreshable { await store.perform { try await store.refresh() } }
@@ -230,42 +260,60 @@ struct BookingView: View {
     @State private var field = ""
     @State private var choice: String?
     @State private var occupied: Booking?
+    @State private var bookingUser = ""
+    @Environment(\.dynamicTypeSize) private var typeSize
+    @Environment(\.scenePhase) private var scenePhase
     var activeField: String { store.config.fields.contains(where: { $0.id == field }) ? field : (store.config.fields.first?.id ?? "") }
     var body: some View {
         List {
             Section {
                 DatePicker("Giorno", selection: $store.selectedDay, in: Date()..., displayedComponents: .date)
                 Picker("Campo", selection: Binding(get: { activeField }, set: { field = $0 })) { ForEach(store.config.fields) { Text($0.name).tag($0.id) } }.pickerStyle(.menu)
+                if store.member?.isManager == true {
+                    Picker("Prenota per", selection: $bookingUser) { Text("Scegli un utente").tag(""); ForEach(store.users.filter { $0.role == "user" && $0.disabled != true && $0.pendingApproval != true }) { user in Text(user.username).tag(user.username) } }
+                    Text("La prenotazione viene intestata all’utente scelto. Non vengono assegnati nuovi crediti.").font(.caption).foregroundStyle(.secondary)
+                }
+            }
+            Section {
+                if store.dayLoading { HStack { ProgressView(); Text("Aggiorno gli orari…").font(.caption).foregroundStyle(.secondary) } }
             }
             Section("Scegli l’orario") {
                 if store.config.fields.isEmpty { ContentUnavailableView("Nessun campo disponibile", systemImage: "sportscourt", description: Text("Il gestore deve configurare i campi.")) }
                 else {
-                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: 4), spacing: 8) {
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: typeSize.isAccessibilitySize ? 2 : 4), spacing: 8) {
                         ForEach(Clock.slots(store.config), id: \.self) { time in
-                            let booked = store.bookings.first { $0.fieldId == activeField && $0.time == time }
+                            let booked = store.bookings.first { $0.overlaps(day: Clock.day(store.selectedDay), field: activeField, time: time, duration: store.config.slotMinutes, fallbackDuration: store.config.slotMinutes) }
                             let closed = store.closures.contains { $0.fieldId == activeField && $0.contains(Clock.day(store.selectedDay), time, duration: store.config.slotMinutes) }
                             let past = (Clock.date(day: Clock.day(store.selectedDay), time: time) ?? .distantPast) <= Date()
                             Button { if let booked { occupied = booked } else { choice = time } } label: {
                                 VStack(spacing: 3) { Text(time).font(.subheadline.monospacedDigit().bold()); Text(closed ? "Chiuso" : (booked == nil ? "Libero" : "Occupato")).font(.system(size: 10)) }
                                     .frame(maxWidth: .infinity, minHeight: 44).foregroundStyle(closed || past ? Color.secondary : (booked == nil ? Color.blue : Color.orange))
                                     .background((booked == nil ? Color.blue : Color.orange).opacity(closed || past ? 0.04 : 0.1), in: RoundedRectangle(cornerRadius: 9))
-                            }.buttonStyle(.plain).disabled(closed || past || store.busy)
+                            }.buttonStyle(SoftPressStyle()).disabled(closed || past || store.busy || store.dayLoading || (store.member?.isManager == true && bookingUser.isEmpty))
                         }
                     }.padding(.vertical, 5)
                 }
             }
             Section { Label("\(store.config.slotMinutes) minuti · 1 credito", systemImage: "clock").font(.caption); Text("Gli orari si riferiscono al fuso orario italiano.").font(.caption).foregroundStyle(.secondary) }
         }
-        .task { await store.perform { try await store.loadDay() } }
-        .onChange(of: store.selectedDay) { _, _ in Task { await store.perform { try await store.loadDay() } } }
+        .task { if store.member?.isManager == true { await store.perform { try await store.loadUsers() } } }
+        .task(id: Clock.day(store.selectedDay)) {
+            do {
+                try await store.loadDay()
+                while !Task.isCancelled {
+                    try await Task.sleep(for: .seconds(20))
+                    if scenePhase == .active, !store.busy { try await store.loadDay() }
+                }
+            } catch is CancellationError {} catch { if !Task.isCancelled { store.message = error.localizedDescription } }
+        }
         .refreshable { await store.perform { try await store.loadDay() } }
         .alert("Conferma prenotazione", isPresented: Binding(get: { choice != nil }, set: { if !$0 { choice = nil } })) {
             Button("Annulla", role: .cancel) { choice = nil }
-            Button("Prenota · 1 credito") { let time = choice ?? ""; choice = nil; Task { await store.perform { try await store.mutate("reservations", body: ["fieldId": activeField, "date": Clock.day(store.selectedDay), "time": time]); try await store.refresh(); store.message = "Prenotazione confermata." } } }
+            Button(store.member?.isManager == true ? "Conferma per utente" : "Prenota · 1 credito") { let time = choice ?? ""; choice = nil; Task { await store.perform { if store.member?.isManager == true { try await store.mutate("admin/reservations", body: ["username": bookingUser, "fieldId": activeField, "date": Clock.day(store.selectedDay), "time": time]) } else { try await store.mutate("reservations", body: ["fieldId": activeField, "date": Clock.day(store.selectedDay), "time": time]) }; try await store.refresh(); store.message = "Prenotazione confermata." } } }
         } message: { Text("\(store.config.fields.first { $0.id == activeField }?.name ?? "Campo") · \(Clock.day(store.selectedDay)) alle \(choice ?? "")") }
         .alert("Orario occupato", isPresented: Binding(get: { occupied != nil }, set: { if !$0 { occupied = nil } })) {
             Button("Chiudi", role: .cancel) { occupied = nil }
-            if occupied?.user != store.member?.username { Button("Entra in lista d’attesa") { let id = occupied?.id ?? ""; occupied = nil; Task { await store.perform { try await store.mutate("waitlist", body: ["reservationId": id]); store.message = "Sei in lista d’attesa. Puoi controllare la disponibilità nella sezione Giocatori." } } } }
+            if store.member?.managementMode != true && occupied?.user != store.member?.username { Button("Entra in lista d’attesa") { let id = occupied?.id ?? ""; occupied = nil; Task { await store.perform { try await store.mutate("waitlist", body: ["reservationId": id]); store.message = "Sei in lista d’attesa. Puoi controllare la disponibilità nella sezione Giocatori." } } } }
         } message: { Text("Puoi controllare se si libera dalla tua lista d’attesa.") }
     }
 }
@@ -301,7 +349,7 @@ struct CreditsView: View {
                 }
             }
             Section("Pacchetti crediti") { Text("Gli acquisti non sono ancora disponibili. Verranno mostrati qui quando il servizio di pagamento sarà attivo.").font(.footnote).foregroundStyle(.secondary) }
-            Section("Movimenti") { if store.movements.isEmpty { Text("Nessun movimento").foregroundStyle(.secondary) }; ForEach(store.movements) { m in HStack { VStack(alignment: .leading) { Text(m.reason); if let at = m.at { Text(String(at.prefix(10))).font(.caption).foregroundStyle(.secondary) } }; Spacer(); Text(m.delta > 0 ? "+\(m.delta)" : "\(m.delta)").foregroundStyle(m.delta > 0 ? .green : .primary).monospacedDigit() } } }
+            Section("Movimenti") { if store.movements.isEmpty { Text("Nessun movimento").foregroundStyle(.secondary) }; ForEach(store.movements) { m in HStack { VStack(alignment: .leading) { Text(m.displayReason); if let at = m.at { Text(String(at.prefix(10))).font(.caption).foregroundStyle(.secondary) } }; Spacer(); Text(m.delta > 0 ? "+\(m.delta)" : "\(m.delta)").foregroundStyle(m.delta > 0 ? .green : .primary).monospacedDigit() } } }
         }.task { await store.perform { try await store.loadCredits() } }.refreshable { await store.perform { try await store.loadCredits() } }
     }
     func reward() async {
@@ -339,6 +387,7 @@ struct CommunityView: View {
                 if store.searches.isEmpty { Text("Nessuna partita aperta. Puoi cercare giocatori da una tua prenotazione.").foregroundStyle(.secondary) }
                 ForEach(store.searches) { item in NavigationLink { SearchDetailView(search: item) } label: { VStack(alignment: .leading, spacing: 4) { Text(store.config.fields.first { $0.id == item.fieldId }?.name ?? item.fieldId).font(.headline); Text("\(item.date) · \(item.time) · \(item.spotsAvailable ?? item.spotsNeeded ?? 0) posti").font(.caption); if let note = item.note { Text(note).font(.subheadline).foregroundStyle(.secondary) } } } }
             }
+            if store.member?.managementMode != true { Section { NavigationLink("Utenti bloccati") { BlockedUsersView() } } }
             Section("La tua lista d’attesa") {
                 if store.waiting.isEmpty { Text("Nessun orario in attesa").foregroundStyle(.secondary) }
                 ForEach(store.waiting) { item in VStack(alignment: .leading) { Text("\(store.config.fields.first { $0.id == item.fieldId }?.name ?? item.fieldId) · \(item.date) · \(item.time)"); if item.available == true { Text("Si è liberato! Prenota dalla sezione Campi.").foregroundStyle(.green) }; Button("Rimuovi", role: .destructive) { Task { await store.perform { try await store.mutate("waitlist/" + item.id, method: "DELETE"); try await store.loadCommunity() } } }.font(.caption) } }
@@ -360,7 +409,7 @@ struct SearchDetailView: View {
     @EnvironmentObject var store: BeachStore
     @Environment(\.dismiss) var dismiss
     let search: PlayerSearch
-    @State private var name = ""
+    @State private var names = [""]
     @State private var phone = ""
     @State private var reason = "other"
     var body: some View {
@@ -374,7 +423,7 @@ struct SearchDetailView: View {
             } else if let r = search.myRequest {
                 Section { Text("La tua richiesta: \(r.status ?? "In attesa")"); Button("Ritira richiesta", role: .destructive) { Task { await store.perform { try await store.mutate("player-searches/\(search.id)/requests/\(r.id)", method: "DELETE"); try await store.loadCommunity(); dismiss() } } } }
             } else {
-                Section("Chiedi di partecipare") { TextField("Nome del giocatore", text: $name); TextField("Telefono per l’organizzatore", text: $phone).keyboardType(.phonePad); Text("Nome e telefono saranno visibili all’organizzatore e al gestore.").font(.caption); Button("Invia richiesta") { Task { await store.perform { try await store.mutate("player-searches/\(search.id)/requests", body: ["participantNames": [name], "phone": phone]); try await store.loadCommunity(); dismiss() } } }.disabled(name.count < 2 || phone.count < 6 || store.busy) }
+                Section("Chiedi di partecipare") { ForEach(names.indices, id: \.self) { i in TextField("Nome giocatore \(i + 1)", text: $names[i]) }; if names.count < min(12, search.spotsAvailable ?? search.spotsNeeded ?? 1) { Button("Aggiungi giocatore") { names.append("") } }; if names.count > 1 { Button("Rimuovi ultimo giocatore") { names.removeLast() } }; TextField("Telefono per l’organizzatore", text: $phone).keyboardType(.phonePad); Text("Nome e telefono saranno visibili all’organizzatore e al gestore.").font(.caption); Button("Invia richiesta") { Task { await store.perform { try await store.mutate("player-searches/\(search.id)/requests", body: ["participantNames": names.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }, "phone": phone]); try await store.loadCommunity(); dismiss() } } }.disabled(names.contains { $0.trimmingCharacters(in: .whitespacesAndNewlines).count < 2 } || phone.count < 6 || store.busy) }
             }
             Section("Segnala un problema") { Picker("Motivo", selection: $reason) { Text("Molestie").tag("harassment"); Text("Contenuto offensivo").tag("offensive"); Text("Spam").tag("spam"); Text("Privacy").tag("privacy"); Text("Altro").tag("other") }; Button("Segnala al gestore", role: .destructive) { Task { await store.perform { try await store.mutate("player-searches/\(search.id)/report", body: ["reason": reason]); store.message = "Segnalazione inviata al gestore." } } }.disabled(store.busy); if search.isOwner != true { Button("Blocca l’organizzatore", role: .destructive) { Task { await store.perform { try await store.mutate("community/blocks", body: ["searchId": search.id]); try await store.loadCommunity(); dismiss() } } }.disabled(store.busy) } }
         }.navigationTitle("Giocatori")
@@ -420,5 +469,38 @@ struct PasswordView: View {
                 old = ""; new = ""; repeatPassword = ""; store.message = "Password aggiornata."; dismiss()
             } } }.disabled(store.busy || new.count < 12 || new != repeatPassword || (target == nil && old.isEmpty))
         }.navigationTitle("Password")
+    }
+}
+
+struct BlockedUser: Decodable, Identifiable { let id: String; let username: String }
+struct BlockedUsersView: View {
+    @EnvironmentObject var store: BeachStore
+    @State private var items: [BlockedUser] = []
+    var body: some View {
+        List {
+            if items.isEmpty { ContentUnavailableView("Nessun utente bloccato", systemImage: "person.crop.circle.badge.checkmark") }
+            ForEach(items) { user in HStack { Text(user.username); Spacer(); Button("Sblocca") { Task { await store.perform { try await store.mutate("community/blocks/" + user.id, method: "DELETE"); try await load(); try await store.loadCommunity() } } }.disabled(store.busy) } }
+        }.navigationTitle("Utenti bloccati").task { await store.perform { try await load() } }.refreshable { await store.perform { try await load() } }
+    }
+    func load() async throws { let response: Items<BlockedUser> = try await store.request("community/blocks"); items = response.items }
+}
+
+struct WeatherForecast: Decodable {
+    struct Daily: Decodable { let time: [String]; let weathercode: [Int]; let temperature_2m_max: [Double]; let temperature_2m_min: [Double] }
+    let daily: Daily
+}
+struct WeatherSummaryView: View {
+    @EnvironmentObject var store: BeachStore
+    @State private var forecast: WeatherForecast?
+    var body: some View {
+        DisclosureGroup("Meteo · area Tommi38") {
+            if let daily = forecast?.daily {
+                ForEach(Array(daily.time.prefix(3).enumerated()), id: \.offset) { index, day in
+                    if index < daily.temperature_2m_max.count && index < daily.temperature_2m_min.count {
+                        HStack { Text(day); Spacer(); Text("\(Int(daily.temperature_2m_max[index].rounded()))° / \(Int(daily.temperature_2m_min[index].rounded()))°").monospacedDigit() }.font(.caption)
+                    }
+                }
+            } else { Text("Previsioni non disponibili al momento").font(.caption).foregroundStyle(.secondary) }
+        }.task { forecast = try? await store.request("weather") }
     }
 }

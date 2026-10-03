@@ -40,6 +40,11 @@ struct Booking: Codable, Identifiable {
     var time: String
     var user: String?
     var status: String?
+    var slotMinutes: Int?
+    func overlaps(day: String, field: String, time: String, duration: Int, fallbackDuration: Int) -> Bool {
+        guard date == day, fieldId == field, status != "cancelled" else { return false }
+        return Clock.minutes(time) < Clock.minutes(self.time) + (slotMinutes ?? fallbackDuration) && Clock.minutes(time) + duration > Clock.minutes(self.time)
+    }
 }
 struct Closure: Codable, Identifiable {
     var id: String
@@ -57,6 +62,17 @@ struct Closure: Codable, Identifiable {
     }
 }
 struct CreditMovement: Codable, Identifiable { var id: String; var delta: Int; var reason: String; var at: String? }
+extension CreditMovement {
+    var displayReason: String {
+        switch reason {
+        case "booking", "reservation": return "Prenotazione campo"
+        case "refund", "cancellation": return "Rimborso prenotazione"
+        case "ad_reward", "rewarded_ad", "admob_reward": return "Video premio"
+        case "admin", "admin_adjustment": return "Rettifica amministratore"
+        default: return reason.contains("_") ? reason.replacingOccurrences(of: "_", with: " ").capitalized : reason
+        }
+    }
+}
 struct CreditResponse: Codable { var balance: Int; var items: [CreditMovement] }
 struct BookingResponse: Codable { var items: [Booking]; var closures: [Closure]? }
 struct Items<T: Decodable>: Decodable { let items: [T] }
@@ -81,8 +97,13 @@ struct PlayerSearch: Codable, Identifiable {
 enum Clock {
     static var calendar: Calendar { var c = Calendar(identifier: .gregorian); c.timeZone = TimeZone(identifier: "Europe/Rome")!; return c }
     static func day(_ date: Date) -> String { let f = DateFormatter(); f.calendar = calendar; f.timeZone = calendar.timeZone; f.dateFormat = "yyyy-MM-dd"; return f.string(from: date) }
-    static func minutes(_ time: String) -> Int { let parts = time.split(separator: ":").compactMap { Int($0) }; return parts.count == 2 ? parts[0] * 60 + parts[1] : 0 }
-    static func slots(_ config: VenueConfig) -> [String] { guard config.slotMinutes > 0 else { return [] }; return stride(from: minutes(config.dayStart), through: minutes(config.dayEnd) - config.slotMinutes, by: config.slotMinutes).map { String(format: "%02d:%02d", $0 / 60, $0 % 60) } }
+    static func validTime(_ time: String) -> Bool {
+        guard time.range(of: "^[0-9]{2}:[0-9]{2}$", options: .regularExpression) != nil else { return false }
+        let parts = time.split(separator: ":").compactMap { Int($0) }
+        return parts.count == 2 && (0...23).contains(parts[0]) && (0...59).contains(parts[1])
+    }
+    static func minutes(_ time: String) -> Int { guard validTime(time) else { return 0 }; let parts = time.split(separator: ":").compactMap { Int($0) }; return parts[0] * 60 + parts[1] }
+    static func slots(_ config: VenueConfig) -> [String] { guard config.slotMinutes > 0, validTime(config.dayStart), validTime(config.dayEnd), minutes(config.dayEnd) >= minutes(config.dayStart) + config.slotMinutes else { return [] }; return stride(from: minutes(config.dayStart), through: minutes(config.dayEnd) - config.slotMinutes, by: config.slotMinutes).map { String(format: "%02d:%02d", $0 / 60, $0 % 60) } }
     static func date(day: String, time: String) -> Date? { let f = DateFormatter(); f.calendar = calendar; f.timeZone = calendar.timeZone; f.dateFormat = "yyyy-MM-dd HH:mm"; return f.date(from: day + " " + time) }
 }
 struct APIError: LocalizedError {

@@ -2,7 +2,7 @@
 
 Interfaccia SwiftUI collegata al servizio esistente `https://tommi38.onrender.com/api`. Non crea un database Firebase separato e non usa WKWebView. Gli account, i controlli sui ruoli e gli accrediti verificati rimangono sul backend esistente.
 
-Aprire `ios/Tommi38.xcodeproj`. Versione 2.0, build 41. Bundle `isaacmorganti.Tommi38IOS`, team già usato dalla versione pubblicata. Xcode 27, iOS 17 o successivo. Google Mobile Ads 13.10.0 e UMP 3.1.0 fissati nel progetto.
+Aprire `ios/Tommi38.xcodeproj`. Versione 2.0, build 42 (migliorie successive alla build 41 inviata ad Apple). Bundle `isaacmorganti.Tommi38IOS`, team già usato dalla versione pubblicata. Xcode 27, iOS 17 o successivo. Google Mobile Ads 13.10.0 e UMP 3.1.0 fissati nel progetto.
 
 Debug mostra solo annunci di test e non assegna crediti reali. Release usa le unità AdMob di produzione; solo la conferma firmata del server può assegnare un credito. La demo pubblica non mostra annunci e non effettua pagamenti. I pacchetti a pagamento restano disattivati.
 

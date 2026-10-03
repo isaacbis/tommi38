@@ -22,6 +22,7 @@ final class BeachStore: ObservableObject {
     @Published var busy = false
     @Published var loading = true
     @Published var selectedDay = Date()
+    @Published var dayLoading = false
     private var generation = 0
     private var dayGeneration = 0
     private let base = URL(string: "https://tommi38.onrender.com/api/")!
@@ -97,14 +98,18 @@ final class BeachStore: ObservableObject {
         guard member != nil else { return }
         config = try await request("public/config")
         member = try await request("me")
+        if let venue = member?.establishment { selected = venue }
         if member?.managementMode != true { let result: Items<Booking> = try await request("reservations/mine"); mine = result.items } else { mine = [] }
         try await loadDay()
         await BookingReminders.sync(mine, fields: config.fields, enabled: member?.demo != true && UserDefaults.standard.bool(forKey: "bookingReminders"))
     }
     func loadDay() async throws {
         dayGeneration += 1; let expectedDay = dayGeneration
-        let result: BookingResponse = try await request("reservations?date=" + Clock.day(selectedDay))
-        guard expectedDay == dayGeneration else { return }
+        dayLoading = true
+        defer { if expectedDay == dayGeneration { dayLoading = false } }
+        let day = Clock.day(selectedDay)
+        let result: BookingResponse = try await request("reservations?date=" + day)
+        guard expectedDay == dayGeneration, day == Clock.day(selectedDay) else { return }
         bookings = result.items; closures = result.closures ?? []
     }
     func loadCredits() async throws {
@@ -113,7 +118,7 @@ final class BeachStore: ObservableObject {
     }
     func loadCommunity() async throws {
         let r: Items<PlayerSearch> = try await request("player-searches"); searches = r.items
-        let w: Items<WaitEntry> = try await request("waitlist"); waiting = w.items
+        if member?.managementMode != true { let w: Items<WaitEntry> = try await request("waitlist"); waiting = w.items } else { waiting = [] }
     }
     func loadUsers() async throws { let r: Items<ManagedUser> = try await request("admin/users"); users = r.items }
     func loadPlatform() async throws { let r: Items<Venue> = try await request("platform/establishments"); platformVenues = r.items }
@@ -143,7 +148,7 @@ final class BeachStore: ObservableObject {
     }
     func clearSession() {
         BookingReminders.clear()
-        generation += 1; member = nil; selected = nil; mine = []; bookings = []; movements = []; searches = []; users = []; waiting = []; platformVenues = []; config = VenueConfig(); ads = nil
+        generation += 1; dayGeneration += 1; dayLoading = false; closures = []; selectedDay = Date(); member = nil; selected = nil; mine = []; bookings = []; movements = []; searches = []; users = []; waiting = []; platformVenues = []; config = VenueConfig(); ads = nil
         HTTPCookieStorage.shared.cookies?.filter { $0.domain.contains("tommi38.onrender.com") }.forEach { HTTPCookieStorage.shared.deleteCookie($0) }
         SecureSession.remove(); UserDefaults.standard.removeObject(forKey: "venue")
     }
