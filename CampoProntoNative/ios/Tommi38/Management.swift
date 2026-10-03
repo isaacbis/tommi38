@@ -8,6 +8,7 @@ struct ManagementView: View {
                 NavigationLink { StatisticsView() } label: { Label("Statistiche", systemImage: "chart.bar") }
                 NavigationLink { AgendaView() } label: { Label("Prenotazioni per giorno", systemImage: "calendar") }
                 NavigationLink { UsersView() } label: { Label("Utenti e approvazioni", systemImage: "person.2") }
+                NavigationLink { RecoveryRequestsView() } label: { Label("Richieste recupero password", systemImage: "key") }
                 NavigationLink { VenueSettingsView() } label: { Label("Campi, orari e foto", systemImage: "slider.horizontal.3") }
                 NavigationLink { ClosuresView() } label: { Label("Chiusure e periodi bloccati", systemImage: "lock") }
                 NavigationLink { ReportsView() } label: { Label("Segnalazioni giocatori", systemImage: "flag") }
@@ -61,14 +62,26 @@ struct UserDetailView: View {
     let user: ManagedUser
     @State private var delta = 1
     @State private var resetPassword = false
+    @State private var newUsername = ""
+    @State private var chosenRole = "user"
     var body: some View {
         Form {
             Section { Text(user.username).font(.headline); Text("\(user.credits) crediti"); Text(user.pendingApproval == true ? "Iscrizione da approvare" : (user.disabled == true ? "Disabilitato" : "Attivo")) }
             Section { Button("Reimposta password") { resetPassword = true }; Button(user.disabled == true || user.pendingApproval == true ? "Approva / abilita utente" : "Disabilita utente", role: user.disabled == true ? nil : .destructive) { Task { await store.perform { try await store.mutate("admin/users/status", method: "PUT", body: ["username": user.username, "disabled": user.pendingApproval == true ? false : !(user.disabled ?? false)]); try await store.loadUsers(); dismiss() } } }.disabled(store.busy || user.username == store.member?.username) }
             if store.member?.platformAdmin == true {
+                Section("Ruolo nello stabilimento") {
+                    Picker("Ruolo", selection: $chosenRole) { Text("Utente").tag("user"); Text("Gestore").tag("admin") }
+                    Text("Il gestore può amministrare solo questo stabilimento. La modifica richiede un nuovo accesso dell’utente.").font(.caption).foregroundStyle(.secondary)
+                    Button("Aggiorna ruolo") { Task { await store.perform { try await store.mutate("admin/users/role", method: "PUT", body: ["username": user.username, "role": chosenRole]); try await store.loadUsers(); dismiss() } } }.disabled(store.busy || chosenRole == user.role || user.username == store.member?.username)
+                }
                 Section("Rettifica crediti · Solo amministratore globale") { Stepper("Variazione: \(delta > 0 ? "+" : "")\(delta)", value: $delta, in: -100...100); Button("Applica rettifica") { Task { await store.perform { try await store.mutate("admin/users/credits", method: "PUT", body: ["username": user.username, "delta": delta]); try await store.loadUsers(); dismiss() } } }.disabled(store.busy || delta == 0) }
             } else { Text("In CampoPronto ADS i crediti si ottengono con video o pacchetti disponibili. Il gestore non può assegnarli.").font(.footnote).foregroundStyle(.secondary) }
-        }.navigationTitle("Gestisci utente").sheet(isPresented: $resetPassword) { PasswordView(target: user.username) }
+        Section("Nome utente") {
+                TextField("Nuovo username", text: $newUsername).textInputAutocapitalization(.never).autocorrectionDisabled()
+                Text("Le prenotazioni e i crediti vengono mantenuti. Comunica il nuovo username all’utente.").font(.caption).foregroundStyle(.secondary)
+                Button("Rinomina utente") { Task { await store.perform { try await store.mutate("admin/users/rename", body: ["oldUsername": user.username, "newUsername": newUsername]); try await store.loadUsers(); dismiss() } } }.disabled(store.busy || newUsername == user.username || newUsername.range(of: "^[a-zA-Z0-9._-]{3,40}$", options: .regularExpression) == nil || user.username == store.member?.username)
+            }
+        }.navigationTitle("Gestisci utente").onAppear { newUsername = user.username; chosenRole = user.role }.sheet(isPresented: $resetPassword) { PasswordView(target: user.username) }
     }
 }
 struct VenueSettingsView: View {
@@ -184,4 +197,18 @@ struct PlatformVenueView: View {
             Button("Gestisci questo stabilimento") { Task { await store.switchVenue(venue); if store.selected?.id == venue.id { dismiss() } } }.disabled(store.busy || !enabled)
         }.navigationTitle(venue.name).onAppear { name = venue.name; city = venue.city ?? ""; visible = venue.visibility == "public"; enabled = venue.enabled ?? true; latitude = venue.latitude.map { String($0) } ?? ""; longitude = venue.longitude.map { String($0) } ?? "" }
     }
+}
+
+struct RecoveryRequest: Decodable, Identifiable { let username: String; var id: String { username } }
+struct RecoveryRequestsView: View {
+    @EnvironmentObject var store: BeachStore
+    @State private var items: [RecoveryRequest] = []
+    var body: some View {
+        List {
+            if items.isEmpty { Text("Nessuna richiesta in attesa").foregroundStyle(.secondary) }
+            ForEach(items) { request in NavigationLink { PasswordView(target: request.username) } label: { Label(request.username, systemImage: "key") } }
+            Text("Verifica l’identità dell’utente prima di reimpostare la password e comunica le credenziali in modo sicuro.").font(.caption).foregroundStyle(.secondary)
+        }.navigationTitle("Recupero password").task { await load() }.refreshable { await load() }
+    }
+    func load() async { await store.perform { let response: Items<RecoveryRequest> = try await store.request("auth/admin/recovery-requests"); items = response.items } }
 }

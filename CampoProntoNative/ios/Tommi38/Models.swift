@@ -128,6 +128,11 @@ struct APIError: LocalizedError {
         case "GLOBAL_ADMIN_REQUIRED": return "Solo l’amministratore globale può rettificare i crediti."
         case "BAD_BODY", "COORDINATE_NON_VALIDE", "URL_FOTO_NON_VALIDO": return "Controlla i dati inseriti e riprova."
         case "WRONG_PASSWORD": return "La password attuale non è corretta."
+        case "USER_EXISTS", "USERNAME_TAKEN": return "Questo username è già utilizzato. Scegline un altro."
+        case "FIELD_HAS_RESERVATIONS": return "Il campo contiene prenotazioni e non può essere rimosso."
+        case "BAD_FIELDS": return "Controlla i nomi e gli identificativi dei campi."
+        case "CONFIG_CHANGED": return "Le impostazioni sono cambiate. Aggiorna gli orari prima di prenotare."
+        case "PROTECTED_ACCOUNT", "CANNOT_RENAME_CURRENT_USER": return "L’account amministratore attuale è protetto da questa modifica."
         case "NETWORK": return "Connessione non disponibile. Riprova."
         default: return "Operazione non riuscita. Aggiorna i dati e riprova, oppure contatta il gestore."
         }

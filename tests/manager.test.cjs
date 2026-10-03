@@ -42,3 +42,9 @@ test('ADS manager cannot assign or remove credits even with a forged platform fl
  for(const delta of [10,-1])assert.equal((await e.call('put','/admin/users/credits',{tenant:'beach-a',session:{user:{username:'manager',role:'admin',platformAdmin:true,establishment:'beach-a'}},body:{username:'alice',delta}})).code,403);
  assert.deepEqual(e.data,before);
 });
+
+test('legacy court IDs with spaces remain editable, path separators are rejected',async()=>{
+ const e=setup();
+ assert.equal((await e.call('put','/admin/fields',{tenant:'beach-a',user:'manager',body:{fields:[{id:'beach volley 1',name:'Volley 1'}]}})).code,200);
+ assert.equal((await e.call('put','/admin/fields',{tenant:'beach-a',user:'manager',body:{fields:[{id:'court/other',name:'Invalid'}]}})).code,400);
+});

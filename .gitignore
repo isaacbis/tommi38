@@ -20,3 +20,11 @@ npm-debug.log*
 xcuserdata/
 *.xcuserstate
 DerivedData/
+
+# Prepared public-only Firebase bundle
+firebase-public/
+backend/.env.*
+
+.firebase/
+firebase-debug.log
+firebase-debug.*.log

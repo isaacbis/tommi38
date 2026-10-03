@@ -8,7 +8,10 @@ final class NativeAds: NSObject, FullScreenContentDelegate {
     static let shared = NativeAds()
     private var rewarded: RewardedAd?
     private var interstitial: InterstitialAd?
-    private var lastInterstitial = Date.distantPast
+    private var lastInterstitial: Date {
+        get { Date(timeIntervalSince1970: UserDefaults.standard.double(forKey: "lastLoginInterstitial")) }
+        set { UserDefaults.standard.set(newValue.timeIntervalSince1970, forKey: "lastLoginInterstitial") }
+    }
     private var continuation: CheckedContinuation<Bool, Error>?
     private var earned = false
     private var started = false

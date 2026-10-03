@@ -264,3 +264,31 @@ test('cross-origin mutations are refused, same-origin and native requests are ac
     }
   });
 });
+
+test('Firebase Hosting uses a secure __session cookie and preserves the signed account session', async () => {
+  const { createApp } = await import(pathToFileURL(path.join(__dirname, '../backend/server.js')));
+  const { FirestoreSessionStore } = await storeModule;
+  const db = database();
+  const app = createApp({ ...routeOptions(), secret: SECRET, sessionStore: new FirestoreSessionStore({db,secret:SECRET}), cookieName:'__session', secureCookies:true, allowedOrigins:['https://ombrelloni-ddb55.web.app'] });
+  await serve(app, async base => {
+    const response = await fetch(base+'/api/session-test',{method:'POST',headers:{Origin:'https://ombrelloni-ddb55.web.app','X-Forwarded-Proto':'https'}});
+    assert.equal(response.status,200);
+    const cookie=response.headers.get('set-cookie');
+    assert.match(cookie,/^__session=/); assert.match(cookie,/Secure/); assert.match(cookie,/HttpOnly/); assert.match(cookie,/SameSite=Lax/);
+    assert.equal(response.headers.get('cache-control'),'no-store');
+    const current=await fetch(base+'/api/session-test',{headers:{Cookie:cookie.split(';')[0],'X-Forwarded-Proto':'https'}});
+    assert.equal((await current.json()).username,'local-test');
+  });
+});
+
+test('Firebase allowed origin does not permit arbitrary origins or cross-site mutations', async () => {
+  const { createApp } = await import(pathToFileURL(path.join(__dirname, '../backend/server.js')));
+  const { FirestoreSessionStore } = await storeModule;
+  const app=createApp({...routeOptions(),secret:SECRET,sessionStore:new FirestoreSessionStore({db:database(),secret:SECRET}),allowedOrigins:['https://ombrelloni-ddb55.web.app']});
+  await serve(app,async base=>{
+    for(const headers of [{Origin:'https://attacker.invalid'},{Origin:'https://ombrelloni-ddb55.web.app','Sec-Fetch-Site':'cross-site'}]) {
+      const response=await fetch(base+'/api/session-test',{method:'POST',headers});
+      assert.equal(response.status,403); assert.equal((await response.json()).error,'CROSS_ORIGIN_REQUEST');
+    }
+  });
+});

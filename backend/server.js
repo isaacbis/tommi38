@@ -34,11 +34,11 @@ export const PUBLIC_FILES = new Map([
   ].map(file => [`/${file}`, file])
 ]);
 
-export function sameOriginMutation(req, res, next) {
+export function sameOriginMutation(req, res, next, allowedOrigins = []) {
   if (["GET", "HEAD", "OPTIONS"].includes(req.method)) return next();
   const origin = req.get("Origin");
   const expected = `${req.protocol}://${req.get("Host")}`;
-  if ((origin && origin !== expected) || req.get("Sec-Fetch-Site") === "cross-site") {
+  if ((origin && origin !== expected && !allowedOrigins.includes(origin)) || req.get("Sec-Fetch-Site") === "cross-site") {
     return res.status(403).json({ error: "CROSS_ORIGIN_REQUEST" });
   }
   next();
@@ -50,10 +50,13 @@ export function createApp({
   apiRoutes = routes,
   platformRoutes = platformRouter,
   accountRoutes = accountRouter,
-  tenantResolver = tenantMiddleware
+  tenantResolver = tenantMiddleware,
+  cookieName = process.env.SESSION_COOKIE_NAME || "tommi38sid",
+  secureCookies = process.env.NODE_ENV === "production",
+  allowedOrigins = []
 } = {}) {
   const app = express();
-  // Render terminates TLS at its reverse proxy.
+  // The hosting platform terminates TLS at its reverse proxy.
   app.set("trust proxy", 1);
   app.disable("x-powered-by");
   app.use(helmet({
@@ -80,15 +83,15 @@ export function createApp({
   // Health and public assets do not need a database round trip or session.
   app.get("/api/health", (req, res) => res.json({
     ok: true,
-    version: process.env.RENDER_GIT_COMMIT || "local",
+    version: process.env.APP_VERSION || process.env.RENDER_GIT_COMMIT || "local",
     time: new Date().toISOString()
   }));
 
   app.get("/api/admob/ssv", admobCallback);
 
-  app.use("/api", sameOriginMutation, express.json(), cookieParser(), session({
+  app.use("/api", (req,res,next) => sameOriginMutation(req,res,next,allowedOrigins), express.json(), cookieParser(), session({
     store: sessionStore || new FirestoreSessionStore({ db, secret }),
-    name: process.env.SESSION_COOKIE_NAME || "tommi38sid",
+    name: cookieName,
     secret,
     resave: false,
     saveUninitialized: false,
@@ -97,7 +100,7 @@ export function createApp({
     cookie: {
       httpOnly: true,
       sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
+      secure: secureCookies,
       maxAge: SESSION_MAX_AGE_MS
     }
   }));

@@ -76,9 +76,9 @@ struct GalleryView: View {
                         Button { expanded = photo } label: {
                             VStack(alignment: .leading, spacing: 4) {
                                 AsyncImage(url: URL(string: photo.url)) { phase in
-                                    if let image = phase.image { image.resizable().scaledToFill() }
+                                    if let image = phase.image { image.resizable().scaledToFit() }
                                     else { ZStack { Color.blue.opacity(0.08); Image(systemName: phase.error == nil ? "photo" : "photo.badge.exclamationmark").foregroundStyle(.secondary) } }
-                                }.frame(width: 112, height: 64).clipped().clipShape(RoundedRectangle(cornerRadius: 10))
+                                }.frame(width: 112, height: 64).background(Color.blue.opacity(0.04)).clipShape(RoundedRectangle(cornerRadius: 10))
                                 if let caption = photo.caption, !caption.isEmpty { Text(caption).font(.caption2).foregroundStyle(.secondary).lineLimit(1).frame(width: 112, alignment: .leading) }
                             }
                         }.buttonStyle(SoftPressStyle()).accessibilityLabel(photo.caption?.isEmpty == false ? photo.caption! : "Apri foto dello stabilimento")
@@ -124,7 +124,7 @@ struct LoginView: View {
                 if store.config.registrationEnabled == true {
                     Section { Button("Crea un account") { register = true } }
                 }
-                Section { Text("Non ricordi le credenziali? Rivolgiti al gestore dello stabilimento.").font(.footnote).foregroundStyle(.secondary); Link("Assistenza e privacy", destination: URL(string: "https://tommi38.onrender.com/privacy.html")!) }
+                Section { Text("Non ricordi le credenziali? Puoi inviare una richiesta al gestore.").font(.footnote).foregroundStyle(.secondary); Button("Richiedi recupero password") { Task { await store.perform { try await store.mutate("auth/recovery-request", body: ["username": username.trimmingCharacters(in: .whitespacesAndNewlines)]); store.message = "Se l’account esiste, la richiesta è stata inviata al gestore. Contattalo per il recupero." } } }.disabled(store.busy || username.trimmingCharacters(in: .whitespacesAndNewlines).count < 3); Link("Assistenza e privacy", destination: URL(string: "https://ombrelloni-ddb55.web.app/privacy.html")!) }
             }
             .navigationTitle("Il tuo stabilimento").navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .topBarLeading) { Button("Indietro") { store.selected = nil } } }
@@ -203,7 +203,7 @@ struct MainView: View {
             shell { CommunityView() }.tabItem { Label("Giocatori", systemImage: "person.2") }
         }.tint(.blue).animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: store.member?.role).sheet(isPresented: $account) { AccountView() }
         .task {
-            guard !adChecked, store.member?.demo != true, store.member?.isManager != true else { return }; adChecked = true
+            guard !adChecked, store.shouldShowLoginAd, store.member?.demo != true, store.member?.isManager != true else { return }; adChecked = true; store.shouldShowLoginAd = false
             do { let status: AdsStatus = try await store.request("ads/status"); if status.available { try await NativeAds.shared.showLoginAd() } } catch { /* Advertising must never prevent access. */ }
         }
     }
@@ -441,7 +441,7 @@ struct AccountView: View {
         NavigationStack {
             Form {
                 Section("Account") { Text(store.member?.username ?? ""); if store.member?.demo != true && store.member?.managementMode != true { NavigationLink("Cambia password") { PasswordView(target: nil) } }; Text(store.member?.platformAdmin == true ? "Amministratore globale" : (store.member?.isManager == true ? "Gestore dello stabilimento" : "Utente")).foregroundStyle(.secondary); Button(store.member?.demo == true ? "Esci dalla demo" : "Esci dall’account") { Task { await store.logout(); dismiss() } } }
-                Section("Informazioni") { Link("Privacy", destination: URL(string: "https://tommi38.onrender.com/privacy.html")!); Link("Assistenza", destination: URL(string: "https://tommi38.onrender.com/support.html")!); Button("Preferenze pubblicità") { Task { do { try await NativeAds.shared.privacy() } catch { store.message = error.localizedDescription } } }; if store.member?.demo != true { Toggle("Promemoria 30 minuti prima", isOn: Binding(get: { reminders }, set: { value in Task { if value { do { reminders = try await BookingReminders.enable() } catch { store.message = error.localizedDescription } } else { reminders = false }; await BookingReminders.sync(store.mine, fields: store.config.fields, enabled: reminders) } })); Text("I promemoria sono locali. Le novità della lista d’attesa si controllano nell’app; non sono ancora disponibili notifiche push.").font(.caption).foregroundStyle(.secondary) } }
+                Section("Informazioni") { Link("Privacy", destination: URL(string: "https://ombrelloni-ddb55.web.app/privacy.html")!); Link("Assistenza", destination: URL(string: "https://ombrelloni-ddb55.web.app/support.html")!); Button("Preferenze pubblicità") { Task { do { try await NativeAds.shared.privacy() } catch { store.message = error.localizedDescription } } }; if store.member?.demo != true { Toggle("Promemoria 30 minuti prima", isOn: Binding(get: { reminders }, set: { value in Task { if value { do { reminders = try await BookingReminders.enable() } catch { store.message = error.localizedDescription } } else { reminders = false }; await BookingReminders.sync(store.mine, fields: store.config.fields, enabled: reminders) } })); Text("I promemoria sono locali. Le novità della lista d’attesa si controllano nell’app; non sono ancora disponibili notifiche push.").font(.caption).foregroundStyle(.secondary) } }
                 if store.member?.demo != true && store.member?.isManager != true {
                     Section { Toggle("Voglio eliminare il mio account", isOn: $deletion); if deletion { SecureField("Password attuale", text: $password); Button("Elimina account", role: .destructive) { confirm = true }.disabled(password.isEmpty || store.busy) } }
                 }

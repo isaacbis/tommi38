@@ -23,9 +23,10 @@ final class BeachStore: ObservableObject {
     @Published var loading = true
     @Published var selectedDay = Date()
     @Published var dayLoading = false
+    var shouldShowLoginAd = false
     private var generation = 0
     private var dayGeneration = 0
-    private let base = URL(string: "https://tommi38.onrender.com/api/")!
+    private let base = URL(string: "https://ombrelloni-ddb55.web.app/api/")!
     private let session: URLSession
     init() {
         let c = URLSessionConfiguration.ephemeral
@@ -89,6 +90,7 @@ final class BeachStore: ObservableObject {
     func login(username: String, password: String) async {
         await perform {
             try await self.mutate("login", body: ["username": username.trimmingCharacters(in: .whitespaces), "password": password])
+            self.shouldShowLoginAd = true
             self.member = try await self.request("me")
             UserDefaults.standard.set(self.selected?.id, forKey: "venue")
             try await self.refresh()
@@ -148,12 +150,12 @@ final class BeachStore: ObservableObject {
     }
     func clearSession() {
         BookingReminders.clear()
-        generation += 1; dayGeneration += 1; dayLoading = false; closures = []; selectedDay = Date(); member = nil; selected = nil; mine = []; bookings = []; movements = []; searches = []; users = []; waiting = []; platformVenues = []; config = VenueConfig(); ads = nil
-        HTTPCookieStorage.shared.cookies?.filter { $0.domain.contains("tommi38.onrender.com") }.forEach { HTTPCookieStorage.shared.deleteCookie($0) }
+        shouldShowLoginAd = false; generation += 1; dayGeneration += 1; dayLoading = false; closures = []; selectedDay = Date(); member = nil; selected = nil; mine = []; bookings = []; movements = []; searches = []; users = []; waiting = []; platformVenues = []; config = VenueConfig(); ads = nil
+        HTTPCookieStorage.shared.cookies?.filter { $0.domain.contains("ombrelloni-ddb55.web.app") }.forEach { HTTPCookieStorage.shared.deleteCookie($0) }
         SecureSession.remove(); UserDefaults.standard.removeObject(forKey: "venue")
     }
     private func saveCookie() {
-        guard let cookie = HTTPCookieStorage.shared.cookies?.first(where: { $0.name == "tommi38sid" && $0.domain.contains("tommi38.onrender.com") }), let properties = cookie.properties else { return }
+        guard let cookie = HTTPCookieStorage.shared.cookies?.first(where: { $0.name == "__session" && $0.domain.contains("ombrelloni-ddb55.web.app") }), let properties = cookie.properties else { return }
         let values = Dictionary(uniqueKeysWithValues: properties.compactMap { key, value -> (String,String)? in
             if let date = value as? Date { return (key.rawValue, String(date.timeIntervalSince1970)) }; return (key.rawValue, String(describing: value))
         })

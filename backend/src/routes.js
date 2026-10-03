@@ -1045,7 +1045,7 @@ router.put("/admin/notes", requireAdmin, async (req, res) => {
 });
 
 router.put("/admin/fields", requireAdmin, async (req, res) => {
-  const parsed = z.object({fields:z.array(z.object({id:z.string().regex(/^[a-zA-Z0-9_-]{1,80}$/),name:z.string().trim().min(1).max(80)})).max(50)}).safeParse(req.body);
+  const parsed = z.object({fields:z.array(z.object({id:z.string().regex(/^[a-zA-Z0-9 _-]{1,80}$/),name:z.string().trim().min(1).max(80)})).max(50)}).safeParse(req.body);
   if (!parsed.success || new Set(parsed.data.fields.map(f=>f.id)).size !== parsed.data.fields.length) return res.status(400).json({error:"BAD_FIELDS"});
   await cleanupExpiredReservations();
   const saved=await db.runTransaction(async tx=>{
