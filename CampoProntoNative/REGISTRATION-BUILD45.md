@@ -1,5 +1,9 @@
 # CampoPronto ADS 2.0 · build 45
 
+## Correzione successiva: elenco pubblico
+
+Il 3 ottobre 2026 il proprietario ha richiesto che gli stabilimenti registrati compaiano insieme agli altri e nella ricerca. La registrazione ora imposta `visibility: public`. Anche i tre stabilimenti già creati tramite autoregistrazione sono stati aggiornati in Firestore. Le demo temporanee e gli altri stabilimenti intenzionalmente privati non sono stati modificati. Nell’elenco si espongono solo nome, città e coordinate pubbliche: utenti, credenziali e prenotazioni restano protetti dai permessi esistenti. Tutti i 155 test passano. Verificato nell’app nativa: ricerca «Andrea» restituisce «bagni andrea», città «fano». La correzione del servizio è distribuita su Firebase e non richiede una nuova build iOS; l’elenco già caricato va aggiornato o l’app riaperta. I riferimenti alla creazione privata qui sotto descrivono la configurazione originaria della build, prima di questa correzione.
+
 ## Registrazione e permessi
 
 La registrazione guidata è disponibile dalla schermata iniziale e dal login. Configura nome, città, 1–6 campi, orari, durata degli slot, account gestore e 1–100 utenti con prefisso personalizzabile e numerazione a tre cifre.
