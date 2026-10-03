@@ -30,39 +30,64 @@ struct WelcomeView: View {
     @StateObject private var nearby = NearbyVenues()
     @State private var demo = false
     @State private var venueRegistration = false
-    var filtered: [Venue] { store.venues.filter { query.isEmpty || ($0.name + " " + ($0.city ?? "")).localizedCaseInsensitiveContains(query) }.sorted { if nearby.location != nil { return (nearby.distance($0) ?? .infinity) < (nearby.distance($1) ?? .infinity) }; return false } }
+    @State private var showAll = false
+    @State private var nearbyOnly = false
+    @State private var resultLimit = 20
+    @FocusState private var searchFocused: Bool
+    var searchTerm: String { query.trimmingCharacters(in: .whitespacesAndNewlines) }
+    var showingResults: Bool { !searchTerm.isEmpty || showAll || nearbyOnly }
+    var filtered: [Venue] {
+        store.venues.filter { venue in
+            (searchTerm.isEmpty || (venue.name + " " + (venue.city ?? "")).localizedCaseInsensitiveContains(searchTerm)) && (!nearbyOnly || nearby.distance(venue) != nil)
+        }.sorted { lhs, rhs in
+            if nearbyOnly { return (nearby.distance(lhs) ?? .infinity) < (nearby.distance(rhs) ?? .infinity) }
+            return lhs.name.localizedStandardCompare(rhs.name) == .orderedAscending
+        }
+    }
     var body: some View {
         NavigationStack {
             List {
+                Section("Per i gestori") {
+                    Button { searchFocused = false; venueRegistration = true } label: { Label("Registra il tuo stabilimento", systemImage: "building.2.crop.circle") }
+                    Button { searchFocused = false; demo = true } label: { Label("Prova come gestore · 10 minuti", systemImage: "sparkles") }
+                }
                 Section {
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack { Image(systemName: "sportscourt.fill").font(.title2).foregroundStyle(.white).padding(12).background(.blue.gradient, in: RoundedRectangle(cornerRadius: 16)); Text("CampoPronto ADS").font(.title2.bold()); Spacer() }
-                        Text("Scegli dove giocare").font(.headline)
-                        Text("Campi, partite e prenotazioni in un solo posto.").font(.subheadline).foregroundStyle(.secondary)
-                    }.padding(.vertical, 8)
-                }.listRowBackground(LinearGradient(colors: [.blue.opacity(0.10), .cyan.opacity(0.04)], startPoint: .topLeading, endPoint: .bottomTrailing))
-                Section("Stabilimenti") {
-                    Button { nearby.locate() } label: { Label(nearby.location == nil ? "Vicini a me" : "Ordinati per distanza", systemImage: "location") }
+                    HStack(spacing: 10) {
+                        Image(systemName: "magnifyingglass").foregroundStyle(.blue)
+                        TextField("Cerca stabilimento o città", text: $query).focused($searchFocused).autocorrectionDisabled().submitLabel(.search)
+                        if !query.isEmpty { Button { query = "" } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary) }.accessibilityLabel("Cancella ricerca").buttonStyle(.plain) }
+                    }
+                    Button {
+                        searchFocused = false; nearbyOnly = true; showAll = false; query = ""; resultLimit = 20; nearby.locate()
+                    } label: { Label("Vicini a me", systemImage: "location") }
+                    Button {
+                        searchFocused = false; nearbyOnly = false; showAll.toggle(); query = ""; resultLimit = 20
+                    } label: { Label(showAll ? "Nascondi elenco" : "Mostra tutti gli stabilimenti", systemImage: "list.bullet") }
                     if let status = nearby.status { Text(status).font(.caption).foregroundStyle(.secondary) }
-                    if filtered.isEmpty { ContentUnavailableView(query.isEmpty ? "Nessuno stabilimento disponibile" : "Nessun risultato", systemImage: "magnifyingglass") }
-                    ForEach(filtered) { venue in
-                        Button { Task { await store.choose(venue) } } label: {
-                            HStack {
-                                Image(systemName: "mappin.and.ellipse").font(.title3).foregroundStyle(.blue).frame(width: 42, height: 42).background(.blue.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
-                                VStack(alignment: .leading) { Text(venue.name).font(.headline).foregroundStyle(.primary); if let city = venue.city, !city.isEmpty { Text(city).font(.caption).foregroundStyle(.secondary) } }
-                                Spacer(); if let distance = nearby.distance(venue) { Text(String(format: "%.1f km", distance)).font(.caption).foregroundStyle(.secondary) }; Image(systemName: "chevron.right").font(.caption).foregroundStyle(.secondary)
-                            }.padding(.vertical, 5)
-                        }.buttonStyle(SoftPressStyle()).disabled(store.busy)
+                } header: { Text("Dove vuoi giocare?") } footer: {
+                    Text("Scegli lo stabilimento, poi accedi con username e password.")
+                }
+                if showingResults {
+                    Section(nearbyOnly ? "Stabilimenti con posizione disponibile" : "Stabilimenti") {
+                        if filtered.isEmpty {
+                            Text(nearbyOnly ? "La ricerca vicina richiede la tua posizione e le coordinate dello stabilimento. Puoi sempre cercarlo per nome o città." : "Nessuno stabilimento trovato. Prova il nome o la città.").font(.subheadline).foregroundStyle(.secondary)
+                        }
+                        ForEach(Array(filtered.prefix(resultLimit))) { venue in
+                            Button { searchFocused = false; Task { await store.choose(venue) } } label: {
+                                HStack {
+                                    Image(systemName: "mappin.and.ellipse").font(.title3).foregroundStyle(.blue).frame(width: 36, height: 36).background(.blue.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
+                                    VStack(alignment: .leading) { Text(venue.name).font(.headline).foregroundStyle(.primary); if let city = venue.city, !city.isEmpty { Text(city).font(.caption).foregroundStyle(.secondary) } }
+                                    Spacer(); if nearbyOnly, let distance = nearby.distance(venue) { Text(String(format: "%.1f km", distance)).font(.caption).foregroundStyle(.secondary) }; Image(systemName: "chevron.right").font(.caption).foregroundStyle(.secondary)
+                                }.padding(.vertical, 3)
+                            }.buttonStyle(SoftPressStyle()).disabled(store.busy)
+                        }
+                        if filtered.count > resultLimit { Button("Mostra altri stabilimenti") { resultLimit += 20 } }
                     }
                 }
-                Section {
-                    Button { venueRegistration = true } label: { Label("Registra il tuo stabilimento", systemImage: "building.2.crop.circle") }
-                    Button { demo = true } label: { Label("Sei un gestore? Prova per 10 minuti", systemImage: "sparkles") }
-                    Text("Crea una demo privata: imposta i campi e prova anche come utente.").font(.caption).foregroundStyle(.secondary)
-                }
             }
-            .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "Cerca stabilimento o città")
-            .navigationTitle("Benvenuto").navigationBarTitleDisplayMode(.inline)
+            .navigationTitle("CampoPronto ADS").navigationBarTitleDisplayMode(.inline)
+            .scrollDismissesKeyboard(.interactively)
+            .onChange(of: query) { _, _ in resultLimit = 20; if !searchTerm.isEmpty { nearbyOnly = false } }
             .refreshable { await store.bootstrap() }
             .listSectionSpacing(.compact)
             .sheet(isPresented: $demo) { DemoWizard() }
@@ -526,7 +551,7 @@ struct VenueRegistrationWizard: View {
     @EnvironmentObject var store: BeachStore
     @Environment(\.dismiss) private var dismiss
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var setup = DemoSetup()
+    @State private var setup: DemoSetup = { var value = DemoSetup(); value.name = ""; return value }()
     @State private var city = ""
     @State private var manager = "gestore"
     @State private var password = ""
@@ -592,7 +617,7 @@ struct VenueRegistrationWizard: View {
                         }
                         Section("Riepilogo") {
                             Text(setup.name).bold(); Text(setup.fields.joined(separator: " · ")); Text("\(setup.dayStart)–\(setup.dayEnd) · \(setup.slotMinutes) minuti")
-                            Text("Lo stabilimento sarà attivo subito e privato: puoi condividere l’invito riportato nel PDF. Il gestore ha accesso solo ai propri dati.").font(.footnote).foregroundStyle(.secondary)
+                            Text("Lo stabilimento sarà attivo subito e visibile nella ricerca per nome e città. Il gestore ha accesso solo ai propri dati.").font(.footnote).foregroundStyle(.secondary)
                         }
                     }
                     if let failure { Section { Text(failure).font(.footnote).foregroundStyle(.red) } }
@@ -620,6 +645,7 @@ struct VenueRegistrationWizard: View {
         submitting = true; failure = nil; defer { submitting = false }
         do {
             let response: VenueRegistrationResult = try await store.request("venue-registration", method: "POST", body: ["requestId": requestID, "name": setup.name, "city": city, "managerUsername": manager, "managerPassword": password, "fields": setup.fields, "dayStart": setup.dayStart, "dayEnd": setup.dayEnd, "slotMinutes": setup.slotMinutes, "userCount": count, "userPrefix": prefix])
+            if !store.venues.contains(where: { $0.id == response.establishmentId }) { store.venues.append(Venue(id: response.establishmentId, name: response.name, city: city)) }
             result = response; password = ""; makeDocument(response)
         } catch { failure = error.localizedDescription }
     }
@@ -644,7 +670,7 @@ enum RegistrationPDF {
                 text(result.name, at: CGPoint(x: 44,y: 75), size: 15, bold: true)
                 let titleHeight = (result.name as NSString).boundingRect(with: CGSize(width:507,height:60), options:.usesLineFragmentOrigin, attributes:[.font:UIFont.boldSystemFont(ofSize:15)], context:nil).height
                 let statusY = 75 + ceil(titleHeight) + 12
-                text("Stabilimento privato e attivo · Zero crediti iniziali", at: CGPoint(x: 44,y: statusY), size: 10)
+                text("Stabilimento attivo e ricercabile · Zero crediti iniziali", at: CGPoint(x: 44,y: statusY), size: 10)
                 text("Pagina \(pageNumber)", at: CGPoint(x: 44,y: 802), size: 10)
                 y = statusY + 32
             }
