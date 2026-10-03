@@ -9,9 +9,9 @@ function setup(){
  vm.runInContext(fs.readFileSync(__dirname+'/../backend/src/venue-registration.js','utf8').replace(/^import .*;$/gm,'').replace(/export /g,''),context);
  return{data,create:value=>context.createVenueRegistration(value),fail:()=>fail=true};
 }
-test('self registration creates private active venue, scoped manager and numbered zero-credit users atomically',async()=>{
+test('self registration creates public active venue, scoped manager and numbered zero-credit users atomically',async()=>{
  const e=setup();const result=await e.create(input);const p='establishments/'+result.establishmentId;
- assert.equal(e.data.get(p).enabled,true);assert.equal(e.data.get(p).visibility,'private');
+ assert.equal(e.data.get(p).enabled,true);assert.equal(e.data.get(p).visibility,'public');
  assert.equal(e.data.get(p+'/users/gestore').platformAdmin,false);assert.equal(e.data.get(p+'/users/gestore').role,'admin');
  assert.deepEqual(Array.from(result.credentials,c=>c.username),['user001','user002','user003']);
  for(const c of result.credentials){assert.match(c.password,/^[A-Za-z0-9]{6}$/);const user=e.data.get(p+'/users/'+c.username);assert.equal(user.credits,0);assert.equal(user.role,'user');assert.equal(user.platformAdmin,false);assert.ok(!('password'in user));assert.equal(user.passwordHash,'hashed:'+c.password)}
@@ -36,7 +36,7 @@ test('registration HTTP flow accepts six-character user login and preserves venu
   return{status:response.status,data:await response.json()};
  };
  const created=await call('/venue-registration','POST',input);assert.equal(created.status,201);assert.equal(created.data.status,'active');
- const id=created.data.establishmentId;assert.ok(!(await call('/establishments')).data.items.some(v=>v.id===id));
+ const id=created.data.establishmentId;assert.ok((await call('/establishments')).data.items.some(v=>v.id===id && v.name===input.name && v.city===input.city));
  assert.equal((await call('/establishments?code='+id)).data.items[0].name,input.name);
  const credential=created.data.credentials[0];assert.equal((await call('/login','POST',credential,id)).status,200);
  const me=await call('/me','GET',undefined,id);assert.equal(me.data.credits,0);assert.equal(me.data.role,'user');

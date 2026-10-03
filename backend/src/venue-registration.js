@@ -33,7 +33,7 @@ export async function createVenueRegistration(input,db=root,hash=(value,cost)=>b
   await db.runTransaction(async tx=>{
     if((await tx.get(ref)).exists)throw Error('REGISTRATION_ALREADY_CREATED');
     const createdAt=FieldValue.serverTimestamp();
-    tx.create(ref,{name:value.name,city:value.city,enabled:true,visibility:'private',registrationStatus:'active',createdAt,createdBy:'self-registration',requestedUserCount:value.userCount});
+    tx.create(ref,{name:value.name,city:value.city,enabled:true,visibility:'public',registrationStatus:'active',createdAt,createdBy:'self-registration',requestedUserCount:value.userCount});
     tx.create(ref.collection('admin').doc('config'),{dayStart:value.dayStart,dayEnd:value.dayEnd,slotMinutes:value.slotMinutes,maxBookingsPerUserPerDay:1,maxActiveBookingsPerUser:1,registrationEnabled:false});
     tx.create(ref.collection('admin').doc('fields'),{fields:value.fields.map((name,i)=>({id:'campo-'+(i+1),name}))});
     tx.create(ref.collection('users').doc(value.managerUsername),{passwordHash:managerHash,role:'admin',platformAdmin:false,credits:0,disabled:false,createdAt});
