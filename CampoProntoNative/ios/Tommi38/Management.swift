@@ -29,7 +29,7 @@ struct AgendaView: View {
                 if items.isEmpty { Text("Nessuna prenotazione in questo giorno").foregroundStyle(.secondary) }
                 ForEach(items) { item in VStack(alignment: .leading, spacing: 8) { BookingRow(booking: item); Text(item.status ?? "attiva").font(.caption).foregroundStyle(.secondary); if item.status != "cancelled" { Button("Annulla prenotazione", role: .destructive) { cancel = item }.font(.caption) } } }
             }
-        }.navigationTitle("Agenda").task(id: Clock.day(day)) { await load() }.refreshable { await load() }
+        }.campoSurface().navigationTitle("Agenda").task(id: Clock.day(day)) { await load() }.refreshable { await load() }
             .confirmationDialog("Annullare questa prenotazione?", isPresented: Binding(get: { cancel != nil }, set: { if !$0 { cancel = nil } }), titleVisibility: .visible) { Button("Annulla prenotazione", role: .destructive) { let id = cancel?.id ?? ""; cancel = nil; Task { await store.perform { try await store.mutate("admin/reservations/" + id, method: "DELETE") }; await load() } } }
     }
     func load() async { let expectedDay = Clock.day(day); do { let response: Items<Booking> = try await store.request("admin/reservations?date=" + expectedDay); guard !Task.isCancelled, expectedDay == Clock.day(day) else { return }; items = response.items.sorted { $0.time < $1.time } } catch is CancellationError {} catch { if !Task.isCancelled { store.message = error.localizedDescription } } }
@@ -43,7 +43,7 @@ struct UsersView: View {
             ForEach(store.users.filter { query.isEmpty || $0.username.localizedCaseInsensitiveContains(query) }) { user in
                 NavigationLink { UserDetailView(user: user) } label: { HStack { VStack(alignment: .leading) { Text(user.username).bold(); Text(user.pendingApproval == true ? "Da approvare" : (user.disabled == true ? "Disabilitato" : user.role == "admin" ? "Gestore" : "Utente")).font(.caption).foregroundStyle(.secondary) }; Spacer(); Text("\(user.credits) crediti").font(.caption) } }
             }
-        }.navigationTitle("Utenti").searchable(text: $query, prompt: "Cerca utente").toolbar { Button { create = true } label: { Image(systemName: "plus") } }
+        }.campoSurface().navigationTitle("Utenti").searchable(text: $query, prompt: "Cerca utente").toolbar { Button { create = true } label: { Image(systemName: "plus") } }
             .task { await store.perform { try await store.loadUsers() } }.refreshable { await store.perform { try await store.loadUsers() } }.sheet(isPresented: $create) { NewUserView() }
     }
 }
@@ -53,7 +53,7 @@ struct NewUserView: View {
     @State private var username = ""
     @State private var password = ""
     var body: some View {
-        NavigationStack { Form { TextField("Username", text: $username).textInputAutocapitalization(.never).autocorrectionDisabled(); SecureField("Password (almeno 12 caratteri)", text: $password).textContentType(.newPassword); Text("L’utente parte con zero crediti. Conserva le credenziali e comunicale all’utente in modo sicuro.").font(.footnote); Button("Crea utente") { Task { await store.perform { try await store.mutate("admin/users", body: ["username": username, "password": password, "credits": 0, "role": "user"]); password = ""; try await store.loadUsers(); dismiss() } } }.disabled(store.busy || username.count < 3 || password.count < 12) }.navigationTitle("Nuovo utente").toolbar { Button("Chiudi") { dismiss() } } }
+        NavigationStack { Form { TextField("Username", text: $username).textInputAutocapitalization(.never).autocorrectionDisabled(); SecureField("Password (almeno 12 caratteri)", text: $password).textContentType(.newPassword); Text("L’utente parte con zero crediti. Conserva le credenziali e comunicale all’utente in modo sicuro.").font(.footnote); Button("Crea utente") { Task { await store.perform { try await store.mutate("admin/users", body: ["username": username, "password": password, "credits": 0, "role": "user"]); password = ""; try await store.loadUsers(); dismiss() } } }.disabled(store.busy || username.count < 3 || password.count < 12) }.campoSurface().navigationTitle("Nuovo utente").toolbar { Button("Chiudi") { dismiss() } } }
     }
 }
 struct UserDetailView: View {
@@ -81,7 +81,7 @@ struct UserDetailView: View {
                 Text("Le prenotazioni e i crediti vengono mantenuti. Comunica il nuovo username all’utente.").font(.caption).foregroundStyle(.secondary)
                 Button("Rinomina utente") { Task { await store.perform { try await store.mutate("admin/users/rename", body: ["oldUsername": user.username, "newUsername": newUsername]); try await store.loadUsers(); dismiss() } } }.disabled(store.busy || newUsername == user.username || newUsername.range(of: "^[a-zA-Z0-9._-]{3,40}$", options: .regularExpression) == nil || user.username == store.member?.username)
             }
-        }.navigationTitle("Gestisci utente").onAppear { newUsername = user.username; chosenRole = user.role }.sheet(isPresented: $resetPassword) { PasswordView(target: user.username) }
+        }.campoSurface().navigationTitle("Gestisci utente").onAppear { newUsername = user.username; chosenRole = user.role }.sheet(isPresented: $resetPassword) { PasswordView(target: user.username) }
     }
 }
 struct VenueSettingsView: View {
@@ -114,7 +114,7 @@ struct VenueSettingsView: View {
                 Text("Pubblica solo immagini per cui hai i diritti e il consenso delle persone riconoscibili.").font(.caption).foregroundStyle(.secondary)
                 Button("Salva foto") { Task { await store.perform { guard photos.allSatisfy({ URL(string: $0.url)?.scheme == "https" }) else { throw APIError(code: "URL_FOTO_NON_VALIDO") }; try await store.mutate("admin/gallery", method: "PUT", body: ["images": photos.map { ["url": $0.url, "caption": $0.caption ?? "", "link": $0.link ?? ""] }]); try await store.refresh(); store.message = "Foto salvate." } } }.disabled(store.busy)
             }
-        }.navigationTitle("Impostazioni").onAppear { config = store.config; note = store.config.notesText ?? ""; photos = store.config.gallery ?? [] }
+        }.campoSurface().navigationTitle("Impostazioni").onAppear { config = store.config; note = store.config.notesText ?? ""; photos = store.config.gallery ?? [] }
     }
 }
 struct ClosuresView: View {
@@ -139,7 +139,7 @@ struct ClosuresView: View {
                 Text("Il periodo include la data finale. Le prenotazioni esistenti non vengono cancellate automaticamente.").font(.caption).foregroundStyle(.secondary)
             }
             Section("Chiusure programmate") { ForEach(closures) { c in VStack(alignment: .leading) { Text(store.config.fields.first { $0.id == c.fieldId }?.name ?? c.fieldId).bold(); Text("\(c.startDate ?? c.date ?? "") – \(c.endDate ?? c.date ?? "") · \(c.start)–\(c.end)").font(.caption); Text(c.reason ?? "").font(.caption); Button("Rimuovi chiusura", role: .destructive) { Task { await store.perform { try await store.mutate("admin/closures/" + c.id, method: "DELETE"); try await load() } } }.font(.caption) } } }
-        }.navigationTitle("Chiusure").task { field = store.config.fields.first?.id ?? ""; start = store.config.dayStart; end = store.config.dayEnd; await store.perform { try await load() } }
+        }.campoSurface().navigationTitle("Chiusure").task { field = store.config.fields.first?.id ?? ""; start = store.config.dayStart; end = store.config.dayEnd; await store.perform { try await load() } }
     }
     func load() async throws { let result: Operations = try await store.request("admin/operations"); closures = result.closures ?? [] }
 }
@@ -148,7 +148,7 @@ struct PlatformView: View {
     @EnvironmentObject var store: BeachStore
     @State private var create = false
     var body: some View {
-        List { ForEach(store.platformVenues) { venue in NavigationLink { PlatformVenueView(venue: venue) } label: { HStack { VStack(alignment: .leading) { Text(venue.name).bold(); Text(venue.visibility == "public" ? "Visibile agli utenti" : "Privato").font(.caption).foregroundStyle(.secondary) }; Spacer(); if store.selected?.id == venue.id { Image(systemName: "checkmark.circle.fill") } } } } }.navigationTitle("Tutti gli stabilimenti").toolbar { Button { create = true } label: { Image(systemName: "plus") } }.task { await store.perform { try await store.loadPlatform() } }.sheet(isPresented: $create) { NewVenueView() }
+        List { ForEach(store.platformVenues) { venue in NavigationLink { PlatformVenueView(venue: venue) } label: { HStack { VStack(alignment: .leading) { Text(venue.name).bold(); Text(venue.visibility == "public" ? "Visibile agli utenti" : "Privato").font(.caption).foregroundStyle(.secondary) }; Spacer(); if store.selected?.id == venue.id { Image(systemName: "checkmark.circle.fill") } } } } }.campoSurface().navigationTitle("Tutti gli stabilimenti").toolbar { Button { create = true } label: { Image(systemName: "plus") } }.task { await store.perform { try await store.loadPlatform() } }.sheet(isPresented: $create) { NewVenueView() }
     }
 }
 struct NewVenueView: View {
@@ -159,14 +159,14 @@ struct NewVenueView: View {
     @State private var username = ""
     @State private var password = ""
     var body: some View {
-        NavigationStack { Form { TextField("Nome stabilimento", text: $name); TextField("Identificativo (es. lido-sole)", text: $id).textInputAutocapitalization(.never).autocorrectionDisabled(); Section("Gestore") { TextField("Username", text: $username).textInputAutocapitalization(.never).autocorrectionDisabled(); SecureField("Password (almeno 12 caratteri)", text: $password).textContentType(.newPassword) }; Text("Lo stabilimento nasce privato. Il gestore può impostare i propri campi, orari e utenti. Le sue credenziali non danno accesso agli altri stabilimenti.").font(.footnote); Button("Crea stabilimento e gestore") { Task { await store.perform { try await store.mutate("platform/establishments", body: ["id": id, "name": name, "managerUsername": username, "managerPassword": password]); password = ""; try await store.loadPlatform(); dismiss() } } }.disabled(name.isEmpty || id.isEmpty || username.isEmpty || password.count < 12 || store.busy) }.navigationTitle("Nuovo stabilimento").toolbar { Button("Chiudi") { dismiss() } } }
+        NavigationStack { Form { TextField("Nome stabilimento", text: $name); TextField("Identificativo (es. lido-sole)", text: $id).textInputAutocapitalization(.never).autocorrectionDisabled(); Section("Gestore") { TextField("Username", text: $username).textInputAutocapitalization(.never).autocorrectionDisabled(); SecureField("Password (almeno 12 caratteri)", text: $password).textContentType(.newPassword) }; Text("Lo stabilimento nasce privato. Il gestore può impostare i propri campi, orari e utenti. Le sue credenziali non danno accesso agli altri stabilimenti.").font(.footnote); Button("Crea stabilimento e gestore") { Task { await store.perform { try await store.mutate("platform/establishments", body: ["id": id, "name": name, "managerUsername": username, "managerPassword": password]); password = ""; try await store.loadPlatform(); dismiss() } } }.disabled(name.isEmpty || id.isEmpty || username.isEmpty || password.count < 12 || store.busy) }.campoSurface().navigationTitle("Nuovo stabilimento").toolbar { Button("Chiudi") { dismiss() } } }
     }
 }
 struct CommunityReport: Decodable, Identifiable { let id: String; var reason: String?; var reportedUser: String?; var date: String?; var time: String? }
 struct ReportsView: View {
     @EnvironmentObject var store: BeachStore
     @State private var items: [CommunityReport] = []
-    var body: some View { List { if items.isEmpty { Text("Nessuna segnalazione aperta") }; ForEach(items) { r in VStack(alignment: .leading) { Text(r.reportedUser ?? "Utente").bold(); Text(r.reason ?? "Segnalazione"); HStack { Button("Nascondi ricerca", role: .destructive) { resolve(r, action: "close-search") }; Button("Risolvi") { resolve(r, action: "resolve") } } } } }.navigationTitle("Segnalazioni").task { await store.perform { try await load() } } }
+    var body: some View { List { if items.isEmpty { Text("Nessuna segnalazione aperta") }; ForEach(items) { r in VStack(alignment: .leading) { Text(r.reportedUser ?? "Utente").bold(); Text(r.reason ?? "Segnalazione"); HStack { Button("Nascondi ricerca", role: .destructive) { resolve(r, action: "close-search") }; Button("Risolvi") { resolve(r, action: "resolve") } } } } }.campoSurface().navigationTitle("Segnalazioni").task { await store.perform { try await load() } } }
     func load() async throws { let r: Items<CommunityReport> = try await store.request("admin/community-reports"); items = r.items }
     func resolve(_ r: CommunityReport, action: String) { Task { await store.perform { try await store.mutate("admin/community-reports/" + r.id, method: "PATCH", body: ["action": action]); try await load() } } }
 }
@@ -174,7 +174,7 @@ struct ReportsView: View {
 struct StatisticsView: View {
     @EnvironmentObject var store: BeachStore
     @State private var stats: Operations?
-    var body: some View { List { LabeledContent("Utenti", value: String(stats?.users ?? 0)); LabeledContent("Prenotazioni future", value: String(stats?.upcoming ?? 0)); LabeledContent("Crediti complessivi", value: String(stats?.credits ?? 0)); Section("Prenotazioni per campo") { ForEach(store.config.fields) { field in LabeledContent(field.name, value: String(stats?.byField?[field.id] ?? 0)) } } }.navigationTitle("Statistiche").task { await store.perform { stats = try await store.request("admin/operations") } } }
+    var body: some View { List { LabeledContent("Utenti", value: String(stats?.users ?? 0)); LabeledContent("Prenotazioni future", value: String(stats?.upcoming ?? 0)); LabeledContent("Crediti complessivi", value: String(stats?.credits ?? 0)); Section("Prenotazioni per campo") { ForEach(store.config.fields) { field in LabeledContent(field.name, value: String(stats?.byField?[field.id] ?? 0)) } } }.campoSurface().navigationTitle("Statistiche").task { await store.perform { stats = try await store.request("admin/operations") } } }
 }
 struct PlatformVenueView: View {
     @EnvironmentObject var store: BeachStore
@@ -195,7 +195,7 @@ struct PlatformVenueView: View {
                 try await store.mutate("platform/establishments/" + venue.id, method: "PATCH", body: body); try await store.loadPlatform(); dismiss() } } }.disabled(store.busy || name.isEmpty)
             ShareLink(item: URL(string: "campopronto://venue?id=" + venue.id)!) { Label("Condividi invito all’app", systemImage: "square.and.arrow.up") }
             Button("Gestisci questo stabilimento") { Task { await store.switchVenue(venue); if store.selected?.id == venue.id { dismiss() } } }.disabled(store.busy || !enabled)
-        }.navigationTitle(venue.name).onAppear { name = venue.name; city = venue.city ?? ""; visible = venue.visibility == "public"; enabled = venue.enabled ?? true; latitude = venue.latitude.map { String($0) } ?? ""; longitude = venue.longitude.map { String($0) } ?? "" }
+        }.campoSurface().navigationTitle(venue.name).onAppear { name = venue.name; city = venue.city ?? ""; visible = venue.visibility == "public"; enabled = venue.enabled ?? true; latitude = venue.latitude.map { String($0) } ?? ""; longitude = venue.longitude.map { String($0) } ?? "" }
     }
 }
 
@@ -208,7 +208,7 @@ struct RecoveryRequestsView: View {
             if items.isEmpty { Text("Nessuna richiesta in attesa").foregroundStyle(.secondary) }
             ForEach(items) { request in NavigationLink { PasswordView(target: request.username) } label: { Label(request.username, systemImage: "key") } }
             Text("Verifica l’identità dell’utente prima di reimpostare la password e comunica le credenziali in modo sicuro.").font(.caption).foregroundStyle(.secondary)
-        }.navigationTitle("Recupero password").task { await load() }.refreshable { await load() }
+        }.campoSurface().navigationTitle("Recupero password").task { await load() }.refreshable { await load() }
     }
     func load() async { await store.perform { let response: Items<RecoveryRequest> = try await store.request("auth/admin/recovery-requests"); items = response.items } }
 }

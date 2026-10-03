@@ -48,8 +48,8 @@ struct WelcomeView: View {
         NavigationStack {
             List {
                 Section("Per i gestori") {
-                    Button { searchFocused = false; venueRegistration = true } label: { Label("Registra il tuo stabilimento", systemImage: "building.2.crop.circle") }
-                    Button { searchFocused = false; demo = true } label: { Label("Prova come gestore · 10 minuti", systemImage: "sparkles") }
+                    Button { searchFocused = false; venueRegistration = true } label: { Label("Registra il tuo stabilimento", systemImage: "building.2.crop.circle").font(.subheadline.weight(.semibold)).padding(.vertical, 5) }
+                    Button { searchFocused = false; demo = true } label: { Label("Prova come gestore · 10 minuti", systemImage: "sparkles").font(.subheadline.weight(.medium)).padding(.vertical, 5) }
                 }
                 Section {
                     HStack(spacing: 10) {
@@ -85,7 +85,7 @@ struct WelcomeView: View {
                     }
                 }
             }
-            .navigationTitle("CampoPronto ADS").navigationBarTitleDisplayMode(.inline)
+            .campoSurface().navigationTitle("CampoPronto ADS").navigationBarTitleDisplayMode(.inline)
             .scrollDismissesKeyboard(.interactively)
             .onChange(of: query) { _, _ in resultLimit = 20; if !searchTerm.isEmpty { nearbyOnly = false } }
             .refreshable { await store.bootstrap() }
@@ -125,7 +125,7 @@ struct GalleryView: View {
                             AsyncImage(url: URL(string: photo.url)) { image in image.resizable().scaledToFit() } placeholder: { Image(systemName: "photo").font(.largeTitle).foregroundStyle(.secondary) }
                             if let caption = photo.caption { Text(caption).font(.subheadline) }
                             if let link = photo.link, let url = URL(string: link), ["https", "http"].contains(url.scheme?.lowercased() ?? "") { Link("Scopri di più", destination: url) }
-                        }.padding().navigationTitle("Foto dello stabilimento").navigationBarTitleDisplayMode(.inline).toolbar { Button("Chiudi") { expanded = nil } }
+                        }.padding().campoSurface().navigationTitle("Foto dello stabilimento").navigationBarTitleDisplayMode(.inline).toolbar { Button("Chiudi") { expanded = nil } }
                     }
                 }
             }
@@ -148,20 +148,46 @@ struct LoginView: View {
     @State private var venueRegistration = false
     var body: some View {
         NavigationStack {
-            Form {
-                Section { Text(store.selected?.name ?? "CampoPronto").font(.title2.bold()); GalleryView(photos: store.config.gallery ?? []) }
-                Section("Accedi") {
-                    TextField("Username", text: $username).textContentType(.username).textInputAutocapitalization(.never).autocorrectionDisabled()
-                    SecureField("Password", text: $password).textContentType(.password)
-                    Button { Task { await store.login(username: username, password: password); if store.member != nil { password = "" } } } label: { HStack { Spacer(); if store.busy { ProgressView() } else { Text("Accedi").bold() }; Spacer() } }.disabled(store.busy || username.isEmpty || password.isEmpty)
-                }
-                if store.config.registrationEnabled == true {
-                    Section { Button("Crea un account") { register = true } }
-                }
-                Section { Button { venueRegistration = true } label: { Label("Registra il tuo stabilimento", systemImage: "building.2.crop.circle") } }
-                Section { Text("Non ricordi le credenziali? Puoi inviare una richiesta al gestore.").font(.footnote).foregroundStyle(.secondary); Button("Richiedi recupero password") { Task { await store.perform { try await store.mutate("auth/recovery-request", body: ["username": username.trimmingCharacters(in: .whitespacesAndNewlines)]); store.message = "Se l’account esiste, la richiesta è stata inviata al gestore. Contattalo per il recupero." } } }.disabled(store.busy || username.trimmingCharacters(in: .whitespacesAndNewlines).count < 3); Link("Assistenza e privacy", destination: URL(string: "https://ombrelloni-ddb55.web.app/privacy.html")!) }
-            }
-            .navigationTitle("Il tuo stabilimento").navigationBarTitleDisplayMode(.inline)
+            ScrollView {
+                VStack(spacing: 16) {
+                    VStack(spacing: 9) {
+                        Image(systemName: "sportscourt.fill")
+                            .font(.system(size: 27, weight: .semibold)).foregroundStyle(.white)
+                            .frame(width: 60, height: 60)
+                            .background(LinearGradient(colors: [.blue, .teal], startPoint: .topLeading, endPoint: .bottomTrailing), in: RoundedRectangle(cornerRadius: 21, style: .continuous))
+                        Text(store.selected?.name ?? "CampoPronto").font(.title2.bold()).multilineTextAlignment(.center)
+                        Text("Il tuo prossimo incontro parte da qui.").font(.subheadline).foregroundStyle(.secondary)
+                        GalleryView(photos: store.config.gallery ?? [])
+                    }.frame(maxWidth: .infinity).padding(.vertical, 8)
+                    VStack(alignment: .leading, spacing: 14) {
+                        Text("Bentornato").font(.title3.bold())
+                        Text("Accedi per scegliere il campo e prenotare.").font(.footnote).foregroundStyle(.secondary)
+                        HStack(spacing: 12) {
+                            Image(systemName: "person").foregroundStyle(.teal).frame(width: 22)
+                            TextField("Username", text: $username).textContentType(.username).textInputAutocapitalization(.never).autocorrectionDisabled()
+                        }.padding(14).background(Color(.tertiarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 15))
+                        HStack(spacing: 12) {
+                            Image(systemName: "lock").foregroundStyle(.teal).frame(width: 22)
+                            SecureField("Password", text: $password).textContentType(.password)
+                        }.padding(14).background(Color(.tertiarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 15))
+                        Button { Task { await store.login(username: username, password: password); if store.member != nil { password = "" } } } label: {
+                            HStack { Spacer(); if store.busy { ProgressView().tint(.white) } else { Text("Accedi").bold(); Image(systemName: "arrow.right") }; Spacer() }
+                                .padding(15).foregroundStyle(.white)
+                                .background(LinearGradient(colors: [.blue, .teal], startPoint: .leading, endPoint: .trailing), in: RoundedRectangle(cornerRadius: 16))
+                        }.buttonStyle(SoftPressStyle()).opacity(username.isEmpty || password.isEmpty ? 0.55 : 1).disabled(store.busy || username.isEmpty || password.isEmpty)
+                        if store.config.registrationEnabled == true { Button("Crea un account") { register = true }.frame(maxWidth: .infinity).padding(.top, 2) }
+                    }.padding(18).background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+                        .overlay(RoundedRectangle(cornerRadius: 24).stroke(.teal.opacity(0.10), lineWidth: 1))
+                        .shadow(color: .black.opacity(0.04), radius: 12, y: 5)
+                    VStack(spacing: 12) {
+                        Button { venueRegistration = true } label: { Label("Registra il tuo stabilimento", systemImage: "building.2.crop.circle") }
+                        Button("Richiedi recupero password") { Task { await store.perform { try await store.mutate("auth/recovery-request", body: ["username": username.trimmingCharacters(in: .whitespacesAndNewlines)]); store.message = "Se l’account esiste, la richiesta è stata inviata al gestore. Contattalo per il recupero." } } }.disabled(store.busy || username.trimmingCharacters(in: .whitespacesAndNewlines).count < 3)
+                        Link("Assistenza e privacy", destination: URL(string: "https://ombrelloni-ddb55.web.app/privacy.html")!).font(.caption)
+                    }.font(.subheadline).padding(.vertical, 4)
+                }.padding(.horizontal, 20).padding(.bottom, 20).frame(maxWidth: 560).frame(maxWidth: .infinity)
+            }.scrollDismissesKeyboard(.interactively).campoSurface()
+
+            .campoSurface().navigationTitle("Il tuo stabilimento").navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .topBarLeading) { Button("Indietro") { store.selected = nil } } }
             .listSectionSpacing(.compact)
             .sheet(isPresented: $register) { RegisterView() }
@@ -181,7 +207,7 @@ struct RegisterView: View {
                 SecureField("Password (almeno 12 caratteri)", text: $password).textContentType(.newPassword)
                 Text("Il gestore potrebbe dover approvare l’iscrizione. I crediti si ottengono con video o pacchetti disponibili.").font(.footnote)
                 Button("Richiedi iscrizione") { Task { await store.perform { try await store.mutate("auth/register", body: ["username": username, "password": password]); password = ""; dismiss(); store.message = "Iscrizione inviata. Puoi accedere quando il gestore ti approva." } } }.disabled(store.busy || username.count < 3 || password.count < 12)
-            }.navigationTitle("Registrati").toolbar { Button("Chiudi") { dismiss() } }
+            }.campoSurface().navigationTitle("Registrati").toolbar { Button("Chiudi") { dismiss() } }
         }
     }
 }
@@ -217,7 +243,7 @@ struct DemoWizard: View {
                     if step > 0 { Button("Indietro") { step -= 1 }.disabled(store.busy) }
                     Button("Salta e usa le impostazioni di base") { launch(nil) }.disabled(store.busy)
                 }
-            }.navigationTitle("Prova l’app").navigationBarTitleDisplayMode(.inline).toolbar { Button("Chiudi") { dismiss() }.disabled(store.busy) }
+            }.campoSurface().navigationTitle("Prova l’app").navigationBarTitleDisplayMode(.inline).toolbar { Button("Chiudi") { dismiss() }.disabled(store.busy) }
         }
     }
     func launch(_ value: DemoSetup?) { Task { await store.startDemo(value); if store.member != nil { dismiss() } } }
@@ -246,7 +272,7 @@ struct MainView: View {
     }
     func shell<Content: View>(@ViewBuilder content: () -> Content) -> some View {
         NavigationStack {
-            content().navigationBarTitleDisplayMode(.inline)
+            content().campoSurface().navigationBarTitleDisplayMode(.inline)
                 .toolbar {
                     ToolbarItem(placement: .principal) {
                         if store.member?.demo == true {
@@ -439,7 +465,7 @@ struct SearchCreateView: View {
     @State private var count = 1
     @State private var note = ""
     var body: some View {
-        NavigationStack { Form { Stepper("\(count) giocatori cercati", value: $count, in: 1...12); TextField("Messaggio (facoltativo)", text: $note, axis: .vertical); Text("Pubblica solo informazioni che vuoi condividere con gli utenti dello stabilimento. Non inserire dati sensibili.").font(.caption).foregroundStyle(.secondary); Button("Pubblica ricerca") { Task { await store.perform { try await store.mutate("player-searches", body: ["reservationId": booking.id, "spotsNeeded": count, "note": note]); dismiss() } } }.disabled(store.busy || note.count > 200) }.navigationTitle("Cerco giocatori").toolbar { Button("Chiudi") { dismiss() } } }
+        NavigationStack { Form { Stepper("\(count) giocatori cercati", value: $count, in: 1...12); TextField("Messaggio (facoltativo)", text: $note, axis: .vertical); Text("Pubblica solo informazioni che vuoi condividere con gli utenti dello stabilimento. Non inserire dati sensibili.").font(.caption).foregroundStyle(.secondary); Button("Pubblica ricerca") { Task { await store.perform { try await store.mutate("player-searches", body: ["reservationId": booking.id, "spotsNeeded": count, "note": note]); dismiss() } } }.disabled(store.busy || note.count > 200) }.campoSurface().navigationTitle("Cerco giocatori").toolbar { Button("Chiudi") { dismiss() } } }
     }
 }
 struct SearchDetailView: View {
@@ -463,7 +489,7 @@ struct SearchDetailView: View {
                 Section("Chiedi di partecipare") { ForEach(names.indices, id: \.self) { i in TextField("Nome giocatore \(i + 1)", text: $names[i]) }; if names.count < min(12, search.spotsAvailable ?? search.spotsNeeded ?? 1) { Button("Aggiungi giocatore") { names.append("") } }; if names.count > 1 { Button("Rimuovi ultimo giocatore") { names.removeLast() } }; TextField("Telefono per l’organizzatore", text: $phone).keyboardType(.phonePad); Text("Nome e telefono saranno visibili all’organizzatore e al gestore.").font(.caption); Button("Invia richiesta") { Task { await store.perform { try await store.mutate("player-searches/\(search.id)/requests", body: ["participantNames": names.map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }, "phone": phone]); try await store.loadCommunity(); dismiss() } } }.disabled(names.contains { $0.trimmingCharacters(in: .whitespacesAndNewlines).count < 2 } || phone.count < 6 || store.busy) }
             }
             Section("Segnala un problema") { Picker("Motivo", selection: $reason) { Text("Molestie").tag("harassment"); Text("Contenuto offensivo").tag("offensive"); Text("Spam").tag("spam"); Text("Privacy").tag("privacy"); Text("Altro").tag("other") }; Button("Segnala al gestore", role: .destructive) { Task { await store.perform { try await store.mutate("player-searches/\(search.id)/report", body: ["reason": reason]); store.message = "Segnalazione inviata al gestore." } } }.disabled(store.busy); if search.isOwner != true { Button("Blocca l’organizzatore", role: .destructive) { Task { await store.perform { try await store.mutate("community/blocks", body: ["searchId": search.id]); try await store.loadCommunity(); dismiss() } } }.disabled(store.busy) } }
-        }.navigationTitle("Giocatori")
+        }.campoSurface().navigationTitle("Giocatori")
     }
     func decide(_ request: PlayerRequest, _ status: String) { Task { await store.perform { try await store.mutate("player-searches/\(search.id)/requests/\(request.id)", method: "PATCH", body: ["status": status]); try await store.loadCommunity(); dismiss() } } }
 }
@@ -482,7 +508,7 @@ struct AccountView: View {
                 if store.member?.demo != true && store.member?.isManager != true {
                     Section { Toggle("Voglio eliminare il mio account", isOn: $deletion); if deletion { SecureField("Password attuale", text: $password); Button("Elimina account", role: .destructive) { confirm = true }.disabled(password.isEmpty || store.busy) } }
                 }
-            }.navigationTitle("Il tuo account").toolbar { Button("Chiudi") { dismiss() } }
+            }.campoSurface().navigationTitle("Il tuo account").toolbar { Button("Chiudi") { dismiss() } }
                 .confirmationDialog("Eliminare definitivamente l’account? Verranno rimossi i tuoi dati secondo l’informativa privacy.", isPresented: $confirm, titleVisibility: .visible) { Button("Elimina definitivamente", role: .destructive) { Task { await store.perform { try await store.mutate("auth/account", method: "DELETE", body: ["username": store.member?.username ?? "", "currentPassword": password, "confirm": true]); password = ""; store.clearSession(); dismiss() } } } }
         }
     }
@@ -505,7 +531,7 @@ struct PasswordView: View {
                 else { try await store.mutate("auth/password", body: ["currentPassword": old, "newPassword": new]) }
                 old = ""; new = ""; repeatPassword = ""; store.message = "Password aggiornata."; dismiss()
             } } }.disabled(store.busy || new.count < 12 || new != repeatPassword || (target == nil && old.isEmpty))
-        }.navigationTitle("Password")
+        }.campoSurface().navigationTitle("Password")
     }
 }
 
@@ -517,7 +543,7 @@ struct BlockedUsersView: View {
         List {
             if items.isEmpty { ContentUnavailableView("Nessun utente bloccato", systemImage: "person.crop.circle.badge.checkmark") }
             ForEach(items) { user in HStack { Text(user.username); Spacer(); Button("Sblocca") { Task { await store.perform { try await store.mutate("community/blocks/" + user.id, method: "DELETE"); try await load(); try await store.loadCommunity() } } }.disabled(store.busy) } }
-        }.navigationTitle("Utenti bloccati").task { await store.perform { try await load() } }.refreshable { await store.perform { try await load() } }
+        }.campoSurface().navigationTitle("Utenti bloccati").task { await store.perform { try await load() } }.refreshable { await store.perform { try await load() } }
     }
     func load() async throws { let response: Items<BlockedUser> = try await store.request("community/blocks"); items = response.items }
 }
@@ -626,7 +652,7 @@ struct VenueRegistrationWizard: View {
                         if step > 0 { Button("Indietro") { withAnimation(reduceMotion ? nil : .spring(response: 0.35, dampingFraction: 0.82)) { step -= 1 } }.disabled(submitting) }
                     }
                 }
-            }.listSectionSpacing(.compact).navigationTitle("Registra stabilimento").navigationBarTitleDisplayMode(.inline)
+            }.listSectionSpacing(.compact).campoSurface().navigationTitle("Registra stabilimento").navigationBarTitleDisplayMode(.inline)
                 .toolbar { if result == nil { Button("Chiudi") { dismiss() }.disabled(submitting) } }
                 .interactiveDismissDisabled(submitting || result != nil)
                 .onAppear {
@@ -699,4 +725,16 @@ enum RegistrationPDF {
         try data.write(to: url, options: [.atomic, .completeFileProtection])
         return url
     }
+}
+
+struct CampoSurface: ViewModifier {
+    func body(content: Content) -> some View {
+        content.scrollContentBackground(.hidden)
+            .background {
+                LinearGradient(colors: [Color(.systemGroupedBackground), Color.teal.opacity(0.08), Color.blue.opacity(0.06)], startPoint: .topLeading, endPoint: .bottomTrailing).ignoresSafeArea()
+            }
+    }
+}
+extension View {
+    func campoSurface() -> some View { modifier(CampoSurface()) }
 }
