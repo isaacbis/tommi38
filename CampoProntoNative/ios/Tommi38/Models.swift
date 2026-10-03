@@ -110,6 +110,9 @@ struct APIError: LocalizedError {
     let code: String
     var errorDescription: String? {
         switch code {
+        case "REGISTRATION_LIMIT": return "Hai raggiunto il limite di registrazioni di oggi. Riprova domani."
+        case "BAD_REGISTRATION": return "Controlla nomi, orari, numero utenti e credenziali del gestore."
+        case "REGISTRATION_ALREADY_CREATED": return "Questa registrazione è già stata completata. Non sono stati creati duplicati: contatta l’assistenza se non hai salvato le credenziali."
         case "INVALID_LOGIN", "INVALID_CREDENTIALS", "BAD_CREDENTIALS": return "Username o password non corretti."
         case "NO_CREDITS", "INSUFFICIENT_CREDITS": return "Non hai crediti sufficienti."
         case "SLOT_TAKEN", "SLOT_BUSY", "CONFLICT": return "Questo orario è appena stato prenotato. Aggiorna i campi."

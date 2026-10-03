@@ -8,6 +8,7 @@ import session from "express-session";
 
 import routes from "./src/routes.js";
 import platformRouter from "./src/platform-routes.js";
+import { createVenueRegistration } from "./src/venue-registration.js";
 import accountRouter from "./src/account-routes.js";
 import admobRouter, { admobCallback } from "./src/admob-routes.js";
 import demoRouter from "./src/demo-routes.js";
@@ -104,6 +105,14 @@ export function createApp({
       maxAge: SESSION_MAX_AGE_MS
     }
   }));
+  app.post('/api/venue-registration', rateLimit({windowMs:86400000,max:3,standardHeaders:true,legacyHeaders:false,message:{error:'REGISTRATION_LIMIT'}}), async (req,res,next)=>{
+    try { res.status(201).json(await createVenueRegistration(req.body)); }
+    catch(error){
+      if(error.name==='ZodError')return res.status(400).json({error:'BAD_REGISTRATION'});
+      if(error.message==='REGISTRATION_ALREADY_CREATED')return res.status(409).json({error:error.message});
+      next(error);
+    }
+  });
   app.post('/api/demo/public', rateLimit({windowMs:3600000,max:5,standardHeaders:true,legacyHeaders:false,message:{error:'DEMO_LIMIT'}}), async (req,res,next) => {
     try {
       if (req.session.publicDemo?.expiresAt > Date.now()) {

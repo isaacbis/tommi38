@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct RootView: View {
     @EnvironmentObject var store: BeachStore
@@ -28,6 +29,7 @@ struct WelcomeView: View {
     @State private var query = ""
     @StateObject private var nearby = NearbyVenues()
     @State private var demo = false
+    @State private var venueRegistration = false
     var filtered: [Venue] { store.venues.filter { query.isEmpty || ($0.name + " " + ($0.city ?? "")).localizedCaseInsensitiveContains(query) }.sorted { if nearby.location != nil { return (nearby.distance($0) ?? .infinity) < (nearby.distance($1) ?? .infinity) }; return false } }
     var body: some View {
         NavigationStack {
@@ -54,6 +56,7 @@ struct WelcomeView: View {
                     }
                 }
                 Section {
+                    Button { venueRegistration = true } label: { Label("Registra il tuo stabilimento", systemImage: "building.2.crop.circle") }
                     Button { demo = true } label: { Label("Sei un gestore? Prova per 10 minuti", systemImage: "sparkles") }
                     Text("Crea una demo privata: imposta i campi e prova anche come utente.").font(.caption).foregroundStyle(.secondary)
                 }
@@ -61,30 +64,35 @@ struct WelcomeView: View {
             .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always), prompt: "Cerca stabilimento o città")
             .navigationTitle("Benvenuto").navigationBarTitleDisplayMode(.inline)
             .refreshable { await store.bootstrap() }
+            .listSectionSpacing(.compact)
             .sheet(isPresented: $demo) { DemoWizard() }
+            .sheet(isPresented: $venueRegistration) { VenueRegistrationWizard() }
         }
     }
 }
 struct GalleryView: View {
     let photos: [Photo]
     @State private var expanded: Photo?
+    @Environment(\.dynamicTypeSize) private var typeSize
     var body: some View {
         if !photos.isEmpty {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    ForEach(Array(photos.enumerated()), id: \.offset) { _, photo in
-                        Button { expanded = photo } label: {
-                            VStack(alignment: .leading, spacing: 4) {
-                                AsyncImage(url: URL(string: photo.url)) { phase in
-                                    if let image = phase.image { image.resizable().scaledToFit() }
-                                    else { ZStack { Color.blue.opacity(0.08); Image(systemName: phase.error == nil ? "photo" : "photo.badge.exclamationmark").foregroundStyle(.secondary) } }
-                                }.frame(width: 112, height: 64).background(Color.blue.opacity(0.04)).clipShape(RoundedRectangle(cornerRadius: 10))
-                                if let caption = photo.caption, !caption.isEmpty { Text(caption).font(.caption2).foregroundStyle(.secondary).lineLimit(1).frame(width: 112, alignment: .leading) }
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 8), count: typeSize.isAccessibilitySize ? 2 : min(4, photos.count)), spacing: 8) {
+                ForEach(Array(photos.enumerated()), id: \.offset) { _, photo in
+                    Button { expanded = photo } label: {
+                        VStack(spacing: 3) {
+                            AsyncImage(url: URL(string: photo.url)) { phase in
+                                if let image = phase.image { image.resizable().scaledToFit() }
+                                else { Image(systemName: phase.error == nil ? "photo" : "photo.badge.exclamationmark").foregroundStyle(.secondary) }
                             }
-                        }.buttonStyle(SoftPressStyle()).accessibilityLabel(photo.caption?.isEmpty == false ? photo.caption! : "Apri foto dello stabilimento")
-                    }
-                }.padding(.vertical, 2)
-            }
+                            .padding(6).frame(maxWidth: .infinity).frame(height: 58)
+                            .background(LinearGradient(colors: [.blue.opacity(0.05), .cyan.opacity(0.03)], startPoint: .topLeading, endPoint: .bottomTrailing))
+                            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                            .overlay(RoundedRectangle(cornerRadius: 18, style: .continuous).stroke(.blue.opacity(0.07), lineWidth: 0.5))
+                            if let caption = photo.caption, !caption.isEmpty { Text(caption).font(.caption2).foregroundStyle(.secondary).lineLimit(1) }
+                        }.frame(maxWidth: .infinity)
+                    }.buttonStyle(SoftPressStyle()).accessibilityLabel(photo.caption?.isEmpty == false ? photo.caption! : "Apri foto dello stabilimento")
+                }
+            }.padding(.vertical, 2)
             .sheet(isPresented: Binding(get: { expanded != nil }, set: { if !$0 { expanded = nil } })) {
                 if let photo = expanded {
                     NavigationStack {
@@ -103,8 +111,8 @@ struct SoftPressStyle: ButtonStyle {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     func makeBody(configuration: Configuration) -> some View {
         configuration.label.opacity(configuration.isPressed ? 0.75 : 1)
-            .scaleEffect(configuration.isPressed && !reduceMotion ? 0.97 : 1)
-            .animation(reduceMotion ? nil : .easeOut(duration: 0.16), value: configuration.isPressed)
+            .scaleEffect(configuration.isPressed && !reduceMotion ? 0.95 : 1)
+            .animation(reduceMotion ? nil : .spring(response: 0.28, dampingFraction: 0.68), value: configuration.isPressed)
     }
 }
 struct LoginView: View {
@@ -112,6 +120,7 @@ struct LoginView: View {
     @State private var username = ""
     @State private var password = ""
     @State private var register = false
+    @State private var venueRegistration = false
     var body: some View {
         NavigationStack {
             Form {
@@ -124,11 +133,14 @@ struct LoginView: View {
                 if store.config.registrationEnabled == true {
                     Section { Button("Crea un account") { register = true } }
                 }
+                Section { Button { venueRegistration = true } label: { Label("Registra il tuo stabilimento", systemImage: "building.2.crop.circle") } }
                 Section { Text("Non ricordi le credenziali? Puoi inviare una richiesta al gestore.").font(.footnote).foregroundStyle(.secondary); Button("Richiedi recupero password") { Task { await store.perform { try await store.mutate("auth/recovery-request", body: ["username": username.trimmingCharacters(in: .whitespacesAndNewlines)]); store.message = "Se l’account esiste, la richiesta è stata inviata al gestore. Contattalo per il recupero." } } }.disabled(store.busy || username.trimmingCharacters(in: .whitespacesAndNewlines).count < 3); Link("Assistenza e privacy", destination: URL(string: "https://ombrelloni-ddb55.web.app/privacy.html")!) }
             }
             .navigationTitle("Il tuo stabilimento").navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .topBarLeading) { Button("Indietro") { store.selected = nil } } }
+            .listSectionSpacing(.compact)
             .sheet(isPresented: $register) { RegisterView() }
+            .sheet(isPresented: $venueRegistration) { VenueRegistrationWizard() }
         }
     }
 }
@@ -231,7 +243,7 @@ struct HomeView: View {
     var body: some View {
         List {
             Section {
-                HStack { VStack(alignment: .leading, spacing: 5) { Text("Ciao, \(store.member?.username ?? "")").font(.title2.bold()); Text(store.member?.isManager == true ? "Gestisci il tuo stabilimento" : "Pronto a giocare?").foregroundStyle(.secondary) }; Spacer(); Image(systemName: "sportscourt.fill").font(.largeTitle).foregroundStyle(.white).padding(12).background(.blue.gradient, in: RoundedRectangle(cornerRadius: 18)) }.padding(.vertical, 8)
+                HStack { VStack(alignment: .leading, spacing: 5) { Text("Ciao, \(store.member?.username ?? "")").font(.title3.bold()); Text(store.member?.isManager == true ? "Gestisci il tuo stabilimento" : "Pronto a giocare?").foregroundStyle(.secondary) }; Spacer(); Image(systemName: "sportscourt.fill").font(.largeTitle).foregroundStyle(.white).padding(12).background(.blue.gradient, in: RoundedRectangle(cornerRadius: 18)) }.padding(.vertical, 3)
                 if store.member?.demo == true { Text("Stai provando come \(store.member?.isManager == true ? "gestore" : "utente"). Usa il pulsante in alto a sinistra per cambiare ruolo.").font(.footnote).foregroundStyle(.orange) }
                 GalleryView(photos: store.config.gallery ?? [])
             }
@@ -243,9 +255,9 @@ struct HomeView: View {
                 Section("La tua prossima partita") { BookingRow(booking: next) }
             }
             if store.selected?.id == "tommi38" { Section { WeatherSummaryView() } }
-            if let notes = store.config.notesText, !notes.isEmpty { Section("Dal tuo stabilimento") { Text(notes) } }
-            Section("Come funziona") { Text("Un credito permette una prenotazione. Scegli il campo e un orario libero. Se è occupato, puoi entrare in lista d’attesa.").font(.footnote).foregroundStyle(.secondary) }
-        }.refreshable { await store.perform { try await store.refresh() } }
+            if let notes = store.config.notesText, !notes.isEmpty { Section { DisclosureGroup("Dal tuo stabilimento") { Text(notes).font(.subheadline) } } }
+            Section { DisclosureGroup("Come funziona") { Text("Un credito permette una prenotazione. Scegli il campo e un orario libero. Se è occupato, puoi entrare in lista d’attesa.").font(.footnote).foregroundStyle(.secondary) } }
+        }.listSectionSpacing(.compact).contentMargins(.top, 6, for: .scrollContent).refreshable { await store.perform { try await store.refresh() } }
     }
 }
 struct BookingRow: View {
@@ -502,5 +514,163 @@ struct WeatherSummaryView: View {
                 }
             } else { Text("Previsioni non disponibili al momento").font(.caption).foregroundStyle(.secondary) }
         }.task { forecast = try? await store.request("weather") }
+    }
+}
+
+struct RegistrationCredential: Decodable { let username: String; let password: String }
+struct VenueRegistrationResult: Decodable {
+    let establishmentId: String; let name: String; let status: String
+    let manager: RegistrationCredential; let credentials: [RegistrationCredential]
+}
+struct VenueRegistrationWizard: View {
+    @EnvironmentObject var store: BeachStore
+    @Environment(\.dismiss) private var dismiss
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @State private var setup = DemoSetup()
+    @State private var city = ""
+    @State private var manager = "gestore"
+    @State private var password = ""
+    @State private var prefix = "user"
+    @State private var count = 10
+    @State private var step = 0
+    @State private var requestID = UUID().uuidString
+    @State private var result: VenueRegistrationResult?
+    @State private var document: URL?
+    @State private var failure: String?
+    @State private var submitting = false
+    var validFields: Bool { setup.name.trimmingCharacters(in: .whitespacesAndNewlines).count >= 2 && !setup.fields.isEmpty && setup.fields.allSatisfy { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty } && Set(setup.fields.map { $0.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) }).count == setup.fields.count }
+    var validHours: Bool { Clock.validTime(setup.dayStart) && Clock.validTime(setup.dayEnd) && Clock.minutes(setup.dayEnd)-Clock.minutes(setup.dayStart) >= setup.slotMinutes }
+    var validAccount: Bool { manager.range(of: "^[A-Za-z0-9][A-Za-z0-9._-]{2,39}$", options: .regularExpression) != nil && password.count >= 12 && password.utf8.count <= 72 && prefix.range(of: "^[A-Za-z][A-Za-z0-9_-]{0,19}$", options: .regularExpression) != nil && !(1...count).contains { prefix + String(format: "%03d", $0) == manager } }
+    var canContinue: Bool { step == 0 ? validFields : step == 1 ? validHours : validAccount }
+    var body: some View {
+        NavigationStack {
+            Form {
+                if let result {
+                    Section {
+                        Label("Stabilimento creato", systemImage: "checkmark.seal.fill").font(.headline).foregroundStyle(.blue)
+                        Text(result.name).bold()
+                        Text("È già attivo. Il gestore può amministrare solo questo stabilimento; l’amministratore globale mantiene il controllo della piattaforma.").font(.subheadline)
+                        Text("\(result.credentials.count) utenti numerati, tutti con zero crediti.").font(.subheadline)
+                    }
+                    Section("Credenziali") {
+                        Text("Gestore: \(result.manager.username)")
+                        Text("Utenti: \(result.credentials.first?.username ?? "") – \(result.credentials.last?.username ?? "")")
+                        Text("Le credenziali vengono mostrate una sola volta. Salva il PDF prima di chiudere: contiene anche le password alfanumeriche di 6 caratteri degli utenti.").font(.footnote).foregroundStyle(.secondary)
+                        if let document { ShareLink(item: document) { Label("Salva o condividi il PDF", systemImage: "square.and.arrow.up") } }
+                        else { Button("Prepara il PDF") { makeDocument(result) } }
+                    }
+                    Section { Button("Ho salvato il PDF · Accedi") { Task { await store.choose(Venue(id: result.establishmentId, name: result.name)); dismiss() } } }
+                } else {
+                    Section {
+                        ProgressView(value: Double(step + 1), total: 3).tint(.blue)
+                        Text("Passo \(step + 1) di 3").font(.caption).foregroundStyle(.secondary).contentTransition(.numericText())
+                    }
+                    if step == 0 {
+                        Section("Il tuo stabilimento") { TextField("Nome dello stabilimento", text: $setup.name); TextField("Città", text: $city) }
+                        Section("Campi") {
+                            ForEach(setup.fields.indices, id: \.self) { i in TextField("Nome campo \(i + 1)", text: $setup.fields[i]) }
+                            if setup.fields.count < 6 { Button("Aggiungi campo") { setup.fields.append("Campo \(setup.fields.count + 1)") } }
+                            if setup.fields.count > 1 { Button("Rimuovi ultimo campo", role: .destructive) { setup.fields.removeLast() } }
+                        }
+                    } else if step == 1 {
+                        Section("Quando si può prenotare?") {
+                            TextField("Apertura HH:mm", text: $setup.dayStart).keyboardType(.numbersAndPunctuation)
+                            TextField("Chiusura HH:mm", text: $setup.dayEnd).keyboardType(.numbersAndPunctuation)
+                            Picker("Durata prenotazione", selection: $setup.slotMinutes) { ForEach([15,30,40,45,60,90], id: \.self) { Text("\($0) minuti").tag($0) } }
+                            Button("Usa orari di base") { setup.dayStart = "09:00"; setup.dayEnd = "20:00"; setup.slotMinutes = 45 }
+                        }
+                    } else {
+                        Section("Il tuo account gestore") {
+                            TextField("Username gestore", text: $manager).textInputAutocapitalization(.never).autocorrectionDisabled().textContentType(.username)
+                            SecureField("Password gestore · almeno 12 caratteri", text: $password).textContentType(.newPassword)
+                        }
+                        Section("Quanti utenti vuoi creare?") {
+                            Stepper("\(count) utenti", value: $count, in: 1...100)
+                            TextField("Prefisso utenti", text: $prefix).textInputAutocapitalization(.never).autocorrectionDisabled()
+                            Text("Da \(prefix)001 a \(prefix)\(String(format: "%03d", count)). Password casuali alfanumeriche di 6 caratteri, riportate nel PDF.").font(.footnote).foregroundStyle(.secondary)
+                            Text("Tutti partono con zero crediti. Un video premio verificato permette di ottenere un credito, secondo disponibilità e limiti giornalieri.").font(.footnote)
+                        }
+                        Section("Riepilogo") {
+                            Text(setup.name).bold(); Text(setup.fields.joined(separator: " · ")); Text("\(setup.dayStart)–\(setup.dayEnd) · \(setup.slotMinutes) minuti")
+                            Text("Lo stabilimento sarà attivo subito e privato: puoi condividere l’invito riportato nel PDF. Il gestore ha accesso solo ai propri dati.").font(.footnote).foregroundStyle(.secondary)
+                        }
+                    }
+                    if let failure { Section { Text(failure).font(.footnote).foregroundStyle(.red) } }
+                    Section {
+                        Button { if step < 2 { withAnimation(reduceMotion ? nil : .spring(response: 0.35, dampingFraction: 0.82)) { step += 1 } } else { Task { await create() } } } label: { HStack { Spacer(); if submitting { ProgressView("Creo stabilimento e utenti…") } else { Text(step < 2 ? "Continua" : "Crea stabilimento e PDF").bold() }; Spacer() } }.disabled(!canContinue || submitting)
+                        if step > 0 { Button("Indietro") { withAnimation(reduceMotion ? nil : .spring(response: 0.35, dampingFraction: 0.82)) { step -= 1 } }.disabled(submitting) }
+                    }
+                }
+            }.listSectionSpacing(.compact).navigationTitle("Registra stabilimento").navigationBarTitleDisplayMode(.inline)
+                .toolbar { if result == nil { Button("Chiudi") { dismiss() }.disabled(submitting) } }
+                .interactiveDismissDisabled(submitting || result != nil)
+                .onAppear {
+                    #if DEBUG
+                    if ProcessInfo.processInfo.environment["CAMPOPRONTO_PDF_PREVIEW"] == "1" {
+                        let sample = VenueRegistrationResult(establishmentId: "sample-preview", name: "Esempio PDF · nessun account reale", status: "active", manager: RegistrationCredential(username: "gestore", password: "Fixture-manager-2026!"), credentials: (1...100).map { RegistrationCredential(username: "user" + String(format: "%03d", $0), password: "Test01") })
+                        result = sample; makeDocument(sample)
+                    }
+                    #endif
+                }
+                .onDisappear { password = ""; result = nil; if let document { try? FileManager.default.removeItem(at: document) } }
+        }
+    }
+    func create() async {
+        guard validFields && validHours && validAccount && !submitting else { return }
+        submitting = true; failure = nil; defer { submitting = false }
+        do {
+            let response: VenueRegistrationResult = try await store.request("venue-registration", method: "POST", body: ["requestId": requestID, "name": setup.name, "city": city, "managerUsername": manager, "managerPassword": password, "fields": setup.fields, "dayStart": setup.dayStart, "dayEnd": setup.dayEnd, "slotMinutes": setup.slotMinutes, "userCount": count, "userPrefix": prefix])
+            result = response; password = ""; makeDocument(response)
+        } catch { failure = error.localizedDescription }
+    }
+    func makeDocument(_ value: VenueRegistrationResult) {
+        do { document = try RegistrationPDF.write(value) }
+        catch { failure = "Stabilimento creato, ma non riesco a preparare il PDF. Premi Prepara il PDF per riprovare." }
+    }
+}
+@MainActor
+enum RegistrationPDF {
+    static func write(_ result: VenueRegistrationResult) throws -> URL {
+        let renderer = UIGraphicsPDFRenderer(bounds: CGRect(x: 0, y: 0, width: 595, height: 842))
+        let data = renderer.pdfData { context in
+            var y: CGFloat = 0
+            var pageNumber = 0
+            func text(_ value: String, at point: CGPoint, size: CGFloat = 13, bold: Bool = false, width: CGFloat = 507) {
+                (value as NSString).draw(in: CGRect(x: point.x, y: point.y, width: width, height: 60), withAttributes: [.font: bold ? UIFont.boldSystemFont(ofSize: size) : UIFont.systemFont(ofSize: size), .foregroundColor: UIColor.black])
+            }
+            func page() {
+                context.beginPage(); pageNumber += 1
+                text("CampoPronto ADS · Credenziali", at: CGPoint(x: 44,y: 38), size: 20, bold: true)
+                text(result.name, at: CGPoint(x: 44,y: 75), size: 15, bold: true)
+                let titleHeight = (result.name as NSString).boundingRect(with: CGSize(width:507,height:60), options:.usesLineFragmentOrigin, attributes:[.font:UIFont.boldSystemFont(ofSize:15)], context:nil).height
+                let statusY = 75 + ceil(titleHeight) + 12
+                text("Stabilimento privato e attivo · Zero crediti iniziali", at: CGPoint(x: 44,y: statusY), size: 10)
+                text("Pagina \(pageNumber)", at: CGPoint(x: 44,y: 802), size: 10)
+                y = statusY + 32
+            }
+            func columns() {
+                text("N.", at:CGPoint(x:44,y:y),size:10,bold:true)
+                text("Nome utente", at:CGPoint(x:100,y:y),size:10,bold:true)
+                text("Password", at:CGPoint(x:350,y:y),size:10,bold:true)
+                y += 25
+            }
+            page()
+            text("Account gestore (password scelta durante la registrazione)", at: CGPoint(x: 44,y:y), bold:true); y += 30
+            text("Username: \(result.manager.username)", at: CGPoint(x:44,y:y)); y += 26
+            text("Password: \(result.manager.password)", at: CGPoint(x:44,y:y), size:11); y += 52
+            text("Invito: campopronto://venue?id=\(result.establishmentId)", at: CGPoint(x:44,y:y),size:10); y += 46
+            columns()
+            for (index, credential) in result.credentials.enumerated() {
+                if y > 735 { page(); columns() }
+                text(String(format:"%03d",index+1), at:CGPoint(x:44,y:y),size:12)
+                text(credential.username, at:CGPoint(x:100,y:y),bold:true,width:220)
+                text(credential.password, at:CGPoint(x:350,y:y),width:150); y += 26
+            }
+            if y > 704 { page() }
+            text("Un credito = una prenotazione. Gli utenti ottengono crediti dai video premio verificati.\nConserva il documento e consegna a ciascun utente soltanto le proprie credenziali.", at:CGPoint(x:44,y:y+12),size:10)
+        }
+        let url = FileManager.default.temporaryDirectory.appendingPathComponent("CampoPronto-credenziali-\(UUID().uuidString).pdf")
+        try data.write(to: url, options: [.atomic, .completeFileProtection])
+        return url
     }
 }

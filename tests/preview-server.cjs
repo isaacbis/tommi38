@@ -81,7 +81,7 @@ function seedDocuments(dates) {
 function loadApplication(memory, dates) {
   const cached = new Map();
   const localModules = new Set([
-    'server.js', 'src/authorization.js', 'src/tenancy.js', 'src/permissions.js',
+    'server.js', 'src/venue-registration.js', 'src/authorization.js', 'src/tenancy.js', 'src/permissions.js',
     'src/management-guards.js', 'src/routes.js', 'src/account-routes.js', 'src/platform-routes.js', 'src/demo-routes.js', 'src/public-demo.js', 'src/admob-routes.js', 'src/admob-rewards.js', 'src/admob-verification.js'
   ]);
   const packages = new Set(['express', 'express-session', 'bcrypt', 'zod', 'express-rate-limit', 'helmet', 'cookie-parser']);
