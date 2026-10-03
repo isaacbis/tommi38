@@ -20,5 +20,6 @@ Home più compatta, comunicazioni e istruzioni espandibili. Foto intere in riqua
 - Login esistente e home verificati su iPhone 18 Pro Max; immagini intere affiancate. Annuncio interstitial AdMob di test mostrato correttamente. Questo non garantisce disponibilità degli annunci di produzione.
 - Hosting e Cloud Functions pubblicati su Firebase, versione `firebase-native-2.0-build45`, URL https://ombrelloni-ddb55.web.app. Callback AdMob firmato invariato, direttamente sulla Cloud Function.
 - Build 45 caricata con successo su App Store Connect. Le novità, la descrizione e le istruzioni di revisione sono aggiornate; aggiunte tre nuove schermate iPhone. Pubblicazione subordinata all’approvazione Apple.
+- Invio confermato il 3 ottobre 2026 alle 16:01: stato **In attesa di verifica**, versione **2.0 (45)**, ID `1134bd9c-07bb-4c6c-a36d-736e2f504403`. La precedente build 44 è stata ritirata per questa sostituzione. Rilascio automatico dopo approvazione.
 
 Pacchetti a pagamento e push remoti restano non attivati. Le vecchie app pubblicate mantengono il vecchio servizio fino all’aggiornamento; la nuova build usa Firebase.
