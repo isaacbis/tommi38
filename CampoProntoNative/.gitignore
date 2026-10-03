@@ -1,0 +1,6 @@
+xcuserdata/
+DerivedData/
+*.xcarchive
+*.ipa
+.DS_Store
+GoogleService-Info.plist
