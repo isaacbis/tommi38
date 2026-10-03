@@ -60,14 +60,15 @@ struct UserDetailView: View {
     @Environment(\.dismiss) var dismiss
     let user: ManagedUser
     @State private var delta = 1
+    @State private var resetPassword = false
     var body: some View {
         Form {
             Section { Text(user.username).font(.headline); Text("\(user.credits) crediti"); Text(user.pendingApproval == true ? "Iscrizione da approvare" : (user.disabled == true ? "Disabilitato" : "Attivo")) }
-            Section { Button(user.disabled == true || user.pendingApproval == true ? "Approva / abilita utente" : "Disabilita utente", role: user.disabled == true ? nil : .destructive) { Task { await store.perform { try await store.mutate("admin/users/status", method: "PUT", body: ["username": user.username, "disabled": user.pendingApproval == true ? false : !(user.disabled ?? false)]); try await store.loadUsers(); dismiss() } } }.disabled(store.busy || user.username == store.member?.username) }
+            Section { Button("Reimposta password") { resetPassword = true }; Button(user.disabled == true || user.pendingApproval == true ? "Approva / abilita utente" : "Disabilita utente", role: user.disabled == true ? nil : .destructive) { Task { await store.perform { try await store.mutate("admin/users/status", method: "PUT", body: ["username": user.username, "disabled": user.pendingApproval == true ? false : !(user.disabled ?? false)]); try await store.loadUsers(); dismiss() } } }.disabled(store.busy || user.username == store.member?.username) }
             if store.member?.platformAdmin == true {
                 Section("Rettifica crediti · Solo amministratore globale") { Stepper("Variazione: \(delta > 0 ? "+" : "")\(delta)", value: $delta, in: -100...100); Button("Applica rettifica") { Task { await store.perform { try await store.mutate("admin/users/credits", method: "PUT", body: ["username": user.username, "delta": delta]); try await store.loadUsers(); dismiss() } } }.disabled(store.busy || delta == 0) }
             } else { Text("In CampoPronto ADS i crediti si ottengono con video o pacchetti disponibili. Il gestore non può assegnarli.").font(.footnote).foregroundStyle(.secondary) }
-        }.navigationTitle("Gestisci utente")
+        }.navigationTitle("Gestisci utente").sheet(isPresented: $resetPassword) { PasswordView(target: user.username) }
     }
 }
 struct VenueSettingsView: View {
@@ -170,12 +171,17 @@ struct PlatformVenueView: View {
     @State private var city = ""
     @State private var visible = false
     @State private var enabled = true
+    @State private var latitude = ""
+    @State private var longitude = ""
     var body: some View {
         Form {
-            Section { TextField("Nome stabilimento", text: $name); TextField("Città", text: $city); Toggle("Visibile nella ricerca", isOn: $visible); if venue.id != "tommi38" { Toggle("Stabilimento attivo", isOn: $enabled) }; Text("Uno stabilimento privato non compare nella ricerca pubblica. Gli utenti già abilitati mantengono il proprio accesso.").font(.footnote).foregroundStyle(.secondary) }
-            Button("Salva") { Task { await store.perform { try await store.mutate("platform/establishments/" + venue.id, method: "PATCH", body: ["name": name, "city": city, "visibility": visible ? "public" : "private", "enabled": enabled]); try await store.loadPlatform(); dismiss() } } }.disabled(store.busy || name.isEmpty)
+            Section { TextField("Nome stabilimento", text: $name); TextField("Città", text: $city); TextField("Latitudine (facoltativa)", text: $latitude).keyboardType(.numbersAndPunctuation); TextField("Longitudine (facoltativa)", text: $longitude).keyboardType(.numbersAndPunctuation); Toggle("Visibile nella ricerca", isOn: $visible); if venue.id != "tommi38" { Toggle("Stabilimento attivo", isOn: $enabled) }; Text("Uno stabilimento privato non compare nella ricerca pubblica. Gli utenti già abilitati mantengono il proprio accesso.").font(.footnote).foregroundStyle(.secondary) }
+            Button("Salva") { Task { await store.perform { var body: [String:Any] = ["name": name, "city": city, "visibility": visible ? "public" : "private", "enabled": enabled]
+                if latitude.isEmpty && longitude.isEmpty { body["latitude"] = NSNull(); body["longitude"] = NSNull() }
+                else { guard let lat = Double(latitude.replacingOccurrences(of: ",", with: ".")), let lon = Double(longitude.replacingOccurrences(of: ",", with: ".")), (-90...90).contains(lat), (-180...180).contains(lon) else { throw APIError(code: "COORDINATE_NON_VALIDE") }; body["latitude"] = lat; body["longitude"] = lon }
+                try await store.mutate("platform/establishments/" + venue.id, method: "PATCH", body: body); try await store.loadPlatform(); dismiss() } } }.disabled(store.busy || name.isEmpty)
             ShareLink(item: URL(string: "campopronto://venue?id=" + venue.id)!) { Label("Condividi invito all’app", systemImage: "square.and.arrow.up") }
             Button("Gestisci questo stabilimento") { Task { await store.switchVenue(venue); if store.selected?.id == venue.id { dismiss() } } }.disabled(store.busy || !enabled)
-        }.navigationTitle(venue.name).onAppear { name = venue.name; city = venue.city ?? ""; visible = venue.visibility == "public"; enabled = venue.enabled ?? true }
+        }.navigationTitle(venue.name).onAppear { name = venue.name; city = venue.city ?? ""; visible = venue.visibility == "public"; enabled = venue.enabled ?? true; latitude = venue.latitude.map { String($0) } ?? ""; longitude = venue.longitude.map { String($0) } ?? "" }
     }
 }

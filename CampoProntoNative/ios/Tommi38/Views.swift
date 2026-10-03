@@ -391,7 +391,7 @@ struct AccountView: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Account") { Text(store.member?.username ?? ""); Text(store.member?.platformAdmin == true ? "Amministratore globale" : (store.member?.isManager == true ? "Gestore dello stabilimento" : "Utente")).foregroundStyle(.secondary); Button(store.member?.demo == true ? "Esci dalla demo" : "Esci dall’account") { Task { await store.logout(); dismiss() } } }
+                Section("Account") { Text(store.member?.username ?? ""); if store.member?.demo != true && store.member?.managementMode != true { NavigationLink("Cambia password") { PasswordView(target: nil) } }; Text(store.member?.platformAdmin == true ? "Amministratore globale" : (store.member?.isManager == true ? "Gestore dello stabilimento" : "Utente")).foregroundStyle(.secondary); Button(store.member?.demo == true ? "Esci dalla demo" : "Esci dall’account") { Task { await store.logout(); dismiss() } } }
                 Section("Informazioni") { Link("Privacy", destination: URL(string: "https://tommi38.onrender.com/privacy.html")!); Link("Assistenza", destination: URL(string: "https://tommi38.onrender.com/support.html")!); Button("Preferenze pubblicità") { Task { do { try await NativeAds.shared.privacy() } catch { store.message = error.localizedDescription } } }; if store.member?.demo != true { Toggle("Promemoria 30 minuti prima", isOn: Binding(get: { reminders }, set: { value in Task { if value { do { reminders = try await BookingReminders.enable() } catch { store.message = error.localizedDescription } } else { reminders = false }; await BookingReminders.sync(store.mine, fields: store.config.fields, enabled: reminders) } })); Text("I promemoria sono locali. Le novità della lista d’attesa si controllano nell’app; non sono ancora disponibili notifiche push.").font(.caption).foregroundStyle(.secondary) } }
                 if store.member?.demo != true && store.member?.isManager != true {
                     Section { Toggle("Voglio eliminare il mio account", isOn: $deletion); if deletion { SecureField("Password attuale", text: $password); Button("Elimina account", role: .destructive) { confirm = true }.disabled(password.isEmpty || store.busy) } }
@@ -399,5 +399,26 @@ struct AccountView: View {
             }.navigationTitle("Il tuo account").toolbar { Button("Chiudi") { dismiss() } }
                 .confirmationDialog("Eliminare definitivamente l’account? Verranno rimossi i tuoi dati secondo l’informativa privacy.", isPresented: $confirm, titleVisibility: .visible) { Button("Elimina definitivamente", role: .destructive) { Task { await store.perform { try await store.mutate("auth/account", method: "DELETE", body: ["username": store.member?.username ?? "", "currentPassword": password, "confirm": true]); password = ""; store.clearSession(); dismiss() } } } }
         }
+    }
+}
+
+struct PasswordView: View {
+    @EnvironmentObject var store: BeachStore
+    @Environment(\.dismiss) var dismiss
+    let target: String?
+    @State private var old = ""
+    @State private var new = ""
+    @State private var repeatPassword = ""
+    var body: some View {
+        Form {
+            if target == nil { SecureField("Password attuale", text: $old).textContentType(.password) } else { Text("Nuova password per \(target ?? "")").font(.headline) }
+            SecureField("Nuova password (almeno 12 caratteri)", text: $new).textContentType(.newPassword)
+            SecureField("Ripeti nuova password", text: $repeatPassword).textContentType(.newPassword)
+            Button("Salva password") { Task { await store.perform {
+                if let target { try await store.mutate("admin/users/password", method: "PUT", body: ["username": target, "newPassword": new]) }
+                else { try await store.mutate("auth/password", body: ["currentPassword": old, "newPassword": new]) }
+                old = ""; new = ""; repeatPassword = ""; store.message = "Password aggiornata."; dismiss()
+            } } }.disabled(store.busy || new.count < 12 || new != repeatPassword || (target == nil && old.isEmpty))
+        }.navigationTitle("Password")
     }
 }

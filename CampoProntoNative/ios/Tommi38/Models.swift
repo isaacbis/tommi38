@@ -89,17 +89,26 @@ struct APIError: LocalizedError {
     let code: String
     var errorDescription: String? {
         switch code {
-        case "INVALID_CREDENTIALS", "BAD_CREDENTIALS": return "Username o password non corretti."
+        case "INVALID_LOGIN", "INVALID_CREDENTIALS", "BAD_CREDENTIALS": return "Username o password non corretti."
         case "NO_CREDITS", "INSUFFICIENT_CREDITS": return "Non hai crediti sufficienti."
         case "SLOT_TAKEN", "SLOT_BUSY", "CONFLICT": return "Questo orario è appena stato prenotato. Aggiorna i campi."
         case "DEMO_EXPIRED": return "I dieci minuti della demo sono terminati."
         case "FORBIDDEN": return "Non puoi eseguire questa operazione con il tuo ruolo."
         case "UNAUTHORIZED": return "Accedi di nuovo per continuare."
         case "ADS_UNAVAILABLE": return "Al momento non ci sono video disponibili. Riprova più tardi."
-        case "DAILY_LIMIT_REACHED", "REWARD_DAILY_LIMIT": return "Hai già ottenuto il credito di oggi."
+        case "DAILY_REWARD_LIMIT", "DAILY_LIMIT_REACHED", "REWARD_DAILY_LIMIT": return "Hai già ottenuto il credito di oggi."
         case "INVALID_DEMO_SETUP": return "Controlla i nomi dei campi e gli orari della demo."
+        case "USER_DISABLED": return "L’account non è ancora approvato o è stato disabilitato. Contatta il gestore."
+        case "MAX_PER_DAY_LIMIT", "ACTIVE_BOOKING_LIMIT", "BOOKING_LIMIT": return "Hai raggiunto il limite di prenotazioni previsto dallo stabilimento."
+        case "FIELD_CLOSED": return "Il campo è chiuso nell’orario scelto."
+        case "PAST_DATE_NOT_ALLOWED", "PAST_TIME_NOT_ALLOWED": return "Scegli una data e un orario futuri."
+        case "EXISTING_RESERVATIONS": return "Il periodo contiene prenotazioni. Gestiscile prima di chiudere il campo."
+        case "REWARD_PENDING": return "Un video è ancora in verifica. Aggiorna il saldo tra poco."
+        case "GLOBAL_ADMIN_REQUIRED": return "Solo l’amministratore globale può rettificare i crediti."
+        case "BAD_BODY", "COORDINATE_NON_VALIDE", "URL_FOTO_NON_VALIDO": return "Controlla i dati inseriti e riprova."
+        case "WRONG_PASSWORD": return "La password attuale non è corretta."
         case "NETWORK": return "Connessione non disponibile. Riprova."
-        default: return "Operazione non riuscita (\(code)). Riprova o contatta l’assistenza."
+        default: return "Operazione non riuscita. Aggiorna i dati e riprova, oppure contatta il gestore."
         }
     }
 }

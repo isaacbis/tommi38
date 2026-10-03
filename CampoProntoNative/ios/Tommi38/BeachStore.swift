@@ -28,7 +28,8 @@ final class BeachStore: ObservableObject {
     private let session: URLSession
     init() {
         let c = URLSessionConfiguration.ephemeral
-        c.timeoutIntervalForRequest = 35
+        c.timeoutIntervalForRequest = 90
+        c.timeoutIntervalForResource = 120
         c.httpCookieStorage = HTTPCookieStorage.shared
         c.requestCachePolicy = .reloadIgnoringLocalCacheData
         session = URLSession(configuration: c)
