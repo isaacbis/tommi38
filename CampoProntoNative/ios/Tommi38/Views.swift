@@ -96,9 +96,9 @@ struct WelcomeView: View {
             List {
                 Section {
                     HStack(spacing: 13) {
-                        Image(systemName: "sportscourt.fill").font(.title2).foregroundStyle(.white)
+                        Image("EntryLogo").resizable().scaledToFit()
                             .frame(width: 52, height: 52)
-                            .background(LinearGradient(colors: [.blue, .teal], startPoint: .topLeading, endPoint: .bottomTrailing), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                            .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
                             .accessibilityHidden(true)
                         VStack(alignment: .leading, spacing: 3) {
                             Text(entryArea == "manager" ? "Il tuo stabilimento" : "La tua prossima partita").font(.title3.bold())
@@ -254,10 +254,9 @@ struct LoginView: View {
             ScrollView {
                 VStack(spacing: 16) {
                     VStack(spacing: 9) {
-                        Image(systemName: "sportscourt.fill")
-                            .font(.system(size: 27, weight: .semibold)).foregroundStyle(.white)
+                        Image("EntryLogo").resizable().scaledToFit()
                             .frame(width: 60, height: 60)
-                            .background(LinearGradient(colors: [.blue, .teal], startPoint: .topLeading, endPoint: .bottomTrailing), in: RoundedRectangle(cornerRadius: 21, style: .continuous))
+                            .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
                         Text(store.selected?.name ?? "CampoPronto").font(.title2.bold()).multilineTextAlignment(.center)
                         Text("Il tuo prossimo incontro parte da qui.").font(.subheadline).foregroundStyle(.secondary)
                         GalleryView(photos: store.config.gallery ?? [])
@@ -400,7 +399,7 @@ struct HomeView: View {
     var body: some View {
         List {
             Section {
-                HStack { VStack(alignment: .leading, spacing: 5) { Text("Ciao, \(store.member?.username ?? "")").font(.title3.bold()); Text(store.member?.isManager == true ? "Gestisci il tuo stabilimento" : "Pronto a giocare?").foregroundStyle(.secondary) }; Spacer(); Image(systemName: "sportscourt.fill").font(.largeTitle).foregroundStyle(.white).padding(12).background(.blue.gradient, in: RoundedRectangle(cornerRadius: 18)) }.padding(.vertical, 3)
+                HStack { VStack(alignment: .leading, spacing: 5) { Text("Ciao, \(store.member?.username ?? "")").font(.title3.bold()); Text(store.member?.isManager == true ? "Gestisci il tuo stabilimento" : "Pronto a giocare?").foregroundStyle(.secondary) }; Spacer(); Image("EntryLogo").resizable().scaledToFit().frame(width: 60, height: 60).clipShape(RoundedRectangle(cornerRadius: 18)) }.padding(.vertical, 3)
                 if store.member?.demo == true { Text("Stai provando come \(store.member?.isManager == true ? "gestore" : "utente"). Usa il pulsante in alto a sinistra per cambiare ruolo.").font(.footnote).foregroundStyle(.orange) }
                 GalleryView(photos: store.config.gallery ?? [])
             }
