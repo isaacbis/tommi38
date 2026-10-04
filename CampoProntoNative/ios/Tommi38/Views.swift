@@ -31,9 +31,9 @@ struct EntryAreaView: View {
             ScrollView {
                 VStack(spacing: 24) {
                     VStack(spacing: 12) {
-                        Image(systemName: "sportscourt.fill").font(.system(size: 38, weight: .semibold)).foregroundStyle(.white)
+                        Image("EntryLogo").resizable().scaledToFit()
                             .frame(width: 88, height: 88)
-                            .background(LinearGradient(colors: [.blue, .teal], startPoint: .topLeading, endPoint: .bottomTrailing), in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+                            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
                             .accessibilityHidden(true)
                         Text("CampoPronto ADS").font(.title2.bold())
                         Text("Come vuoi entrare?").font(.title3.weight(.semibold))
