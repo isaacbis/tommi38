@@ -15,3 +15,5 @@ La prenotazione rimane in un'unica schermata come richiesto nella build 50. Ness
 Corretto e verificato il testo premio in AdMob: «1 video completato = 1 credito», al posto della vecchia dicitura dei due video. Quantità premio invariata a 1.
 
 Verifica visiva completata su iPhone 18 Pro: tre giorni affiancati e descrizioni accessibili corrette. Upload 2.1 (51) completato e disponibilità verificata nel gruppo interno Campi di TestFlight, stato «Test in corso».
+
+App Store: creata versione 2.1, aggiornate novità e note per la revisione, selezionata build 51 e inviata ad Apple. Stato verificato «In attesa di verifica», ID dc8adc54-435d-4a2b-b363-4660c45ce210. Rilascio automatico dopo approvazione. Non ancora pubblicata la versione 2.1. Nessun banner aggiunto: proposta di posizionamento nella Home.
