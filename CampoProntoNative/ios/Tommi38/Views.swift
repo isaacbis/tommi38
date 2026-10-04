@@ -353,6 +353,7 @@ struct DemoWizard: View {
 struct MainView: View {
     @EnvironmentObject var store: BeachStore
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    @Environment(\.scenePhase) private var scenePhase
     @State private var account = false
     @State private var adChecked = false
     @State private var bannerReady = false
@@ -385,21 +386,30 @@ struct MainView: View {
                 ZStack { Color(.systemBackground).ignoresSafeArea(); ProgressView("Entro nello stabilimento…") }
             }
         }
-        .task {
-            guard !adChecked, store.member?.demo != true, store.member?.isManager != true else { return }
-            adChecked = true
+        .task(id: scenePhase) {
+            guard scenePhase == .active, !adChecked, store.member?.demo != true, store.member?.isManager != true else { return }
             let showLoginAd = store.shouldShowLoginAd
             store.shouldShowLoginAd = false
             enteringWithAd = showLoginAd
             defer { enteringWithAd = false }
-            do {
-                let status: AdsStatus = try await store.request("ads/status")
-                guard status.available else { return }
-                if showLoginAd { try? await NativeAds.shared.showLoginAd() }
-                try Task.checkCancellation()
-                try await NativeAds.shared.prepareBanner()
-                bannerReady = true
-            } catch { /* Advertising must never prevent access. */ }
+            for attempt in 0..<3 {
+                do {
+                    let status: AdsStatus = try await store.request("ads/status")
+                    guard status.available else { return }
+                    // Never show a late login interstitial after the client starts using the app.
+                    if showLoginAd && attempt == 0 { try? await NativeAds.shared.showLoginAd() }
+                    try Task.checkCancellation()
+                    try await NativeAds.shared.prepareBanner()
+                    bannerReady = true
+                    adChecked = true
+                    return
+                } catch {
+                    enteringWithAd = false
+                    guard !Task.isCancelled, attempt < 2 else { return }
+                    do { try await Task.sleep(for: .seconds(attempt == 0 ? 5 : 15)) }
+                    catch { return }
+                }
+            }
         }
     }
     func shell<Content: View>(@ViewBuilder content: () -> Content) -> some View {

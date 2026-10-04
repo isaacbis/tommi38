@@ -17,6 +17,7 @@ final class NativeAds: NSObject, FullScreenContentDelegate {
     private var earned = false
     private var started = false
     private var consentUpdated = false
+    private var consentOperation: Task<Void, Error>?
     private var loading = false
     var presenter: UIViewController? {
         guard let scene = UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first(where: { $0.activationState == .foregroundActive }), var controller = scene.windows.first(where: \.isKeyWindow)?.rootViewController else { return nil }
@@ -24,6 +25,13 @@ final class NativeAds: NSObject, FullScreenContentDelegate {
         return controller is UIAlertController ? nil : controller
     }
     private func consent() async throws {
+        if let consentOperation { try await consentOperation.value; return }
+        let operation = Task { try await self.updateConsentAndStartAds() }
+        consentOperation = operation
+        defer { consentOperation = nil }
+        try await operation.value
+    }
+    private func updateConsentAndStartAds() async throws {
         if !consentUpdated {
             try await ConsentInformation.shared.requestConsentInfoUpdate(with: RequestParameters())
             try await ConsentForm.loadAndPresentIfRequired(from: presenter)
