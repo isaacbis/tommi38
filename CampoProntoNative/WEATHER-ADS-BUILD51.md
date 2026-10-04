@@ -11,3 +11,7 @@ Verifiche del 4 ottobre 2026:
 - Pagamenti non ancora disponibili: il pannello indica soglia iniziale da raggiungere, verifica identità e dati bancari non ancora disponibili. Utili stimati non equivalgono a pagamento effettuato.
 
 La prenotazione rimane in un'unica schermata come richiesto nella build 50. Nessuna modifica ai crediti o al backend.
+
+Corretto e verificato il testo premio in AdMob: «1 video completato = 1 credito», al posto della vecchia dicitura dei due video. Quantità premio invariata a 1.
+
+Verifica visiva completata su iPhone 18 Pro: tre giorni affiancati e descrizioni accessibili corrette. Upload 2.1 (51) completato e disponibilità verificata nel gruppo interno Campi di TestFlight, stato «Test in corso».
