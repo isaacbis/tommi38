@@ -357,14 +357,18 @@ struct MainView: View {
     @State private var account = false
     @State private var adChecked = false
     @State private var bannerReady = false
+    @StateObject private var banner = ClientBannerState()
     @State private var enteringWithAd = false
     var body: some View {
         VStack(spacing: 0) {
             if bannerReady, store.member?.demo != true, store.member?.isManager != true {
                 VStack(spacing: 2) {
                     Text("Pubblicità").font(.system(size: 10)).foregroundStyle(.secondary)
-                    ClientBannerView().frame(width: 320, height: 50)
+                    ClientBannerView(state: banner, active: scenePhase == .active).frame(width: 320, height: 50)
                 }.frame(maxWidth: .infinity).padding(.vertical, 4).background(.background)
+                    .frame(height: banner.loaded ? nil : 0).clipped()
+                    .opacity(banner.loaded ? 1 : 0)
+                    .accessibilityHidden(!banner.loaded)
             }
         TabView {
             shell { HomeView() }.tabItem { Label("Home", systemImage: "house.fill") }

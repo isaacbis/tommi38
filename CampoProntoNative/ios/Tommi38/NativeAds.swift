@@ -95,21 +95,65 @@ final class NativeAds: NSObject, FullScreenContentDelegate {
 }
 
 
-/// One persistent banner above the client tabs, below the iPhone safe area.
-struct ClientBannerView: UIViewRepresentable {
-    func makeUIView(context: Context) -> BannerView {
-        let banner = BannerView(adSize: AdSizeBanner)
+/// A failed/no-fill banner must not reserve space. Only retry while the client screen is active.
+@MainActor
+final class ClientBannerState: NSObject, ObservableObject, BannerViewDelegate {
+    @Published private(set) var loaded = false
+    let banner = BannerView(adSize: AdSizeBanner)
+    private var active = false
+    private var loading = false
+    private var retry: Task<Void, Never>?
+    override init() {
+        super.init()
         #if DEBUG
         banner.adUnitID = "ca-app-pub-3940256099942544/2435281174"
         #else
         banner.adUnitID = "ca-app-pub-5793073160443124/8892398136"
         #endif
+    }
+    func setActive(_ value: Bool) {
+        guard active != value else { return }
+        active = value
+        if value {
+            banner.delegate = self
+            if !loaded { load() }
+        } else { retry?.cancel(); retry = nil }
+    }
+    private func load() {
+        guard active, !loading else { return }
+        loading = true
         banner.rootViewController = NativeAds.shared.presenter
         let request = Request()
         let extras = Extras(); extras.additionalParameters = ["npa": "1"]; request.register(extras)
         banner.load(request)
-        return banner
     }
-    func updateUIView(_ banner: BannerView, context: Context) {}
-    static func dismantleUIView(_ banner: BannerView, coordinator: ()) { banner.delegate = nil; banner.rootViewController = nil }
+    func bannerViewDidReceiveAd(_ bannerView: BannerView) {
+        loading = false
+        loaded = true
+        retry?.cancel(); retry = nil
+    }
+    func bannerView(_ bannerView: BannerView, didFailToReceiveAdWithError error: Error) {
+        loading = false
+        loaded = false
+        retry?.cancel()
+        guard active else { return }
+        retry = Task { [weak self] in
+            do { try await Task.sleep(for: .seconds(60)) } catch { return }
+            guard !Task.isCancelled else { return }
+            self?.load()
+        }
+    }
+    func stop() {
+        active = false; loading = false; retry?.cancel(); retry = nil
+        banner.delegate = nil; banner.rootViewController = nil
+    }
+}
+
+struct ClientBannerView: UIViewRepresentable {
+    let state: ClientBannerState
+    let active: Bool
+    func makeUIView(context: Context) -> BannerView { state.banner }
+    func updateUIView(_ banner: BannerView, context: Context) { state.setActive(active) }
+    func makeCoordinator() -> ClientBannerState { state }
+    static func dismantleUIView(_ banner: BannerView, coordinator: ClientBannerState) { coordinator.stop() }
 }
