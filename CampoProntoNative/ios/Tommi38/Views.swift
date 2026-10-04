@@ -47,25 +47,39 @@ struct WelcomeView: View {
     var body: some View {
         NavigationStack {
             List {
+                Section {
+                    HStack(spacing: 13) {
+                        Image(systemName: "sportscourt.fill").font(.title2).foregroundStyle(.white)
+                            .frame(width: 52, height: 52)
+                            .background(LinearGradient(colors: [.blue, .teal], startPoint: .topLeading, endPoint: .bottomTrailing), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                            .accessibilityHidden(true)
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("La tua prossima partita").font(.title3.bold())
+                            Text("Trova il posto. Scegli il campo.").font(.footnote).foregroundStyle(.secondary)
+                        }
+                    }.padding(.vertical, 3)
+                }.listRowBackground(Color.clear).listRowSeparator(.hidden)
                 Section("Per i gestori") {
-                    Button { searchFocused = false; venueRegistration = true } label: { Label("Registra il tuo stabilimento", systemImage: "building.2.crop.circle").font(.subheadline.weight(.semibold)).padding(.vertical, 5) }
-                    Button { searchFocused = false; demo = true } label: { Label("Prova come gestore · 10 minuti", systemImage: "sparkles").font(.subheadline.weight(.medium)).padding(.vertical, 5) }
+                    Button { searchFocused = false; venueRegistration = true } label: {
+                        welcomeAction("Registra il tuo stabilimento", subtitle: "Campi, orari e utenti in pochi passi", icon: "building.2.crop.circle", color: .blue)
+                    }.buttonStyle(SoftPressStyle())
+                    Button { searchFocused = false; demo = true } label: {
+                        welcomeAction("Prova come gestore", subtitle: "10 minuti per scoprire come funziona", icon: "sparkles", color: .teal)
+                    }.buttonStyle(SoftPressStyle())
                 }
                 Section {
                     HStack(spacing: 10) {
-                        Image(systemName: "magnifyingglass").foregroundStyle(.blue)
+                        Image(systemName: "magnifyingglass").foregroundStyle(.teal).accessibilityHidden(true)
                         TextField("Cerca stabilimento o città", text: $query).focused($searchFocused).autocorrectionDisabled().submitLabel(.search)
                         if !query.isEmpty { Button { query = "" } label: { Image(systemName: "xmark.circle.fill").foregroundStyle(.secondary) }.accessibilityLabel("Cancella ricerca").buttonStyle(.plain) }
-                    }
-                    Button {
-                        searchFocused = false; nearbyOnly = true; showAll = false; query = ""; resultLimit = 20; nearby.locate()
-                    } label: { Label("Vicini a me", systemImage: "location") }
-                    Button {
-                        searchFocused = false; nearbyOnly = false; showAll.toggle(); query = ""; resultLimit = 20
-                    } label: { Label(showAll ? "Nascondi elenco" : "Mostra tutti gli stabilimenti", systemImage: "list.bullet") }
+                    }.padding(.vertical, 9)
+                    ViewThatFits(in: .horizontal) {
+                        HStack(spacing: 10) { nearbyButton; allVenuesButton }
+                        VStack(spacing: 10) { nearbyButton; allVenuesButton }
+                    }.padding(.vertical, 4)
                     if let status = nearby.status { Text(status).font(.caption).foregroundStyle(.secondary) }
                 } header: { Text("Dove vuoi giocare?") } footer: {
-                    Text("Scegli lo stabilimento, poi accedi con username e password.")
+                    Text("Scegli lo stabilimento e accedi con le tue credenziali.")
                 }
                 if showingResults {
                     Section(nearbyOnly ? "Stabilimenti con posizione disponibile" : "Stabilimenti") {
@@ -78,7 +92,7 @@ struct WelcomeView: View {
                                     Image(systemName: "mappin.and.ellipse").font(.title3).foregroundStyle(.blue).frame(width: 36, height: 36).background(.blue.opacity(0.08), in: RoundedRectangle(cornerRadius: 12))
                                     VStack(alignment: .leading) { Text(venue.name).font(.headline).foregroundStyle(.primary); if let city = venue.city, !city.isEmpty { Text(city).font(.caption).foregroundStyle(.secondary) } }
                                     Spacer(); if nearbyOnly, let distance = nearby.distance(venue) { Text(String(format: "%.1f km", distance)).font(.caption).foregroundStyle(.secondary) }; Image(systemName: "chevron.right").font(.caption).foregroundStyle(.secondary)
-                                }.padding(.vertical, 3)
+                                }.padding(.vertical, 8)
                             }.buttonStyle(SoftPressStyle()).disabled(store.busy)
                         }
                         if filtered.count > resultLimit { Button("Mostra altri stabilimenti") { resultLimit += 20 } }
@@ -94,6 +108,35 @@ struct WelcomeView: View {
             .sheet(isPresented: $venueRegistration) { VenueRegistrationWizard() }
         }
     }
+    private func welcomeAction(_ title: String, subtitle: String, icon: String, color: Color) -> some View {
+        HStack(spacing: 12) {
+            Image(systemName: icon).font(.title3).foregroundStyle(color)
+                .frame(width: 42, height: 42).background(color.opacity(0.10), in: RoundedRectangle(cornerRadius: 15, style: .continuous)).accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title).font(.subheadline.weight(.semibold)).foregroundStyle(.primary)
+                Text(subtitle).font(.caption).foregroundStyle(.secondary)
+            }
+            Spacer(minLength: 4)
+            Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(color).accessibilityHidden(true)
+        }.padding(.vertical, 4)
+    }
+    private var nearbyButton: some View {
+        Button {
+            searchFocused = false; nearbyOnly = true; showAll = false; query = ""; resultLimit = 20; nearby.locate()
+        } label: {
+            Label("Vicini a me", systemImage: "location.fill").font(.subheadline.weight(.semibold)).padding(.horizontal, 14).padding(.vertical, 12)
+                .foregroundStyle(.white).background(LinearGradient(colors: [.blue, .teal], startPoint: .leading, endPoint: .trailing), in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+        }.buttonStyle(SoftPressStyle())
+    }
+    private var allVenuesButton: some View {
+        Button {
+            searchFocused = false; nearbyOnly = false; showAll.toggle(); query = ""; resultLimit = 20
+        } label: {
+            Label(showAll ? "Nascondi elenco" : "Mostra tutti", systemImage: "list.bullet").font(.subheadline.weight(.semibold)).padding(.horizontal, 14).padding(.vertical, 12)
+                .foregroundStyle(.blue).background(.blue.opacity(0.08), in: RoundedRectangle(cornerRadius: 15, style: .continuous))
+        }.buttonStyle(SoftPressStyle()).accessibilityLabel(showAll ? "Nascondi elenco" : "Mostra tutti gli stabilimenti")
+    }
+
 }
 struct GalleryView: View {
     let photos: [Photo]
