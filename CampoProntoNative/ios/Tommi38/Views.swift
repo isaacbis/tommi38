@@ -375,7 +375,6 @@ struct BookingRow: View {
 }
 struct BookingView: View {
     @EnvironmentObject var store: BeachStore
-    @State private var step = 0
     @State private var field = ""
     @State private var choice: String?
     @State private var occupied: Booking?
@@ -386,44 +385,21 @@ struct BookingView: View {
     var body: some View {
         List {
             Section {
-                HStack {
-                    Text("Passo \(step + 1) di 3").font(.subheadline.bold())
-                    Spacer()
-                    if store.member?.isManager != true { Label("\(store.member?.credits ?? 0) crediti", systemImage: "circle.hexagongrid").font(.caption).foregroundStyle(.blue) }
+                DatePicker("Giorno", selection: $store.selectedDay, in: Date()..., displayedComponents: .date)
+                Picker("Campo", selection: Binding(get: { activeField }, set: { field = $0 })) { ForEach(store.config.fields) { Text($0.name).tag($0.id) } }.pickerStyle(.menu)
+                if store.member?.isManager == true {
+                    Picker("Prenota per", selection: $bookingUser) { Text("Scegli un utente").tag(""); ForEach(store.users.filter { $0.role == "user" && $0.disabled != true && $0.pendingApproval != true }) { user in Text(user.username).tag(user.username) } }
+                    Text("La prenotazione viene intestata all’utente scelto. Non vengono assegnati nuovi crediti.").font(.caption).foregroundStyle(.secondary)
                 }
-                ProgressView(value: Double(step + 1), total: 3)
             }
-            if step == 0 {
-                Section("1 · Quale campo?") {
-                    Picker("Campo", selection: Binding(get: { activeField }, set: { field = $0 })) { ForEach(store.config.fields) { Text($0.name).tag($0.id) } }.pickerStyle(.menu)
-                    Text("Una prenotazione dura \(store.config.slotMinutes) minuti e usa 1 credito.").font(.caption).foregroundStyle(.secondary)
-                    Button("Scegli il giorno →") { step = 1 }.disabled(store.config.fields.isEmpty)
-                }
-            } else if step == 1 {
-                Section("2 · Quando vuoi giocare?") {
-                    Text(store.config.fields.first { $0.id == activeField }?.name ?? "Campo").font(.headline)
-                    DatePicker("Giorno", selection: $store.selectedDay, in: Date()..., displayedComponents: .date)
-                    Button("Mostra gli orari →") { step = 2 }
-                    Button("Cambia campo") { step = 0 }
-                }
-            } else {
-                Section("3 · Scegli un orario") {
-                    Text("\(store.config.fields.first { $0.id == activeField }?.name ?? "Campo") · \(Clock.day(store.selectedDay))").font(.headline)
-                    Button("Cambia campo o giorno") { choice = nil; occupied = nil; step = 0 }
-                    if store.member?.isManager == true {
-                        Picker("Prenota per", selection: $bookingUser) { Text("Scegli un utente").tag(""); ForEach(store.users.filter { $0.role == "user" && $0.disabled != true && $0.pendingApproval != true }) { user in Text(user.username).tag(user.username) } }
-                        Text("Il credito viene usato dall’utente scelto.").font(.caption).foregroundStyle(.secondary)
-                    }
-                }
             Section {
                 if store.dayLoading { HStack { ProgressView(); Text("Aggiorno gli orari…").font(.caption).foregroundStyle(.secondary) } }
             }
-            Section("Orari disponibili") {
-                if Clock.slots(store.config).allSatisfy({ (Clock.date(day: Clock.day(store.selectedDay), time: $0) ?? .distantPast) <= Date() }) { Text("Non ci sono più orari per questo giorno. Scegli un’altra data.").font(.subheadline).foregroundStyle(.secondary) }
+            Section("Scegli l’orario") {
                 if store.config.fields.isEmpty { ContentUnavailableView("Nessun campo disponibile", systemImage: "sportscourt", description: Text("Il gestore deve configurare i campi.")) }
                 else {
                     LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 6), count: typeSize.isAccessibilitySize ? 2 : 4), spacing: 8) {
-                        ForEach(Clock.slots(store.config).filter { (Clock.date(day: Clock.day(store.selectedDay), time: $0) ?? .distantPast) > Date() }, id: \.self) { time in
+                        ForEach(Clock.slots(store.config), id: \.self) { time in
                             let booked = store.bookings.first { $0.overlaps(day: Clock.day(store.selectedDay), field: activeField, time: time, duration: store.config.slotMinutes, fallbackDuration: store.config.slotMinutes) }
                             let closed = store.closures.contains { $0.fieldId == activeField && $0.contains(Clock.day(store.selectedDay), time, duration: store.config.slotMinutes) }
                             let past = (Clock.date(day: Clock.day(store.selectedDay), time: time) ?? .distantPast) <= Date()
@@ -437,8 +413,7 @@ struct BookingView: View {
                 }
             }
             Section { Label("\(store.config.slotMinutes) minuti · 1 credito", systemImage: "clock").font(.caption); Text("Gli orari si riferiscono al fuso orario italiano.").font(.caption).foregroundStyle(.secondary) }
-            }
-        }.campoSurface()
+        }
         .task { if store.member?.isManager == true { await store.perform { try await store.loadUsers() } } }
         .task(id: Clock.day(store.selectedDay)) {
             do {
@@ -453,7 +428,7 @@ struct BookingView: View {
         .alert("Conferma prenotazione", isPresented: Binding(get: { choice != nil }, set: { if !$0 { choice = nil } })) {
             Button("Annulla", role: .cancel) { choice = nil }
             Button(store.member?.isManager == true ? "Conferma per utente" : "Prenota · 1 credito") { let time = choice ?? ""; choice = nil; Task { await store.perform { if store.member?.isManager == true { try await store.mutate("admin/reservations", body: ["username": bookingUser, "fieldId": activeField, "date": Clock.day(store.selectedDay), "time": time]) } else { try await store.mutate("reservations", body: ["fieldId": activeField, "date": Clock.day(store.selectedDay), "time": time]) }; try await store.refresh(); store.message = "Prenotazione confermata." } } }
-        } message: { Text("\(store.config.fields.first { $0.id == activeField }?.name ?? "Campo") · \(Clock.day(store.selectedDay)) alle \(choice ?? ""). Durata: \(store.config.slotMinutes) minuti. Costo: 1 credito.\(store.member?.isManager == true ? " Utente: " + bookingUser : "")") }
+        } message: { Text("\(store.config.fields.first { $0.id == activeField }?.name ?? "Campo") · \(Clock.day(store.selectedDay)) alle \(choice ?? "")") }
         .alert("Orario occupato", isPresented: Binding(get: { occupied != nil }, set: { if !$0 { occupied = nil } })) {
             Button("Chiudi", role: .cancel) { occupied = nil }
             if store.member?.managementMode != true && occupied?.user != store.member?.username { Button("Entra in lista d’attesa") { let id = occupied?.id ?? ""; occupied = nil; Task { await store.perform { try await store.mutate("waitlist", body: ["reservationId": id]); store.message = "Sei in lista d’attesa. Puoi controllare la disponibilità nella sezione Giocatori." } } } }
