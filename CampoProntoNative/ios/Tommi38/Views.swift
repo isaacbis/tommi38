@@ -355,7 +355,16 @@ struct MainView: View {
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
     @State private var account = false
     @State private var adChecked = false
+    @State private var bannerReady = false
+    @State private var enteringWithAd = false
     var body: some View {
+        VStack(spacing: 0) {
+            if bannerReady, store.member?.demo != true, store.member?.isManager != true {
+                VStack(spacing: 2) {
+                    Text("Pubblicità").font(.system(size: 10)).foregroundStyle(.secondary)
+                    ClientBannerView().frame(width: 320, height: 50)
+                }.frame(maxWidth: .infinity).padding(.vertical, 4).background(.background)
+            }
         TabView {
             shell { HomeView() }.tabItem { Label("Home", systemImage: "house.fill") }
             if store.member?.isManager == true {
@@ -369,10 +378,28 @@ struct MainView: View {
                 shell { CreditsView() }.tabItem { Label("Crediti", systemImage: "play.circle") }
                 shell { CommunityView() }.tabItem { Label("Giocatori", systemImage: "person.2") }
             }
+        }
         }.tint(.blue).animation(reduceMotion ? nil : .easeInOut(duration: 0.2), value: store.member?.role).sheet(isPresented: $account) { AccountView() }
+        .overlay {
+            if enteringWithAd {
+                ZStack { Color(.systemBackground).ignoresSafeArea(); ProgressView("Entro nello stabilimento…") }
+            }
+        }
         .task {
-            guard !adChecked, store.shouldShowLoginAd, store.member?.demo != true, store.member?.isManager != true else { return }; adChecked = true; store.shouldShowLoginAd = false
-            do { let status: AdsStatus = try await store.request("ads/status"); if status.available { try await NativeAds.shared.showLoginAd() } } catch { /* Advertising must never prevent access. */ }
+            guard !adChecked, store.member?.demo != true, store.member?.isManager != true else { return }
+            adChecked = true
+            let showLoginAd = store.shouldShowLoginAd
+            store.shouldShowLoginAd = false
+            enteringWithAd = showLoginAd
+            defer { enteringWithAd = false }
+            do {
+                let status: AdsStatus = try await store.request("ads/status")
+                guard status.available else { return }
+                if showLoginAd { try? await NativeAds.shared.showLoginAd() }
+                try Task.checkCancellation()
+                try await NativeAds.shared.prepareBanner()
+                bannerReady = true
+            } catch { /* Advertising must never prevent access. */ }
         }
     }
     func shell<Content: View>(@ViewBuilder content: () -> Content) -> some View {
