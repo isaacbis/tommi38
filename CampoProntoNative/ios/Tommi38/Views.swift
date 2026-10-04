@@ -24,9 +24,51 @@ struct RootView: View {
         }
     }
 }
+struct EntryAreaView: View {
+    let choose: (String) -> Void
+    var body: some View {
+        NavigationStack {
+            ScrollView {
+                VStack(spacing: 24) {
+                    VStack(spacing: 12) {
+                        Image(systemName: "sportscourt.fill").font(.system(size: 38, weight: .semibold)).foregroundStyle(.white)
+                            .frame(width: 88, height: 88)
+                            .background(LinearGradient(colors: [.blue, .teal], startPoint: .topLeading, endPoint: .bottomTrailing), in: RoundedRectangle(cornerRadius: 28, style: .continuous))
+                            .accessibilityHidden(true)
+                        Text("CampoPronto ADS").font(.title2.bold())
+                        Text("Come vuoi entrare?").font(.title3.weight(.semibold))
+                        Text("Scegli la tua area per iniziare.").font(.subheadline).foregroundStyle(.secondary)
+                    }.padding(.top, 24).padding(.bottom, 8)
+                    areaButton("Sono un cliente", subtitle: "Trova il tuo stabilimento e prenota un campo.", icon: "figure.tennis", color: .blue, area: "client")
+                    areaButton("Sono un gestore", subtitle: "Gestisci il tuo stabilimento, registralo o prova l’app.", icon: "building.2.fill", color: .teal, area: "manager")
+                    Text("Puoi cambiare area in qualsiasi momento prima di accedere.").font(.footnote).foregroundStyle(.secondary).multilineTextAlignment(.center)
+                    Link("Assistenza e privacy", destination: URL(string: "https://ombrelloni-ddb55.web.app/privacy.html")!).font(.footnote)
+                }.padding(24).frame(maxWidth: 560).frame(maxWidth: .infinity)
+            }.campoSurface().navigationBarTitleDisplayMode(.inline)
+        }
+    }
+    private func areaButton(_ title: String, subtitle: String, icon: String, color: Color, area: String) -> some View {
+        Button { choose(area) } label: {
+            HStack(spacing: 15) {
+                Image(systemName: icon).font(.title2).foregroundStyle(color).frame(width: 52, height: 52)
+                    .background(color.opacity(0.10), in: RoundedRectangle(cornerRadius: 18)).accessibilityHidden(true)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(title).font(.headline).foregroundStyle(.primary)
+                    Text(subtitle).font(.subheadline).foregroundStyle(.secondary).fixedSize(horizontal: false, vertical: true)
+                }
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right").font(.footnote.weight(.semibold)).foregroundStyle(color).accessibilityHidden(true)
+            }.padding(20).frame(maxWidth: .infinity, alignment: .leading)
+                .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 26, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 26).stroke(color.opacity(0.15), lineWidth: 1))
+                .shadow(color: color.opacity(0.06), radius: 12, y: 5)
+        }.buttonStyle(SoftPressStyle())
+    }
+}
 struct WelcomeView: View {
     @EnvironmentObject var store: BeachStore
     @AppStorage("lastRealVenue") private var lastVenueID = ""
+    @AppStorage("entryArea") private var entryArea = ""
     @State private var query = ""
     @StateObject private var nearby = NearbyVenues()
     @State private var demo = false
@@ -46,6 +88,10 @@ struct WelcomeView: View {
         }
     }
     var body: some View {
+        Group {
+            if entryArea.isEmpty {
+                EntryAreaView { entryArea = $0 }
+            } else {
         NavigationStack {
             List {
                 Section {
@@ -55,8 +101,8 @@ struct WelcomeView: View {
                             .background(LinearGradient(colors: [.blue, .teal], startPoint: .topLeading, endPoint: .bottomTrailing), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
                             .accessibilityHidden(true)
                         VStack(alignment: .leading, spacing: 3) {
-                            Text("La tua prossima partita").font(.title3.bold())
-                            Text("Trova il posto. Scegli il campo.").font(.footnote).foregroundStyle(.secondary)
+                            Text(entryArea == "manager" ? "Il tuo stabilimento" : "La tua prossima partita").font(.title3.bold())
+                            Text(entryArea == "manager" ? "Accedi, registrati o fai una prova." : "Trova il posto. Scegli il campo.").font(.footnote).foregroundStyle(.secondary)
                         }
                     }.padding(.vertical, 3)
                 }.listRowBackground(Color.clear).listRowSeparator(.hidden)
@@ -67,6 +113,7 @@ struct WelcomeView: View {
                         }.buttonStyle(SoftPressStyle()).disabled(store.busy)
                     }
                 }
+                if entryArea == "manager" {
                 Section("Per i gestori") {
                     Button { searchFocused = false; venueRegistration = true } label: {
                         welcomeAction("Registra il tuo stabilimento", subtitle: "Campi, orari e utenti in pochi passi", icon: "building.2.crop.circle", color: .blue)
@@ -74,6 +121,7 @@ struct WelcomeView: View {
                     Button { searchFocused = false; demo = true } label: {
                         welcomeAction("Prova come gestore", subtitle: "10 minuti per scoprire come funziona", icon: "sparkles", color: .teal)
                     }.buttonStyle(SoftPressStyle())
+                }
                 }
                 Section {
                     HStack(spacing: 10) {
@@ -86,7 +134,7 @@ struct WelcomeView: View {
                         VStack(spacing: 10) { nearbyButton; allVenuesButton }
                     }.padding(.vertical, 4)
                     if let status = nearby.status { Text(status).font(.caption).foregroundStyle(.secondary) }
-                } header: { Text("Dove vuoi giocare?") } footer: {
+                } header: { Text(entryArea == "manager" ? "Accedi al tuo stabilimento" : "Dove vuoi giocare?") } footer: {
                     Text("Scegli lo stabilimento e accedi con le tue credenziali.")
                 }
                 if showingResults {
@@ -107,13 +155,16 @@ struct WelcomeView: View {
                     }
                 }
             }
-            .campoSurface().navigationTitle("CampoPronto ADS").navigationBarTitleDisplayMode(.inline)
+            .campoSurface().navigationTitle(entryArea == "manager" ? "Area gestore" : "Area cliente").navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .topBarLeading) { Button("Cambia area") { query = ""; showAll = false; nearbyOnly = false; searchFocused = false; entryArea = "" } } }
             .scrollDismissesKeyboard(.interactively)
             .onChange(of: query) { _, _ in resultLimit = 20; if !searchTerm.isEmpty { nearbyOnly = false } }
             .refreshable { await store.bootstrap() }
             .listSectionSpacing(.compact)
             .sheet(isPresented: $demo) { DemoWizard() }
             .sheet(isPresented: $venueRegistration) { VenueRegistrationWizard() }
+        }
+            }
         }
     }
     private func welcomeAction(_ title: String, subtitle: String, icon: String, color: Color) -> some View {
@@ -193,6 +244,7 @@ struct SoftPressStyle: ButtonStyle {
 }
 struct LoginView: View {
     @EnvironmentObject var store: BeachStore
+    @AppStorage("entryArea") private var entryArea = ""
     @State private var username = ""
     @State private var password = ""
     @State private var register = false
@@ -212,7 +264,7 @@ struct LoginView: View {
                     }.frame(maxWidth: .infinity).padding(.vertical, 8)
                     VStack(alignment: .leading, spacing: 14) {
                         Text("Bentornato").font(.title3.bold())
-                        Text("Accedi per scegliere il campo e prenotare.").font(.footnote).foregroundStyle(.secondary)
+                        Text(entryArea == "manager" ? "Accedi con le credenziali del tuo account gestore." : "Accedi per scegliere il campo e prenotare.").font(.footnote).foregroundStyle(.secondary)
                         HStack(spacing: 12) {
                             Image(systemName: "person").foregroundStyle(.teal).frame(width: 22)
                             TextField("Username", text: $username).textContentType(.username).textInputAutocapitalization(.never).autocorrectionDisabled()
@@ -231,7 +283,7 @@ struct LoginView: View {
                         .overlay(RoundedRectangle(cornerRadius: 24).stroke(.teal.opacity(0.10), lineWidth: 1))
                         .shadow(color: .black.opacity(0.04), radius: 12, y: 5)
                     VStack(spacing: 12) {
-                        Button { venueRegistration = true } label: { Label("Registra il tuo stabilimento", systemImage: "building.2.crop.circle") }
+                        if entryArea == "manager" { Button { venueRegistration = true } label: { Label("Registra il tuo stabilimento", systemImage: "building.2.crop.circle") } }
                         Button("Richiedi recupero password") { Task { await store.perform { try await store.mutate("auth/recovery-request", body: ["username": username.trimmingCharacters(in: .whitespacesAndNewlines)]); store.message = "Se l’account esiste, la richiesta è stata inviata al gestore. Contattalo per il recupero." } } }.disabled(store.busy || username.trimmingCharacters(in: .whitespacesAndNewlines).count < 3)
                         Link("Assistenza e privacy", destination: URL(string: "https://ombrelloni-ddb55.web.app/privacy.html")!).font(.caption)
                     }.font(.subheadline).padding(.vertical, 4)
