@@ -7,3 +7,5 @@ L'area scelta viene ricordata sul dispositivo; «Cambia area» torna alla scelta
 Verifiche: archivio Release firmato e build simulatore riusciti. Su iPhone 18 Pro controllati scelta iniziale, ricerca/elenco cliente, selezione stabilimento e login senza opzioni gestore, ritorno e cambio area, apertura della prova gestore. Nessuna prenotazione né stabilimento creati durante questi controlli. Sincronizzato il progetto Desktop.
 
 La build 51 resta quella inviata alla revisione App Store; questa build è destinata alla prova su TestFlight richiesta dall'utente.
+
+Confermata la persistenza dell'area gestore dopo il riavvio. Upload completato; verificata 2.1 (52) nel gruppo interno Campi di TestFlight con stato «Test in corso».
