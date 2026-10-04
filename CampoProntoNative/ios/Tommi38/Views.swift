@@ -366,7 +366,7 @@ struct MainView: View {
                     Text("Pubblicità").font(.system(size: 10)).foregroundStyle(.secondary)
                     ClientBannerView(state: banner, active: scenePhase == .active).frame(width: 320, height: 50)
                 }.frame(maxWidth: .infinity).padding(.vertical, 4).background(.background)
-                    .frame(height: banner.loaded ? nil : 0).clipped()
+                    .frame(height: banner.loaded ? 74 : 0).clipped()
                     .opacity(banner.loaded ? 1 : 0)
                     .accessibilityHidden(!banner.loaded)
             }

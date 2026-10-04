@@ -50,7 +50,7 @@ final class NativeAds: NSObject, FullScreenContentDelegate {
         if ConsentInformation.shared.privacyOptionsRequirementStatus == .required { try await ConsentForm.presentPrivacyOptionsForm(from: presenter) }
     }
     func showLoginAd() async throws {
-        guard !loading, continuation == nil, Date().timeIntervalSince(lastInterstitial) >= 1800 else { return }
+        guard !loading, continuation == nil, Date().timeIntervalSince(lastInterstitial) >= 120 else { return }
         loading = true; defer { loading = false }
         try await consent()
         let request = Request(); let extras = Extras(); extras.additionalParameters = ["npa": "1"]; request.register(extras)
