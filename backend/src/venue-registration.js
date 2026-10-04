@@ -11,7 +11,7 @@ export const venueRegistrationSchema = z.object({
   managerPassword:z.string().min(12).max(72).refine(value=>Buffer.byteLength(value,'utf8')<=72),
   fields:z.array(z.string().trim().min(1).max(80)).min(1).max(6),
   dayStart:time,dayEnd:time,slotMinutes:z.union([z.literal(15),z.literal(30),z.literal(40),z.literal(45),z.literal(60),z.literal(90)]),
-  userCount:z.number().int().min(1).max(100),userPrefix:z.string().regex(/^[A-Za-z][A-Za-z0-9_-]{0,19}$/)
+  userCount:z.number().int().min(1).max(1000),userPrefix:z.string().regex(/^[A-Za-z][A-Za-z0-9_-]{0,19}$/)
 }).strict().superRefine((value,ctx)=>{
   if(minute(value.dayEnd)-minute(value.dayStart)<value.slotMinutes)ctx.addIssue({code:'custom',message:'Invalid opening interval'});
   if(new Set(value.fields.map(f=>f.toLowerCase())).size!==value.fields.length)ctx.addIssue({code:'custom',message:'Duplicate court'});

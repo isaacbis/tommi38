@@ -735,7 +735,10 @@ struct VenueRegistrationWizard: View {
     @State private var manager = "gestore"
     @State private var password = ""
     @State private var prefix = "user"
-    @State private var count = 10
+    @State private var countText = "10"
+    @FocusState private var enteringCount: Bool
+    private var count: Int { Int(countText) ?? 0 }
+    private var validCount: Bool { (1...1000).contains(count) }
     @State private var step = 0
     @State private var requestID = UUID().uuidString
     @State private var result: VenueRegistrationResult?
@@ -744,7 +747,7 @@ struct VenueRegistrationWizard: View {
     @State private var submitting = false
     var validFields: Bool { setup.name.trimmingCharacters(in: .whitespacesAndNewlines).count >= 2 && !setup.fields.isEmpty && setup.fields.allSatisfy { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty } && Set(setup.fields.map { $0.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) }).count == setup.fields.count }
     var validHours: Bool { Clock.validTime(setup.dayStart) && Clock.validTime(setup.dayEnd) && Clock.minutes(setup.dayEnd)-Clock.minutes(setup.dayStart) >= setup.slotMinutes }
-    var validAccount: Bool { manager.range(of: "^[A-Za-z0-9][A-Za-z0-9._-]{2,39}$", options: .regularExpression) != nil && password.count >= 12 && password.utf8.count <= 72 && prefix.range(of: "^[A-Za-z][A-Za-z0-9_-]{0,19}$", options: .regularExpression) != nil && !(1...count).contains { prefix + String(format: "%03d", $0) == manager } }
+    var validAccount: Bool { validCount && manager.range(of: "^[A-Za-z0-9][A-Za-z0-9._-]{2,39}$", options: .regularExpression) != nil && password.count >= 12 && password.utf8.count <= 72 && prefix.range(of: "^[A-Za-z][A-Za-z0-9_-]{0,19}$", options: .regularExpression) != nil && !(1...count).contains { prefix + String(format: "%03d", $0) == manager } }
     var canContinue: Bool { step == 0 ? validFields : step == 1 ? validHours : validAccount }
     var body: some View {
         NavigationStack {
@@ -789,9 +792,17 @@ struct VenueRegistrationWizard: View {
                             SecureField("Password gestore · almeno 12 caratteri", text: $password).textContentType(.newPassword)
                         }
                         Section("Quanti utenti vuoi creare?") {
-                            Stepper("\(count) utenti", value: $count, in: 1...100)
+                            HStack {
+                                Text("Numero clienti")
+                                Spacer()
+                                TextField("1–1000", text: $countText)
+                                    .keyboardType(.numberPad).focused($enteringCount).multilineTextAlignment(.trailing)
+                                    .frame(width: 100).accessibilityLabel("Numero clienti, da 1 a 1000")
+                            }
+                            Text("Scrivi il numero desiderato, da 1 a 1.000.").font(.footnote).foregroundStyle(.secondary)
+                            if !validCount { Text("Inserisci un numero intero da 1 a 1.000.").font(.footnote).foregroundStyle(.red) }
                             TextField("Prefisso utenti", text: $prefix).textInputAutocapitalization(.never).autocorrectionDisabled()
-                            Text("Da \(prefix)001 a \(prefix)\(String(format: "%03d", count)). Password casuali alfanumeriche di 6 caratteri, riportate nel PDF.").font(.footnote).foregroundStyle(.secondary)
+                            Text("Da \(prefix)001 a \(prefix)\(String(format: "%03d", max(1, count))). Password casuali alfanumeriche di 6 caratteri, riportate nel PDF.").font(.footnote).foregroundStyle(.secondary)
                             Text("Tutti partono con zero crediti. Un video premio verificato permette di ottenere un credito, secondo disponibilità e limiti giornalieri.").font(.footnote)
                         }
                         Section("Riepilogo") {
@@ -807,6 +818,7 @@ struct VenueRegistrationWizard: View {
                 }
             }.listSectionSpacing(.compact).campoSurface().navigationTitle("Registra stabilimento").navigationBarTitleDisplayMode(.inline)
                 .toolbar { if result == nil { Button("Chiudi") { dismiss() }.disabled(submitting) } }
+                .toolbar { ToolbarItemGroup(placement: .keyboard) { Spacer(); Button("Fine") { enteringCount = false } } }
                 .interactiveDismissDisabled(submitting || result != nil)
                 .onAppear {
                     #if DEBUG

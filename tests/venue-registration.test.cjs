@@ -19,7 +19,7 @@ test('self registration creates public active venue, scoped manager and numbered
  await assert.rejects(e.create(input),/REGISTRATION_ALREADY_CREATED/);
 });
 test('self registration cannot inject credits, global roles or invalid settings',async()=>{
- for(const change of [{credits:99},{platformAdmin:true},{enabled:true},{userCount:101},{userCount:0},{managerPassword:'abcdef'},{fields:['Volley','volley']},{dayEnd:'08:00'},{dayStart:'29:00'},{managerUsername:'user001'},{userPrefix:'../'}]){
+ for(const change of [{credits:99},{platformAdmin:true},{enabled:true},{userCount:1001},{userCount:0},{managerPassword:'abcdef'},{fields:['Volley','volley']},{dayEnd:'08:00'},{dayStart:'29:00'},{managerUsername:'user001'},{userPrefix:'../'}]){
   const e=setup();await assert.rejects(e.create({...input,...change}));assert.equal(e.data.size,0);
  }
 });
@@ -47,4 +47,14 @@ test('registration HTTP flow accepts six-character user login and preserves venu
  assert.equal((await call('/admin/users/credits','PUT',{username:credential.username,delta:5},id)).status,403);
  assert.equal((await call('/platform/establishments','GET',undefined,id)).status,403);
  assert.equal((await call('/public/config','GET',undefined,id)).data.fields.length,2);
+});
+
+test('registration accepts 997, 998 and 1000 numbered clients, all with zero credits',async()=>{
+ for(const userCount of [997,998,1000]) {
+  const e=setup();const result=await e.create({...input,userCount});
+  assert.equal(result.credentials.length,userCount);
+  assert.equal(result.credentials.at(-1).username,'user'+userCount);
+  assert.equal(e.data.size,userCount+4);
+  for(const c of result.credentials)assert.equal(e.data.get('establishments/'+result.establishmentId+'/users/'+c.username).credits,0);
+ }
 });

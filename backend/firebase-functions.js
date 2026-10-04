@@ -5,7 +5,7 @@ import { createApp } from "./server.js";
 const sessionSecret = defineSecret("CAMPOPRONTO_SESSION_SECRET");
 let app;
 export const campoprontoApi = onRequest({
-  region: "europe-west1", secrets: [sessionSecret], timeoutSeconds: 60,
+  region: "europe-west1", secrets: [sessionSecret], timeoutSeconds: 300,
   minInstances: 0, maxInstances: 2, concurrency: 20, memory: "512MiB",
   invoker: "public"
 }, (req, res) => {

@@ -31,7 +31,7 @@ final class BeachStore: ObservableObject {
     init() {
         let c = URLSessionConfiguration.ephemeral
         c.timeoutIntervalForRequest = 90
-        c.timeoutIntervalForResource = 120
+        c.timeoutIntervalForResource = 360
         c.httpCookieStorage = HTTPCookieStorage.shared
         c.requestCachePolicy = .reloadIgnoringLocalCacheData
         session = URLSession(configuration: c)
@@ -44,6 +44,11 @@ final class BeachStore: ObservableObject {
     func request<T: Decodable>(_ path: String, method: String = "GET", body: [String: Any]? = nil) async throws -> T {
         let expected = generation
         var req = URLRequest(url: base.appendingPathComponent(path.components(separatedBy: "?")[0]))
+        // Large registrations bypass Hosting's short proxy timeout; still use the same Firebase API.
+        if path == "venue-registration" {
+            req.url = URL(string: "https://europe-west1-ombrelloni-ddb55.cloudfunctions.net/campoprontoApi/api/venue-registration")!
+            req.timeoutInterval = 300
+        }
         if let query = path.components(separatedBy: "?").dropFirst().first { var u = URLComponents(url: req.url!, resolvingAgainstBaseURL: false)!; u.percentEncodedQuery = query; req.url = u.url }
         req.httpMethod = method
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
