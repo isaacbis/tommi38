@@ -93,6 +93,7 @@ final class BeachStore: ObservableObject {
             self.shouldShowLoginAd = true
             self.member = try await self.request("me")
             UserDefaults.standard.set(self.selected?.id, forKey: "venue")
+            if self.member?.demo != true { UserDefaults.standard.set(self.selected?.id, forKey: "lastRealVenue") }
             try await self.refresh()
         }
     }
