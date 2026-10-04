@@ -9,3 +9,5 @@ Verifiche: banner Google di test ricevuto sul simulatore iPhone 18 Pro Max con a
 Screenshot nel workspace: artifacts/campopronto-native-2.1-build56/admob-banner-creato.png e banner-home-iphone.png. L'erogazione reale dipende da consenso, disponibilità e AdMob; gli annunci di test non generano guadagni.
 
 Upload TestFlight tentato: Apple lookupGenericSettingsForSubmission restituisce HTTP 434 e impedisce l'export. Aperta la finestra di accesso Apple in Xcode; richiesta all'utente autenticazione e verifica, senza condividere password/codici in chat. Build 56 non ancora caricata. Archivio pronto: /tmp/CampoProntoADS-native-2.1-build56.xcarchive.
+
+Distribuzione completata dopo accesso Apple dell'utente: export/upload riuscito. App Store Connect verificato: build 2.1 (56), gruppo Campi, stato «Test in corso», caricata il 4 ottobre 2026 alle 23:49. Screenshot testflight-build56.png nel percorso degli altri artefatti. Disponibile su TestFlight; submission App Store precedente invariata.
