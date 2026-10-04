@@ -610,16 +610,63 @@ struct WeatherForecast: Decodable {
 struct WeatherSummaryView: View {
     @EnvironmentObject var store: BeachStore
     @State private var forecast: WeatherForecast?
+    @State private var loading = true
+    private func weather(_ code: Int) -> (symbol: String, label: String) {
+        switch code {
+        case 0: return ("sun.max.fill", "Sereno")
+        case 1, 2: return ("cloud.sun.fill", "Poco nuvoloso")
+        case 3: return ("cloud.fill", "Nuvoloso")
+        case 45, 48: return ("cloud.fog.fill", "Nebbia")
+        case 51...57: return ("cloud.drizzle.fill", "Pioviggine")
+        case 61...67, 80...82: return ("cloud.rain.fill", "Pioggia")
+        case 71...77, 85, 86: return ("cloud.snow.fill", "Neve")
+        case 95...99: return ("cloud.bolt.rain.fill", "Temporale")
+        default: return ("cloud.fill", "Meteo")
+        }
+    }
+    private func dayLabel(_ day: String, index: Int) -> String {
+        if index == 0 { return "Oggi" }
+        if index == 1 { return "Domani" }
+        let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "it_IT")
+        formatter.timeZone = TimeZone(identifier: "Europe/Rome")
+        formatter.dateFormat = "yyyy-MM-dd"
+        guard let date = formatter.date(from: day) else { return day }
+        formatter.dateFormat = "EEE"
+        return formatter.string(from: date).capitalized
+    }
     var body: some View {
-        DisclosureGroup("Meteo · area Tommi38") {
+        VStack(alignment: .leading, spacing: 10) {
+            Label("Meteo · area Tommi38", systemImage: "sun.max").font(.subheadline.weight(.semibold))
             if let daily = forecast?.daily {
-                ForEach(Array(daily.time.prefix(3).enumerated()), id: \.offset) { index, day in
-                    if index < daily.temperature_2m_max.count && index < daily.temperature_2m_min.count {
-                        HStack { Text(day); Spacer(); Text("\(Int(daily.temperature_2m_max[index].rounded()))° / \(Int(daily.temperature_2m_min[index].rounded()))°").monospacedDigit() }.font(.caption)
+                let count = min(3, daily.time.count, daily.weathercode.count, daily.temperature_2m_max.count, daily.temperature_2m_min.count)
+                HStack(alignment: .top, spacing: 8) {
+                    ForEach(0..<count, id: \.self) { index in
+                        let condition = weather(daily.weathercode[index])
+                        VStack(spacing: 6) {
+                            Text(dayLabel(daily.time[index], index: index)).font(.caption.weight(.semibold))
+                            Image(systemName: condition.symbol).symbolRenderingMode(.multicolor).font(.title2).frame(height: 30)
+                            Text("\(Int(daily.temperature_2m_max[index].rounded()))° / \(Int(daily.temperature_2m_min[index].rounded()))°").font(.caption.weight(.medium)).monospacedDigit()
+                        }
+                        .frame(maxWidth: .infinity).padding(.vertical, 10)
+                        .background(.teal.opacity(0.06), in: RoundedRectangle(cornerRadius: 14))
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel("\(dayLabel(daily.time[index], index: index)), \(condition.label), massima \(Int(daily.temperature_2m_max[index].rounded())) gradi, minima \(Int(daily.temperature_2m_min[index].rounded())) gradi")
                     }
                 }
-            } else { Text("Previsioni non disponibili al momento").font(.caption).foregroundStyle(.secondary) }
-        }.task { forecast = try? await store.request("weather") }
+                if count == 0 { Text("Previsioni non disponibili").font(.caption).foregroundStyle(.secondary) }
+            } else if loading {
+                ProgressView("Carico il meteo…").font(.caption)
+            } else {
+                Text("Previsioni non disponibili al momento").font(.caption).foregroundStyle(.secondary)
+                Button("Riprova") { Task { await load() } }.font(.caption)
+            }
+        }.task { await load() }
+    }
+    private func load() async {
+        loading = true
+        defer { loading = false }
+        forecast = try? await store.request("weather")
     }
 }
 
