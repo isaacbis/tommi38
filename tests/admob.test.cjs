@@ -66,3 +66,15 @@ test('legacy progress remains eligible and legacy earned rewards cannot be grant
  assert.equal((await user.get()).data().credits,4);
  assert.equal((await service.status('tommi38','alice')).earned,true);
 });
+
+test('Android verified video shares the iOS daily limit and rejects other units',async()=>{
+ const {createRewardStore,ANDROID_REWARDED_UNIT}=await import('../backend/src/admob-rewards.js');
+ const {db}=createMemoryFirestore(); const now=Date.parse('2026-10-05T12:00:00Z');
+ const service=createRewardStore(db,()=>now); const user=db.collection('users').doc('android-client'); await user.set({credits:0});
+ const token=await service.start('tommi38','android-client');
+ const event={ad_unit:ANDROID_REWARDED_UNIT,reward_amount:'1',custom_data:token,transaction_id:'android-video',timestamp:String(now)};
+ await assert.rejects(service.fulfill({...event,ad_unit:'123'}),/INVALID_REWARD/);
+ await service.fulfill(event); await service.fulfill(event);
+ assert.equal((await user.get()).data().credits,1);
+ await assert.rejects(service.start('tommi38','android-client'),/DAILY_REWARD_LIMIT/);
+});

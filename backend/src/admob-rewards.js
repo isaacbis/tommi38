@@ -1,4 +1,5 @@
 import { createHash, randomBytes } from 'node:crypto';
+export const ANDROID_REWARDED_UNIT = 'ca-app-pub-5793073160443124/8867814571';
 export const REWARDED_UNIT = 'ca-app-pub-5793073160443124/7248847275';
 export const INTERSTITIAL_UNIT = 'ca-app-pub-5793073160443124/2680912264';
 const hasEarned = progress => progress?.earned === true || Number(progress?.videos || 0) >= 2;
@@ -42,7 +43,7 @@ export function createRewardStore(root, now = () => Date.now()) {
     });
   }
   async function fulfill(event) {
-    if (![REWARDED_UNIT,REWARDED_UNIT.split('/')[1]].includes(event.ad_unit) || event.reward_amount!=='1' || !/^[a-f0-9]{64}$/.test(event.custom_data || '')) throw Error('INVALID_REWARD');
+    if (![REWARDED_UNIT,ANDROID_REWARDED_UNIT,REWARDED_UNIT.split('/')[1],ANDROID_REWARDED_UNIT.split('/')[1]].includes(event.ad_unit) || event.reward_amount!=='1' || !/^[a-f0-9]{64}$/.test(event.custom_data || '')) throw Error('INVALID_REWARD');
     const ref=root.collection('admobAttempts').doc(hash(event.custom_data));
     const eventRef=root.collection('admobTransactions').doc(hash(event.transaction_id));
     return root.runTransaction(async tx=>{
