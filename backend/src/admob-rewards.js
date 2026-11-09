@@ -12,7 +12,7 @@ export function createRewardStore(root, now = () => Date.now()) {
     const snap = await daily(venue,user,rewardDay(now())).get();
     const videos = Math.min(2,Number(snap.data()?.videos || 0));
     const earned = hasEarned(snap.data());
-    return {videos,remainingVideos:earned?0:1,earned};
+    return {videos,remainingVideos:earned?0:Math.max(0,2-videos),earned};
   };
   async function start(venue,user) {
     if (venue.startsWith('demo-')) throw Error('DEMO_UNSUPPORTED');
@@ -60,14 +60,15 @@ export function createRewardStore(root, now = () => Date.now()) {
       const venue=await tx.get(root.collection('establishments').doc(a.venue));
       if(!account.exists || account.data().disabled || account.data().deletionPending || Number(account.data().sessionVersion||0)!==a.sessionVersion || (venue.exists && venue.data().enabled===false))return {ignored:true};
       const videos=Math.min(2,Number(progress.data()?.videos||0)+1);
-      const grant=!hasEarned(progress.data());
+      const grant=!hasEarned(progress.data()) && videos>=2;
+      const earned=hasEarned(progress.data()) || videos>=2;
       tx.set(eventRef,{attempt:ref.id,at:now()});
       tx.update(ref,{used:true});
-      tx.set(dayRef,{ownerKey:a.venue+":"+a.user,videos,earned:true,pendingUntil:0,attempt:null});
+      tx.set(dayRef,{ownerKey:a.venue+":"+a.user,videos,earned,pendingUntil:0,attempt:null});
       if(grant){
         tx.update(userRef,{credits:Number(account.data().credits||0)+1});
         const ledger=a.venue==='tommi38'?root.collection('creditLedger'):root.collection('establishments').doc(a.venue).collection('creditLedger');
-        tx.set(ledger.doc('admob-'+dayRef.id),{user:a.user,delta:1,reason:'Premio: 1 video verificato',createdAt:new Date(now())});
+        tx.set(ledger.doc('admob-'+dayRef.id),{user:a.user,delta:1,reason:'Premio: 2 video verificati',createdAt:new Date(now())});
       }
       return {granted:grant,videos};
     });

@@ -25,8 +25,11 @@ window.CampoAds = (() => {
     async function update(verified){
       try{
         data=verified?.earned===true?verified:await api('/ads/status');if(!current())return;
-        status.textContent=data.earned?'Credito premio di oggi assegnato. Torna domani.':'Un video completato e verificato dà un credito personale, non trasferibile e non convertibile in denaro.';
-        watch.textContent='Guarda un video · +1 credito';
+        const watched=Math.min(2,Math.max(0,Number(data.videos||0)));
+        status.textContent=data.earned?'Credito premio di oggi assegnato. Torna domani.':
+          watched===1?'Primo video verificato (1/2). Completa il secondo per ricevere 1 credito.':
+          'Completa 2 video verificati per ricevere 1 credito personale, non trasferibile e non convertibile in denaro.';
+        watch.textContent=`Guarda video ${Math.min(watched+1,2)}/2`;
         watch.disabled=busy || data.earned || !data.available || !supported();
         if(!supported())status.textContent+=' I video sono disponibili nell’app iPhone aggiornata.';
         else if(!data.available)status.textContent+=' I video premio non sono ancora disponibili in questo ambiente.';
@@ -51,9 +54,9 @@ window.CampoAds = (() => {
           for(let i=0;i<30 && current();i++){
             if(i>0)await new Promise(resolve=>setTimeout(resolve,i<10?1000:2500));
             const next=await api('/ads/status');
-            if(next.earned){await update(next);if(typeof refreshHome==='function')refreshHome();return;}
+            if(next.earned || Number(next.videos||0)>Number(data?.videos||0)){await update(next);if(next.earned && typeof refreshHome==='function')refreshHome();return;}
           }
-          if(current())status.textContent='Video completato: la verifica è ancora in corso. Premi Aggiorna premio tra poco; non serve riguardarlo.';
+          if(current())status.textContent='Video completato: la verifica è ancora in corso. Premi Aggiorna premio tra poco; non riguardare il video finché la verifica è in attesa.';
         } else {
           await api('/ads/cancel',{method:'POST',body:JSON.stringify({token})});
           status.textContent=result.status==='closed'?'Video chiuso prima del premio. Puoi riprovare.':'Nessun video disponibile ora. Riprova più tardi.';
@@ -67,7 +70,7 @@ window.CampoAds = (() => {
     if(!supported() || !STATE.me || STATE.me.demo || STATE.me.role==='admin')return;
     const venue=selectedEstablishment,user=STATE.me.username;
     try{
-      const data=verified?.earned===true?verified:await api('/ads/status');
+      const data=await api('/ads/status');
       if(!data.available || venue!==selectedEstablishment || user!==STATE.me?.username)return;
       // A dedicated transition before interacting with the venue; never on a booking confirmation.
       const cancel=()=>window.webkit.messageHandlers.campoprontoAds.postMessage({action:'cancel',id:'navigation'});
